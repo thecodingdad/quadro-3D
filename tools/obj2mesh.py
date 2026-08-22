@@ -128,12 +128,17 @@ FITTINGS = {
 # sowie 250x250 (16x), Tücher nur 350x750 (63x), 600x750 (11x), 590x750 (7x)
 # und 550x750 (1x). Die halbe Platte gibt es hier nur einmal -- 150x350 ist
 # dieselbe, um 90 Grad um ihre Normale gedreht; das macht die Szene.
-# Die Lochplatte hat kein Modell: die Software zeichnet ihre Löcher nicht,
-# unsere gezeichnete Fassung schon.
+# Die Lochplatte ist der einzige Nachbau -- Schlüssel ist dort die Katalog-
+# Kennung, nicht ein Maßpaar.
 SURFACES = {
     "panel2_350x350": "panel2_350x350.obj",
     "panel2_350x150": "panel2_350x150.obj",
     "panel2_250x250": "panel2_250x250.obj",
+    # Die Lochplatte ist ein NACHBAU (tools/make_hole_panel.py, Deckflaeche aus
+    # panel2_350x350 plus 3x3 Loechern): das Format kennt sie nicht. Sie
+    # ueberlebt Speichern und Laden ueber ein eigenes Material, siehe MATERIALS
+    # in qdfexport.js.
+    "hole_panel_40x40": "hole_panel_40x40.obj",
     "textil2_350x750": "textil2_350x750.obj",
     "textil2_550x750": "textil2_550x750.obj",
     "textil2_590x750": "textil2_590x750.obj",

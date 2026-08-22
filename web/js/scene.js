@@ -908,14 +908,15 @@ export class SceneManager {
    *
    * Der Schluessel ist das Masspaar in Millimetern, Feld 3 (lokale Y-Achse)
    * zuerst. Die halbe Platte liegt nur in EINER Drehung vor; kommt sie quer,
-   * wird das Kreuz um 90 Grad um die Normale gedreht.
+   * wird das Kreuz um 90 Grad um die Normale gedreht. Die Lochplatte steht
+   * unter ihrer Katalog-Kennung -- `art` ist dann schon der ganze Schluessel.
    */
   _surfaceMeshFor(art, xAxis, zAxis, spanX, spanZ, center, nrmArr, side) {
     const store = this._surfMeshes;
     if (!store) return null;
     const cs = geometry().connectorSize;
     const mm = (cm) => Math.round((cm - cs) * 10);
-    const key = `${art}_${mm(spanZ)}x${mm(spanX)}`;
+    const key = store[art] ? art : `${art}_${mm(spanZ)}x${mm(spanX)}`;
     const quer = `${art}_${mm(spanX)}x${mm(spanZ)}`;
     const rec = store[key] || store[quer];
     if (!rec) return null;
@@ -2986,11 +2987,11 @@ export class SceneManager {
         : this._panelMaterial(p.color, st === "current", false);
       // Abgegriffenes Originalteil, wenn es die Groesse gibt. Es bringt seinen
       // Versatz auf den Rohrscheitel selbst mit, also OHNE `lift` und mit der
-      // rohen Eckenmitte. Die Lochplatte hat keines -- die Software zeichnet
-      // ihre Loecher nicht.
-      const echteFlaeche = wantMeshes && !(getPanel(p.panelId) || {}).holes
-        ? this._surfaceMeshFor("panel2", xAxis, zAxis, u.length(), w.length(),
-          center.clone(), nrm, p.side)
+      // rohen Eckenmitte. Die Lochplatte laeuft ueber ihre Katalog-Kennung: sie
+      // ist ein Nachbau, kein Mitschnitt, und hat kein eigenes Masspaar.
+      const echteFlaeche = wantMeshes
+        ? this._surfaceMeshFor((getPanel(p.panelId) || {}).holes ? p.panelId : "panel2",
+          xAxis, zAxis, u.length(), w.length(), center.clone(), nrm, p.side)
         : null;
       if (echteFlaeche) {
         this._batchAdd(echteFlaeche.geo, matFor(p.id, mat), echteFlaeche.matrix,

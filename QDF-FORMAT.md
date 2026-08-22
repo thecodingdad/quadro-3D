@@ -626,13 +626,29 @@ they are moved.
 clamps, fittings, slides. Three things are worth knowing:
 
 - A 45° angle connector is written as a `connector3` **plus** a
-  `connector45_2` at the same point, and the latter with five fields.
+  `connector45_2` at the same point, and the latter with five fields — with its
+  **own** quaternion. The two are not the same: the cube is rotationally
+  symmetric, the angle connector is not, and at 559 of 726 occurrences in the
+  sample files the two lines at one point carry different quaternions.
 - Reinforcements are written as **runs** bridging joints, not as one profile
   per tube — that is how the manufacturer's files have it.
 - `camera2` is never written: what its 25 fields do is unknown, and the
   software falls back to its own default view.
 - Size additions are written back where they came from, and the two sizes of
   an imported panel keep the order the file had them in.
+
+**Perforated panels ride on a material.** The format has no perforated panel:
+there is no element for it in the binary's keyword table, and `panel2` has no
+spare field — field 3 is the visibility flag, fields 8 and 9 are the step range,
+and the two size fields each carry their addition. So this app writes a
+perforated panel as an ordinary `panel2` that points at a **material of its
+own**: same colour values as the solid panel, but a separate number (15–19) and
+a name ending in `" (hole)"`. The manufacturer's software draws a normal panel
+in the same colour, so the file stays valid and looks right there; we recognise
+the panel on the way back in. That extra materials are tolerated is not a
+guess — 19 of the sample files carry a material 20 and six a material 21, with
+free-form names up to `"new material"`, all written by the software itself.
+Numbers 15 to 19 are unused across the whole corpus.
 
 **What a round trip does not preserve.** Diagonals are normalised to 45°;
 parts with no QDF equivalent are dropped; panel sizes are written from the

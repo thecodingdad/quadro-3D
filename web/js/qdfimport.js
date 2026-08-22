@@ -84,6 +84,13 @@ const COLOR_BY_NAME = {
   // wurde es zu Blau, und ein schwarzes Schwimmrad kam blau zurueck.
   black: "black",
 };
+
+// Lochplatten-Marker: Das QDF-Format kennt keine Lochplatte -- `panel2` hat kein
+// freies Feld dafuer. Unser Export gibt ihr deshalb ein eigenes MATERIAL mit
+// denselben Farbwerten und einem Namen "<farbe> (hole)" (siehe MATERIALS in
+// qdfexport.js). Die Herstellersoftware zeichnet damit eine gewoehnliche Platte
+// in derselben Farbe, wir erkennen sie hier wieder.
+const HOLE_SUFFIX = " (hole)";
 const FALLBACK_COLOR = "blue";
 
 // Abstand vom gespeicherten Punkt des Spielsacks zur Mitte seines Feldes (cm).
@@ -227,6 +234,7 @@ export function parseQDF(text, opts = {}) {
   const curvedTubeId = opts.curvedTubeId || "TC1";
 
   const materials = new Map(); // id -> colorId
+  const holeMaterials = new Set(); // Material-Nummern, die eine Lochplatte kennzeichnen
   const nodes = [];            // { id, x, y, z }
   const tubes = [];            // { id, a, b, tubeId, color, length }
   const panels = [];           // { id, nodes:[4 ids], panelId, color }
@@ -239,12 +247,16 @@ export function parseQDF(text, opts = {}) {
   let seq = 1;
 
   // Plattengroesse (w x h cm) -> panelId. Sortiert, damit Reihenfolge egal ist.
-  // Lochplatten (holes) bleiben aussen vor: sie haben dieselben Masse wie die
-  // volle Platte und wuerden diese sonst in der Map ueberschreiben. Das QDF-
-  // Format kennt nur "panel2" ohne Loch-Kennzeichnung -> import als volle Platte.
+  // Lochplatten (holes) bleiben aus der Massliste heraus: sie haben dieselben
+  // Masse wie die volle Platte und wuerden diese sonst ueberschreiben. Aus einer
+  // Herstellerdatei kommt eine Platte deshalb immer als VOLLE Platte -- das
+  // Format kennt keine Lochplatte. Nur unsere eigenen Dateien kennzeichnen sie
+  // ueber das Material (siehe HOLE_SUFFIX), dafuer steht `holePanelId`.
   const panelByDims = new Map();
+  let holePanelId = null;
   for (const pa of opts.panels || []) {
-    if (pa.w == null || pa.h == null || pa.holes) continue;
+    if (pa.w == null || pa.h == null) continue;
+    if (pa.holes) { if (!holePanelId) holePanelId = pa.id; continue; }
     const a = Math.round(pa.w), b = Math.round(pa.h);
     panelByDims.set(Math.min(a, b) + "x" + Math.max(a, b), pa.id);
   }
@@ -343,7 +355,11 @@ export function parseQDF(text, opts = {}) {
     if (!p) continue;
     if (p.name === "material3") {
       const id = p.rest.find((v) => typeof v === "number");
-      const colorName = p.rest.find((v) => typeof v === "string");
+      let colorName = p.rest.find((v) => typeof v === "string");
+      if (typeof colorName === "string" && colorName.endsWith(HOLE_SUFFIX)) {
+        if (id != null) holeMaterials.add(id);
+        colorName = colorName.slice(0, -HOLE_SUFFIX.length);
+      }
       if (id != null) materials.set(id, COLOR_BY_NAME[colorName] || FALLBACK_COLOR);
     } else if (p.name === "connector3" || p.name === "connector45_2") {
       if (!p.tuple || p.tuple.length < 7) continue;
@@ -650,11 +666,15 @@ export function parseQDF(text, opts = {}) {
       // liegen aber um die Zuschlaege weiter aussen.
       const padW = padOf(p.rest, 4), padH = padOf(p.rest, 6);
       if (!(dimW > 0) || !(dimH > 0)) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
-      const panelId = panelIdForDims(dimW + conn, dimH + conn);
+      const matNr = typeof p.rest[0] === "number" ? p.rest[0] : null;
+      // Lochplatte? Dann nicht ueber das Mass suchen -- das Lochraster steht im
+      // Material (siehe HOLE_SUFFIX), die Groesse ist dieselbe wie bei der vollen.
+      const panelId = (matNr != null && holeMaterials.has(matNr) && holePanelId)
+        ? holePanelId : panelIdForDims(dimW + conn, dimH + conn);
       if (!panelId) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
       const nodesFound = findPanelCorners(q, cx, cy, cz, (dimW + padW + conn) / 2, (dimH + padH + conn) / 2);
       if (!nodesFound) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
-      const mat = typeof p.rest[0] === "number" ? p.rest[0] : null;
+      const mat = matNr;
       panels.push({ id: "p" + seq++, nodes: nodesFound.map((n) => n.id), panelId,
         color: materials.get(mat) || FALLBACK_COLOR, side: sideFromQuat(q, nodesFound),
         // Eigene Lage wie beim Rohr: auf Schraegen liegt die Platte in der Datei

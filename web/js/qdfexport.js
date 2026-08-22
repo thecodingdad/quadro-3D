@@ -42,6 +42,24 @@ const MATERIALS = [
   'material3{11,"alu", 1, 0.8,0.8,0.8, 0.5,0.4,0.7,7.5, 0.3,0.,0.,7.5, "", 0}',
   'material3{13,"Aluminium", 1, 0.8,0.8,0.8, 0.5,0.4,0.7,7.5, 0.3,0.,0.,7.5, "", 0}',
   'material3{14,"white", 2, 1.,1.,1., 0.6,0.5,0.5,7.5, 0.6,0.5,0.5,7.5, "", 0}',
+  // Lochplatten. Das Format kennt sie nicht: `panel2` hat kein freies Feld
+  // (Feld 2 ist der Sichtbarkeits-Schalter, Feld 7/8 sind Bearbeitungsschritte)
+  // und in der Schluesselwort-Tabelle der Binary steht keine eigene Art. Damit
+  // sie Speichern und Laden trotzdem ueberleben, tragen sie ein eigenes
+  // MATERIAL: dieselben Farbwerte wie die volle Platte, nur unter eigener
+  // Nummer und mit einem Namen, an dem wir sie wiedererkennen. Die
+  // Herstellersoftware zeichnet sie damit als gewoehnliche Platte in derselben
+  // Farbe -- die Datei bleibt also gueltig und sieht dort richtig aus.
+  //
+  // Dass zusaetzliche Materialien vertragen werden, steht in den
+  // Herstellerdateien selbst: 19 von ihnen fuehren eine Nummer 20, sechs eine
+  // 21, mit frei getexteten Namen bis hin zu "new material". Die Nummern
+  // 15 bis 19 sind im ganzen Bestand frei.
+  'material3{15,"red (hole)", 2, 1.,0.,0., 0.6,0.5,0.5,7.5, 0.6,0.5,0.5,7.5, "", 0}',
+  'material3{16,"green (hole)", 2, 0.,0.4941,0.0941, 0.6,0.5,0.5,7.5, 0.6,0.5,0.5,7.5, "", 0}',
+  'material3{17,"blue (hole)", 2, 0.,0.,1., 0.6,0.5,0.5,7.5, 0.6,0.5,0.5,7.5, "", 0}',
+  'material3{18,"yellow (hole)", 2, 1.,1.,0., 0.6,0.5,0.5,7.5, 0.6,0.5,0.5,7.5, "", 0}',
+  'material3{19,"black (hole)", 2, 0.,0.,0., 0.6,0.5,0.5,7.5, 0.6,0.5,0.5,7.5, "", 0}',
 ];
 
 // Farb-ID -> Material-Nummer. Rohre nehmen den ersten Satz, Platten den zweiten;
@@ -49,6 +67,9 @@ const MATERIALS = [
 // ersten Satzes zurueck.
 const TUBE_MAT = { black: 1, red: 2, green: 3, blue: 4, yellow: 5 };
 const PANEL_MAT = { red: 6, green: 7, blue: 8, yellow: 9, black: 1, white: 14 };
+// Lochplatten: dieselbe Farbe, eigene Materialnummer -- daran erkennen wir sie
+// beim Einlesen wieder (siehe MATERIALS). Weiss hat keine Lochplatte.
+const HOLE_MAT = { red: 15, green: 16, blue: 17, yellow: 18, black: 19 };
 // Verstaerkungsprofil: Material 11 in 166 von 174 Vorkommen der Herstellerdateien.
 const ALU_MAT = 11;
 const CONNECTOR_MAT = 1;
@@ -170,7 +191,17 @@ function tuple(q, x, y, z) {
 }
 
 function tubeMat(color) { return TUBE_MAT[color] || TUBE_MAT.blue; }
-function panelMat(color) { return PANEL_MAT[color] || PANEL_MAT.blue; }
+/** Traegt diese Platte ein Lochraster? (Katalogteil `holes`) */
+function lochplatte(p) {
+  const def = getPanel(p.panelId);
+  return !!(def && def.holes);
+}
+
+function panelMat(color, holes) {
+  if (holes && HOLE_MAT[color]) return HOLE_MAT[color];
+  if (holes) return HOLE_MAT.blue;
+  return PANEL_MAT[color] || PANEL_MAT.blue;
+}
 
 /**
  * Modell als QDF-Text.
@@ -461,12 +492,12 @@ export function buildQDF(model) {
       // Reihenfolge wie in der Datei: `w` ist das ERSTE Mass (lokale Y-Achse),
       // `h` das zweite -- so hat der Import sie gelesen. Andersherum kam jede
       // nicht-quadratische Platte gedreht heraus (alle 106 im Bestand).
-      lines.push(`panel2{${panelMat(p.color)}, ${tuple(encodeQuat([g.quat[3], g.quat[0], g.quat[1], g.quat[2]]), g.p[0], g.p[1], g.p[2])}, 1, ${mm(g.w)}, ${mm(g.padW || 0)}, ${mm(g.h)}, ${mm(g.padH || 0)}, 0}`);
+      lines.push(`panel2{${panelMat(p.color, lochplatte(p))}, ${tuple(encodeQuat([g.quat[3], g.quat[0], g.quat[1], g.quat[2]]), g.p[0], g.p[1], g.p[2])}, 1, ${mm(g.w)}, ${mm(g.padW || 0)}, ${mm(g.h)}, ${mm(g.padH || 0)}, 0}`);
       stats.panels++;
       continue;
     }
     const def = getPanel(p.panelId);
-    const line = rectLine("panel2", model.panelCorners(p), panelMat(p.color), def ? [def.w, def.h] : null, p.side);
+    const line = rectLine("panel2", model.panelCorners(p), panelMat(p.color, lochplatte(p)), def ? [def.w, def.h] : null, p.side);
     if (line) { lines.push(line); stats.panels++; }
   }
   for (const x of (model.textiles ? model.textiles.values() : [])) {
