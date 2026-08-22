@@ -5,6 +5,8 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { clampOffset } from "./model.js";
+import { loadConnectorMeshes, loadSlideMeshes } from "./meshes.js";
+import { CONNECTOR_ARM_BITS } from "./qdfimport.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
 // So viel darf ein Bauteil vor einem Ankerpunkt liegen, ohne ihn zu verdecken
@@ -21,10 +23,14 @@ const ONE = new THREE.Vector3(1, 1, 1);
 export const QUALITY_LEVELS = ["low", "medium", "high"];
 // notch = Segmente je Eck-Aussparung einer Platte. 0 heisst rechtwinklig --
 // das passt zur Stufe "low", auf der auch die Kupplungen kantig sind.
+// meshes = die aus der Herstellersoftware abgegriffenen Modelle für Kupplungen,
+// Rutschen und Dächer benutzen (siehe meshes.js). Auf "low" bleibt es bei den
+// selbst gezeichneten Formen: der kantige Würfel kostet 12 Dreiecke, das echte
+// Teil je nach Armzahl 224 bis 624 -- und genau dafür ist die Stufe da.
 const QUALITY = {
-  low:    { conn: null,      tube: 8,  bow: 8,  notch: 0,  shadow: 0,    antialias: false },
-  medium: { conn: [16, 10],  tube: 16, bow: 14, notch: 6,  shadow: 1024, antialias: true  },
-  high:   { conn: [48, 32],  tube: 44, bow: 32, notch: 16, shadow: 2048, antialias: true  },
+  low:    { conn: null,      tube: 8,  bow: 8,  notch: 0,  shadow: 0,    antialias: false, meshes: false },
+  medium: { conn: [16, 10],  tube: 16, bow: 14, notch: 6,  shadow: 1024, antialias: true,  meshes: true  },
+  high:   { conn: [48, 32],  tube: 44, bow: 32, notch: 16, shadow: 2048, antialias: true,  meshes: true  },
 };
 const DEFAULT_QUALITY = "medium";
 
@@ -151,6 +157,75 @@ const CUBE_PX = 104;        // Kantenlaenge des Ausschnitts in CSS-Pixeln
 const CUBE_MARGIN = 14;
 const CUBE_SNAP_MS = 320;   // Dauer des Kameraschwenks beim Klick
 
+// Wie weit darf eine Rohrrichtung von einer Würfelachse abweichen, damit noch
+// ein Kupplungsmodell dazu passt? cos(20°) ≈ 0,94. Alles Schiefere (Rampen,
+// Sparren) bekommt weiter den selbst gezeichneten Würfel.
+const AXIS_TOL = 0.94;
+
+/** Bit der Würfelachse, auf der diese Richtung liegt -- 0, wenn sie zu schief ist. */
+function axisBit(x, y, z) {
+  const ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z);
+  if (ax >= ay && ax >= az) return ax < AXIS_TOL ? 0 : (x > 0 ? 0x01 : 0x02);
+  if (ay >= az) return ay < AXIS_TOL ? 0 : (y > 0 ? 0x04 : 0x08);
+  return az < AXIS_TOL ? 0 : (z > 0 ? 0x10 : 0x20);
+}
+
+/**
+ * Die 24 Drehungen, die einen Würfel auf sich selbst abbilden: jede Wahl, wohin
+ * +X zeigt (sechs), mal jede Wahl für +Y darauf senkrecht (vier).
+ */
+function cubeRotations() {
+  const AXES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  const out = [];
+  for (const x of AXES) {
+    for (const y of AXES) {
+      if (Math.abs(x[0] * y[0] + x[1] * y[1] + x[2] * y[2]) > 0.5) continue;
+      const z = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+      const m = new THREE.Matrix4().makeBasis(
+        new THREE.Vector3(...x), new THREE.Vector3(...y), new THREE.Vector3(...z));
+      out.push({ cols: [x, y, z], quat: new THREE.Quaternion().setFromRotationMatrix(m) });
+    }
+  }
+  return out;
+}
+
+/** Armmaske, nachdem die Kupplung mit dieser Drehung gedreht wurde. */
+function turnMask(mask, cols) {
+  let out = 0;
+  for (const [bit, d] of CONNECTOR_ARM_BITS) {
+    if (!(mask & bit)) continue;
+    const i = d[0] ? 0 : d[1] ? 1 : 2;
+    const s = d[0] || d[1] || d[2];
+    const c = cols[i];
+    out |= axisBit(c[0] * s, c[1] * s, c[2] * s);
+  }
+  return out;
+}
+
+/**
+ * Armmaske -> { Modell, Drehung }. Die abgegriffenen Kupplungen liegen in je
+ * einer festen Lage vor; welche der 24 Würfeldrehungen eine davon auf die
+ * gesuchte Maske bringt, steht hier. Einmal gebaut, sobald die Modelle da sind.
+ *
+ * NICHT abgedeckt sind die acht Masken mit drei zueinander SENKRECHTEN Armen
+ * (die Raumkupplung 3-armig, z. B. 21 = +X, +Y, +Z): dafür fehlt das Modell.
+ * Diese Knoten fallen auf den gezeichneten Würfel zurück.
+ */
+let _maskTable = null;
+function maskTable(store) {
+  if (_maskTable) return _maskTable;
+  _maskTable = {};
+  for (const rot of cubeRotations()) {
+    for (const id of Object.keys(store)) {
+      const mask = store[id].mask;
+      if (!mask) continue;
+      const turned = turnMask(mask, rot.cols);
+      if (_maskTable[turned] === undefined) _maskTable[turned] = { id, quat: rot.quat };
+    }
+  }
+  return _maskTable;
+}
+
 // Hintergrundfarben fuer die Beschriftung nach Kategorie (Aufbaumodus-Hervorhebung).
 const LABEL_BG = {
   tube75: "rgba(139,61,245,0.94)",  // 75er Rohre - violett
@@ -167,6 +242,9 @@ export class SceneManager {
     this._quality = DEFAULT_QUALITY;
     this._makeRenderer(QUALITY[DEFAULT_QUALITY].antialias);
     this.onRendererReplaced = () => {};   // Builder haengt seine Listener neu ein
+    // Die abgegriffenen Modelle kommen erst nach dem ersten Bild; sind sie da,
+    // laesst dieser Haken die Szene einmal neu aufbauen (main.js: builder.refresh).
+    this.onMeshesReady = () => {};
 
     this.scene = new THREE.Scene();
     // Farbschema und Szene entscheiden gemeinsam ueber Hintergrund und Raster
@@ -739,6 +817,78 @@ export class SceneManager {
     return this._connGeo;
   }
 
+  // ---- Abgegriffene Originalmodelle (meshes.js) -------------------------------
+
+  /** Geometrie aus einem geladenen Modell, einmal gebaut und behalten. */
+  _meshGeometry(key, rec) {
+    return this._cachedGeo("mesh:" + key, () => {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(rec.pos, 3));
+      geo.setAttribute("normal", new THREE.BufferAttribute(rec.nrm, 3));
+      geo.setIndex(new THREE.BufferAttribute(rec.idx, 1));
+      geo.computeBoundingSphere();
+      return geo;
+    });
+  }
+
+  /**
+   * Modelle nachladen und danach EINMAL neu zeichnen lassen. Beides passiert
+   * erst, wenn wirklich etwas davon vorkommt -- ein leerer Entwurf holt die
+   * Rutschen gar nicht. Bis die Antwort da ist, zeichnet die Szene ihre eigenen
+   * Formen; schlaegt sie fehl, bleibt es dabei.
+   */
+  _ensureMeshes(which) {
+    const feld = which === "slides" ? "_slideMeshes" : "_connMeshes";
+    if (this[feld] !== undefined) return this[feld];
+    this[feld] = null;   // laeuft -> nicht noch einmal anfordern
+    const laden = which === "slides" ? loadSlideMeshes() : loadConnectorMeshes();
+    laden.then((rec) => {
+      if (!rec) return;
+      this[feld] = rec;
+      this.onMeshesReady();
+    });
+    return null;
+  }
+
+  /**
+   * Passendes Kupplungsmodell zu den Richtungen, in denen an diesem Knoten
+   * wirklich etwas steckt. Geliefert wird Geometrie samt Drehung, oder `null`
+   * -- dann zeichnet der Aufrufer wie bisher Würfel plus Stutzen.
+   *
+   * Der Weg: die Weltrichtungen zurück in das lokale System der Kupplung
+   * drehen, auf die Würfelachsen runden und daraus die Armmaske bilden (dieselbe
+   * Bitfolge wie `variant2` in der Datei). Jedes Modell liegt nur in EINER Lage
+   * vor -- welche der 24 Würfeldrehungen es auf die gesuchte Maske bringt, steht
+   * in `maskTable()`.
+   *
+   * `null` kommt heraus, wenn eine Richtung mehr als ~20 Grad von ihrer Achse
+   * abweicht (Rampen, Sparren), wenn zwei Teile denselben Arm belegen, bei
+   * weniger als zwei Armen -- und am Bogenrohr: dessen Krümmung läuft dem
+   * geraden 5-cm-Arm davon, er stiesse durch die Rohrwand.
+   */
+  _connMeshFor(dirs, cubeQuat) {
+    const store = this._connMeshes;
+    if (!store || !dirs.length) return null;
+    const inv = cubeQuat.clone().invert();
+    const v = new THREE.Vector3();
+    let mask = 0;
+    for (const e of dirs) {
+      if (e.bow) return null;
+      v.set(e.d[0], e.d[1], e.d[2]).applyQuaternion(inv);
+      const bit = axisBit(v.x, v.y, v.z);
+      if (!bit || mask & bit) return null;
+      mask |= bit;
+    }
+    const entry = maskTable(store)[mask];
+    if (!entry) return null;
+    const rec = store[entry.id];
+    if (!rec) return null;
+    return {
+      geo: this._meshGeometry("conn:" + entry.id, rec),
+      quat: cubeQuat.clone().multiply(entry.quat),
+    };
+  }
+
   /**
    * Koerper einer Klemme, in ihrer eigenen Ebene: die beiden Loecher liegen auf
    * der X-Achse im Abstand `d`, die Rohre laufen entlang +Z.
@@ -906,6 +1056,16 @@ export class SceneManager {
     const hex = f.color ? colorHex(f.color) : 0x2b2b2b;
     let geo = null, mat = null;
     const cs = geometry().connectorSize;
+
+    // Abgegriffenes Originalmodell, wenn es zu dieser Art eines gibt -- unter den
+    // Anbauteilen ist das bisher nur das grosse Dach; es liegt bei den Rutschen,
+    // weil die Datei es als Dach fuehrt.
+    const echt = this._q().meshes && this._slideMeshes ? this._slideMeshes[f.kind] : null;
+    if (echt) {
+      const mesh = new THREE.Mesh(
+        this._meshGeometry("slide:" + f.kind, echt), this._fittingMaterial(hex, false));
+      return [this._placeFitting(mesh, f, q)];
+    }
 
     switch (f.kind) {
       case "multi-wheel2": {            // Speichenrad: Scheibe mit Kranz
@@ -1337,6 +1497,10 @@ export class SceneManager {
 
   // Rutschen-Material je Art, SOLIDE (Gregor): gerade Rutsche rot, Bogenrutsche
   // gruen, Auslauf gelb, Dach grau. Im Aufbau-Modus hervorgehoben.
+  // Beide Seiten, immer: die selbst gezeichnete Rinne ist eine blosse Flaeche,
+  // und auch das abgegriffene Originalmodell braucht sie -- die Herstellersoftware
+  // zeichnet ohne Rueckseiten-Aussortierung, ihre Dreiecke sind deshalb nicht
+  // einheitlich nach aussen gewickelt. Mit FrontSide fehlt die halbe Rutschbahn.
   _slideMatFor(kind, isCurrent, colorId) {
     const COL = {
       "slide2": 0xd23b3b, "slide-new2": 0xd23b3b,  // gerade Rutsche = rot
@@ -2279,6 +2443,16 @@ export class SceneManager {
       }
     }
 
+    // Abgegriffene Originalmodelle: auf dieser Stufe erwuenscht? Dann laden --
+    // beim ersten Mal kommt noch nichts zurueck und es bleibt bei den selbst
+    // gezeichneten Formen, danach zeichnet onMeshesReady() neu.
+    const wantMeshes = qual.meshes;
+    if (wantMeshes && model.nodes.size) this._ensureMeshes("connectors");
+    // Das grosse Dach ist ein Anbauteil, liegt aber bei den Rutschen.
+    const wantsSlideMeshes = model.slides.size
+      || [...(model.fittings ? model.fittings.values() : [])].some((f) => f.kind === "roof-large2");
+    if (wantMeshes && wantsSlideMeshes) this._ensureMeshes("slides");
+
     // Zustand eines Teils im Aufbaumodus: "done" | "current" | "future".
     const stateOf = (id) => {
       if (!asm) return "done";
@@ -2329,24 +2503,33 @@ export class SceneManager {
           const sa = this._slopeRotationAxis(model, n);
           if (sa) quat.setFromAxisAngle(sa, Math.PI / 4);
         }
-        this._batchAdd(this._connGeometry(), matFor(n.id, mat),
-          new THREE.Matrix4().compose(pos, quat, ONE), "node", n.id, this.pickNodes);
+        // Das abgegriffene Originalteil, wenn es zum Anschlussbild passt: EIN
+        // Mesh mit Bohrungen und Armen, also auch keine Stutzen mehr dazu.
+        const dirs = tubeDirsAt.get(n.id) || [];
+        const echt = wantMeshes ? this._connMeshFor(dirs, quat) : null;
+        if (echt) {
+          this._batchAdd(echt.geo, matFor(n.id, mat),
+            new THREE.Matrix4().compose(pos, echt.quat, ONE), "node", n.id, this.pickNodes);
+        } else {
+          this._batchAdd(this._connGeometry(), matFor(n.id, mat),
+            new THREE.Matrix4().compose(pos, quat, ONE), "node", n.id, this.pickNodes);
 
-        // Arm-Stutzen der Kupplung: kurze Zylinder, die in die Rohre greifen.
-        // Gezeichnet wird je Richtung, in der wirklich ein Rohr steckt -- die
-        // Kupplung zeigt damit genau ihr tatsaechliches Anschlussbild. Offene
-        // Stutzen entfallen; die Herstellersoftware kennt sie ebenfalls nicht,
-        // und die variant2-Maske importierter Dateien fuehrt Arme ins Leere.
-        // Quelle sind die tatsaechlichen Rohrrichtungen, nicht node.arms: sonst
-        // haetten im Editor gebaute Kupplungen (ohne variant2) gar keine.
-        for (const e of tubeDirsAt.get(n.id) || []) {
-          const dv = new THREE.Vector3(e.d[0], e.d[1], e.d[2]);
-          const off = e.bow ? bowStubOff : armStubOff;
-          const p = new THREE.Vector3(
-            n.x + dv.x * off, n.y + dv.y * off, n.z + dv.z * off);
-          const q = new THREE.Quaternion().setFromUnitVectors(UP, dv);
-          this._batchAdd(e.bow ? bowStubGeo : armStubGeo, matFor(n.id, mat),
-            new THREE.Matrix4().compose(p, q, ONE), "node", n.id, this.pickNodes);
+          // Arm-Stutzen der Kupplung: kurze Zylinder, die in die Rohre greifen.
+          // Gezeichnet wird je Richtung, in der wirklich ein Rohr steckt -- die
+          // Kupplung zeigt damit genau ihr tatsaechliches Anschlussbild. Offene
+          // Stutzen entfallen; die Herstellersoftware kennt sie ebenfalls nicht,
+          // und die variant2-Maske importierter Dateien fuehrt Arme ins Leere.
+          // Quelle sind die tatsaechlichen Rohrrichtungen, nicht node.arms: sonst
+          // haetten im Editor gebaute Kupplungen (ohne variant2) gar keine.
+          for (const e of dirs) {
+            const dv = new THREE.Vector3(e.d[0], e.d[1], e.d[2]);
+            const off = e.bow ? bowStubOff : armStubOff;
+            const p = new THREE.Vector3(
+              n.x + dv.x * off, n.y + dv.y * off, n.z + dv.z * off);
+            const q = new THREE.Quaternion().setFromUnitVectors(UP, dv);
+            this._batchAdd(e.bow ? bowStubGeo : armStubGeo, matFor(n.id, mat),
+              new THREE.Matrix4().compose(p, q, ONE), "node", n.id, this.pickNodes);
+          }
         }
       }
 
@@ -2699,6 +2882,8 @@ export class SceneManager {
       if (hideFlat) continue;
       const st = stateOf(sl.id);
       if (st === "future") continue;
+      // Liegt zu dieser Art ein abgegriffenes Originalmodell vor?
+      const echtesTeil = !!(wantMeshes && this._slideMeshes && this._slideMeshes[sl.kind]);
       const base = (asm && st === "done")
         ? this._fadedMaterial(true)
         : this._slideMatFor(sl.kind, st === "current", sl.color);
@@ -2715,6 +2900,10 @@ export class SceneManager {
         }
       }
 
+      // Originalmodell, sobald es geladen ist: das Teil sitzt schlicht auf seiner
+      // gespeicherten Lage -- genau so zeichnet es die Herstellersoftware. Die
+      // Kette darunter braucht es dann nicht mehr, jedes Stueck steht fuer sich.
+      if (echtesTeil && this._addSlideMesh(sl, mat, st)) continue;
       // Bogenrutsche: gekrümmte 90°-Form oben, fuehrt nach unten ins Folgeteil.
       if (sl.kind === "curved-slide2") { this._addCurvedSlide(sl, model, mat, st); continue; }
       // Gerade Rutsche: schraege Rampe von ihrer Position zum naechsten Folgeteil.
@@ -2763,6 +2952,30 @@ export class SceneManager {
 
     // Der Szenegraph ist neu -> Schattenkarte einmal nachziehen.
     this._shadowsDirty();
+  }
+
+  /**
+   * Rutsche oder Dach als abgegriffenes Originalmodell setzen: Lage aus der
+   * Datei (Bezugspunkt + eigenes Quaternion), sonst nichts -- die Kette der
+   * selbst gezeichneten Teile entfaellt hier, weil jedes Stueck seine Form
+   * mitbringt. Liefert false, wenn zu dieser Art kein Modell vorliegt.
+   */
+  _addSlideMesh(sl, mat, st) {
+    const rec = this._slideMeshes && this._slideMeshes[sl.kind];
+    if (!rec) return false;
+    const mesh = new THREE.Mesh(this._meshGeometry("slide:" + sl.kind, rec), mat);
+    mesh.position.set(sl.x, sl.y, sl.z);
+    mesh.quaternion.copy(this._slideQuat(sl));
+    mesh.userData = { kind: "slide", id: sl.id };
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.buildGroup.add(mesh);
+    if (st !== "future") this.pickSlides.push(mesh);
+    // Der Querschnitt-Uebergabe der gezeichneten Kette ist hier nichts zu
+    // uebergeben -- ein nachfolgendes gezeichnetes Teil faengt frisch an.
+    this._slideChainFrame = null;
+    this._slideChainNextId = null;
+    return true;
   }
 
   // Gerade Rutsche (slide2/slide-new2): schraege Rampe (Rutschflaeche + 2 erhoehte

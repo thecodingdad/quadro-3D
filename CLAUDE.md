@@ -71,6 +71,7 @@ Three.js ausschließlich in `scene.js`, DOM ausschließlich in `ui.js`/`scene.js
 | `web/js/bom.js` | Stückliste, Kupplungstyp-Heuristik, Verstärkungs-Profile, Bestandsvergleich |
 | `web/js/buildplan.js` | Aufbauplan: Modell Lage für Lage in Bauschritte zerlegen |
 | `web/js/scene.js` | Three.js: Renderer, Kamera, Rendering, Raycasting, Handles, Label-Sprites, Umgebung (Gras/Bäume/Himmel) |
+| `web/js/meshes.js` | Lädt `data/models/*.json` (die aus `Quadro.exe` abgegriffenen Modelle) als rohe Zahlenfelder – **ohne** Three.js |
 | `web/js/builder.js` | Interaktion: Auswahl, Handles, Setzen/Löschen, Modi, Undo/Redo |
 | `web/js/storage.js` | IndexedDB-Zugriff (`dbTx`), Modell-Sammlung, Datei-Export/Import |
 | `web/js/docs.js` | Virtuelle Dateien: Modelle speichern/laden/umbenennen, offene Sitzung, Migration |
@@ -83,6 +84,7 @@ Three.js ausschließlich in `scene.js`, DOM ausschließlich in `ui.js`/`scene.js
 | `manifest.webmanifest` | PWA-Manifest (Wurzel, damit `scope` auch `data/` umfasst) |
 | `sw.js` | Service Worker: Netz zuerst, Cache als Rückfall – macht die App offline lauffähig |
 | `tools/make-icons.py` | Erzeugt die Symbole in `icons/` (nur von Hand, kein Build-Step) |
+| `tools/obj2mesh.py` | Wandelt die abgegriffenen OBJ-Modelle in `data/models/*.json` (nur von Hand, kein Build-Step) |
 
 **Datenfluss:** Jede Modelländerung → `builder.refresh()` → `scene.renderModel()` + Handles neu →
 `builder.onChange()` → (in `main.js`) `ui.update()` + `ui.touchActiveTab()` (markiert den Tab,
@@ -280,6 +282,25 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
 ## Fallstricke
 
 - `catalog.js` lädt `../data/parts.json` relativ – die App muss unter `/web/` ausgeliefert werden.
+- **Abgegriffene Originalmodelle** (`data/models/*.json`, erzeugt aus `tmp/extracted/models/` mit
+  `tools/obj2mesh.py`): Kupplungen, Rutschen und Dächer zeichnet die Szene damit statt aus
+  Primitiven. Vier Dinge, die dabei zählen:
+  - **Die Armmaske kommt aus den Rohren, die wirklich anstecken** (`tubeDirsAt`), nicht aus
+    `variant2` der Datei. Am Bestand gemessen führt `variant2` an den allermeisten Knoten mehr
+    Arme als Rohre – gezeichnet stünden dort überall Stutzen ins Leere.
+  - `maskTable()` in `scene.js` legt jede Maske über die **24 Würfeldrehungen** auf eines der
+    Modelle. Passt nichts (schiefe Richtung > 20°, zwei Teile auf einem Arm, weniger als zwei
+    Arme, **Bogenrohr** – dessen Krümmung läuft dem geraden 5-cm-Arm davon), zeichnet der alte
+    Pfad Würfel plus Stutzen. Ebenso auf der Qualitätsstufe **„niedrig"**.
+  - **Der Raumkupplung 3-armig fehlt bisher ihr Modell.** Die abgegriffene Datei
+    `connector3_3way_mask13` ist in Wahrheit ein ebenes T (Maske 13 = +X, +Y, −Y) und deshalb
+    nicht eingebunden; drei zueinander senkrechte Arme (z. B. Maske 21) hat der Mitschnitt nicht.
+    Solche Knoten laufen über den Rückfallpfad.
+  - **Beide Seiten rendern bleibt Pflicht.** Die Herstellersoftware zeichnet ohne
+    Rückseiten-Aussortierung; ihre Dreiecke sind nicht einheitlich nach außen gewickelt. Mit
+    `FrontSide` fehlt die halbe Rutschbahn.
+  Geladen wird erst, wenn ein Modell die Teile enthält, und danach zeichnet `onMeshesReady()`
+  (in `main.js` auf `builder.refresh()`) einmal neu.
 - **Ansicht zurücksetzen passt ein:** `scene.resetCamera(model)` behält immer den Blickwinkel der
   Vorgabe (`_defaultCam`), rückt aber Bildmitte und Abstand so, dass die Kiste um alle Teile ins
   Bild passt. Gerechnet wird mit den **acht Ecken** (eine Kugel um die Kiste ließe flache Modelle

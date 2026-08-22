@@ -11,6 +11,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Neu · Added
+- **Kupplungen, Rutschen und Dächer stehen als die echten Teile im Bild** – ihre Form stammt jetzt aus den Modellen, die aus der Original-Software abgegriffen wurden, statt aus nachgebauten Grundkörpern: die Kupplung mit ihren Bohrungen und Armen, die Rutsche mit ihrer gewölbten Bahn und den Rippen, der Auslauf mit seiner Lippe. Auf der Qualitätsstufe „niedrig" bleibt es beim einfachen Würfel. Kosten tut es fast nichts: auf „mittel" 8 % weniger Dreiecke als vorher, auf „hoch" 65 % weniger, weil die echten Teile weit sparsamer aufgebaut sind als die feinen Kugeln davor · **Connectors, slides and roofs are drawn from the original models** – captured from the manufacturer's software; „low" keeps the plain cube
 - **Dunkelmodus** – in den Einstellungen unter „Erscheinungsbild": *Auto (System)*, *Hell*, *Dunkel*. „Auto" folgt dem Betriebssystem und schaltet sofort mit. Dunkel werden die Oberfläche und die normale 3D-Ansicht (Hintergrund und Bodenraster); die Szene-Ansicht bleibt Tag, die Teilefarben bleiben Produktfarben · **Dark mode** – Auto (system), Light, Dark in the settings
 
 ### Geändert · Changed

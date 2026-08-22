@@ -33,6 +33,10 @@ async function boot() {
   // nachgezogen: der Dreh-Knopf gilt auch fuer die schwebende Kopie.
   builder.onPreview = () => ui.syncButtons();
 
+  // Die aus der Herstellersoftware abgegriffenen Modelle werden nachgeladen --
+  // sobald sie da sind, einmal neu zeichnen.
+  scene.onMeshesReady = () => builder.refresh();
+
   // Gibt es hier ein Backend? Wenn ja, wird der Speicher im Browser einmal mit
   // dem Server abgeglichen, bevor die Sitzung aufgeht -- so öffnen die Tabs
   // gleich den aktuellen Stand. Antwortet niemand, bleibt alles rein lokal.

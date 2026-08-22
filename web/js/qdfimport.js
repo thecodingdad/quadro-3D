@@ -178,8 +178,10 @@ function hasRenderRange(rest, base) {
   return rest.length > base && typeof rest[base] === "number";
 }
 
-// Lokale Arm-Achsen je variant2-Bit einer connector3 (Bitmaske der vorhandenen Arme).
-const CONNECTOR_ARM_BITS = [
+// Lokale Arm-Achsen je variant2-Bit einer connector3 (Bitmaske der vorhandenen
+// Arme). Exportiert, weil `scene.js` dieselbe Bitfolge braucht: die abgegriffenen
+// Kupplungsmodelle sind nach ihr benannt und werden ueber sie zugeordnet.
+export const CONNECTOR_ARM_BITS = [
   [0x01, [1, 0, 0]], [0x02, [-1, 0, 0]],
   [0x04, [0, 1, 0]], [0x08, [0, -1, 0]],
   [0x10, [0, 0, 1]], [0x20, [0, 0, -1]],
