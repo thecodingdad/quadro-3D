@@ -2609,8 +2609,14 @@ export class SceneManager {
     }
     // Die Kupplung, die eine Lagerkupplung traegt, steckt mit einem Stutzen in
     // ihr -- der zeigt zurueck zum Rohr, sonst schwebt der Wuerfel frei.
+    // Die Kupplung, die eine Lagerkupplung traegt, steckt mit einem Stutzen in
+    // ihr -- der zeigt zurueck zum Rohr, sonst schwebt der Wuerfel frei. Gilt
+    // fuer die selbst gesetzte (part "bearing") wie fuer die eingelesene, die
+    // ihren `stub` aus dem 3. Durchlauf des Imports hat (`bearingOn`).
     for (const n of model.nodes.values()) {
-      if (n.part !== "bearing" || !n.stub) continue;
+      if (!n.stub) continue;
+      if (n.part && n.part !== "bearing") continue;
+      if (!n.part && !n.bearingOn) continue;
       pushDir(n.id, -n.stub[0], -n.stub[1], -n.stub[2], false);
     }
     for (const t of model.tubes.values()) {

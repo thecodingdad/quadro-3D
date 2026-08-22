@@ -347,6 +347,14 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     hält die schon versorgten Rohre fest. Die **Rollachse** ist frei wählbar – im Bestand kommen
     neun verschiedene vor, eine Regel gibt es dort nicht; genommen wird die, die am ehesten nach
     oben zeigt.
+  - **Die Lagerkupplung** (`bearing-connector4`, Katalog `bearing`) klemmt um ein Rohr und
+    **trägt eine Kupplung**. Die steht in der Datei als eigene `connector3`, 10 cm entgegen der
+    +X-Achse der Klemme (gemessen: alle 47 eindeutigen Fälle). Ein eigener Durchlauf im Import
+    hängt sie zusammen (`node.bearingOn`, `node.stub`), sonst stand die Kupplung als nackter
+    Würfel ohne Stutzen neben dem Rohr. **Noch nicht sauber:** im Editor ist die Lagerkupplung
+    EIN Knoten, der Klemme und Kupplung zugleich ist (`node.part = "bearing"`) – ein Klick auf
+    den Würfel wählt die Klemme statt einer echten Kupplung –, und der Export schreibt dafür
+    `bearing2` (das Radlager) statt `bearing-connector4`.
   - **Die Winkelkupplung hat eine EIGENE Lage**, nicht die des Würfels: der Würfel ist
     drehsymmetrisch, sie nicht. An **559 von 726** Vorkommen im Bestand tragen `connector3` und
     `connector45_2` an derselben Stelle verschiedene Quaternionen. Der Import merkt sie als

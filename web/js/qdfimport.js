@@ -93,6 +93,10 @@ const COLOR_BY_NAME = {
 const HOLE_SUFFIX = " (hole)";
 const FALLBACK_COLOR = "blue";
 
+// So weit sitzt die Kupplung, die eine Lagerkupplung traegt, von deren Punkt
+// entfernt (cm) -- gemessen an den Herstellerdateien, entgegen ihrer +X-Achse.
+const BEARING_REACH = 10;
+
 // Abstand vom gespeicherten Punkt des Spielsacks zur Mitte seines Feldes (cm).
 const BAG_OFFSET = 20;
 
@@ -785,6 +789,26 @@ export function parseQDF(text, opts = {}) {
     }
   }
 
+  // Lagerkupplung (bearing-connector4): Sie klemmt um ein Rohr und TRAEGT eine
+  // Kupplung. Die steht in der Datei als eigene connector3 -- 10 cm entlang der
+  // Ruecken-Richtung der Klemme (gemessen: 47 von 47 eindeutigen Faellen liegen
+  // dort, ihre lokale +X-Achse zeigt von der Kupplung weg). Ohne diesen Durchlauf
+  // weiss die Kupplung nichts von der Klemme und bekommt keinen Stutzen -- sie
+  // stand als nackter Wuerfel neben dem Rohr.
+  for (const f of fittings) {
+    if (f.kind !== "bearing-connector4" || !f.quat) continue;
+    // Lokale +X-Achse des Anbauteils (f.quat in Three-Order x,y,z,w).
+    const ex = rotateByQuat([f.quat[3], f.quat[0], f.quat[1], f.quat[2]], [1, 0, 0]);
+    const ziel = [f.x - ex[0] * BEARING_REACH, f.y - ex[1] * BEARING_REACH, f.z - ex[2] * BEARING_REACH];
+    const nd = nodeAt(round(ziel[0]), round(ziel[1]), round(ziel[2]), false);
+    if (!nd || nd.part) continue;
+    // Stutzen-Richtung wie beim selbst gesetzten Teil: vom Rohr WEG (die Kupplung
+    // zeichnet ihren Arm entgegengesetzt, siehe scene.js).
+    const r4 = (v) => Math.round(v * 1e4) / 1e4;
+    nd.stub = [r4(-ex[0]), r4(-ex[1]), r4(-ex[2])];
+    nd.bearingOn = f.id;
+  }
+
   // 3. Durchlauf: Alu-Verstaerkungsprofile -> markiere getroffene Rohre.
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   let reinforced = 0;
@@ -1036,6 +1060,7 @@ export function parseQDF(text, opts = {}) {
       if (n.part) o.part = n.part; // festes Katalogteil (Klemm-Kupplung)
       if (n.clampOn) o.clampOn = n.clampOn; // umschlossenes Rohr + Stelle darauf
       if (n.stub) o.stub = n.stub; // Richtung des offenen Anschlusses
+      if (n.bearingOn) o.bearingOn = n.bearingOn; // getragen von dieser Lagerkupplung
       if (n.ownConnector) o.ownConnector = true; // c45body, an dem auch eine Kupplung sitzt
       return o;
     }),

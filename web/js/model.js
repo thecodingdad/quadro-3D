@@ -1950,7 +1950,8 @@ export class BuildModel {
         c45: !!n.c45, c45body: !!n.c45body, c45axis: n.c45axis || null, c45quat: n.c45quat || null,
         armDirs: n.armDirs || null, arms: n.arms || null, quat: n.quat || null,
         part: n.part || null, clampOn: n.clampOn ? { ...n.clampOn } : null,
-        stub: n.stub || null, ownConnector: !!n.ownConnector, c45file: !!n.c45file,
+        stub: n.stub || null, bearingOn: n.bearingOn || null,
+        ownConnector: !!n.ownConnector, c45file: !!n.c45file,
         unused: !!n.unused, partQuat: n.partQuat || null,
       });
     }
@@ -2876,6 +2877,7 @@ export class BuildModel {
         if (n.part) o.part = n.part; // festes Katalogteil (Klemm-Kupplungen)
         if (n.clampOn) o.clampOn = n.clampOn; // umschlossenes Rohr + Stelle darauf
         if (n.stub) o.stub = n.stub; // Richtung des offenen Anschlusses
+        if (n.bearingOn) o.bearingOn = n.bearingOn; // getragen von dieser Lagerkupplung
         if (n.ownConnector) o.ownConnector = true; // Adapter-Koerper MIT eigener Kupplung
         return o;
       }),
@@ -2954,6 +2956,7 @@ export class BuildModel {
         c45axis: n.c45axis || null, c45quat: n.c45quat || null,
         armDirs: n.armDirs || null, arms: n.arms || null, quat: n.quat || null,
         part: n.part || null, clampOn: n.clampOn || null, stub: n.stub || null,
+        bearingOn: n.bearingOn || null,
         ownConnector: !!n.ownConnector, c45file: !!n.c45file, unused: !!n.unused,
         partQuat: n.partQuat || null });
       maxSeq = Math.max(maxSeq, parseSeq(n.id));
