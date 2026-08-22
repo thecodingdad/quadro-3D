@@ -351,10 +351,15 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     **trägt eine Kupplung**. Die steht in der Datei als eigene `connector3`, 10 cm entgegen der
     +X-Achse der Klemme (gemessen: alle 47 eindeutigen Fälle). Ein eigener Durchlauf im Import
     hängt sie zusammen (`node.bearingOn`, `node.stub`), sonst stand die Kupplung als nackter
-    Würfel ohne Stutzen neben dem Rohr. **Noch nicht sauber:** im Editor ist die Lagerkupplung
-    EIN Knoten, der Klemme und Kupplung zugleich ist (`node.part = "bearing"`) – ein Klick auf
-    den Würfel wählt die Klemme statt einer echten Kupplung –, und der Export schreibt dafür
-    `bearing2` (das Radlager) statt `bearing-connector4`.
+    Würfel ohne Stutzen neben dem Rohr. **Gesetzt** wird sie in beiden Reihenfolgen: ans Rohr,
+    dann erscheint die Kupplung außen (`addTubeClamp`), oder an einen freien Arm einer Kupplung,
+    dann klemmt später ein Rohr darin (`addBearingAtArm`). In beiden Fällen entsteht dieselbe
+    Form wie beim Laden – ein **Anbauteil** plus ein **gewöhnlicher Knoten**, nie ein Knoten,
+    der beides ist. Der Stutzen zur Klemme zählt in der Stückliste als Arm (`neighborDirs` in
+    `bom.js`), sonst stünde dort eine Kupplung mit einem Arm zu wenig.
+    Und `bearing2` ist **nicht** dieses Teil: das ist das Radlager, das auf einer Kupplung sitzt
+    (124 von 125 Vorkommen auf einer `connector3`), während die Lagerkupplung am Rohr sitzt
+    (101 von 101 **nicht** auf einer Kupplung).
   - **Die Winkelkupplung hat eine EIGENE Lage**, nicht die des Würfels: der Würfel ist
     drehsymmetrisch, sie nicht. An **559 von 726** Vorkommen im Bestand tragen `connector3` und
     `connector45_2` an derselben Stelle verschiedene Quaternionen. Der Import merkt sie als

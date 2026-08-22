@@ -309,10 +309,12 @@ export function buildQDF(model) {
         stats.fittings++;
         continue;   // die Lochzapfenkupplung IST die Kupplung
       }
-      // Lagerkupplung: eigene Zeile PLUS die normale Kupplung, die sie traegt --
-      // genau so stehen beide in den Herstellerdateien am selben Punkt.
-      lines.push(`bearing2{${CONNECTOR_MAT}, ${tuple(encodeQuat(quatFromX(n.stub)), n.x, n.y, n.z)}, 1, ${mm(cs50)}, 0., 0}`);
-      stats.fittings++;
+      // Frueher stand hier eine bearing2-Zeile fuer die Lagerkupplung. Das war
+      // das falsche Teil: bearing2 ist das RADLAGER (in 124 von 125 Vorkommen
+      // sitzt es auf einer connector3), die Lagerkupplung ist
+      // bearing-connector4 und sitzt am Rohr (101 von 101 Vorkommen NICHT auf
+      // einer Kupplung). Sie ist jetzt ein Anbauteil und wird weiter unten
+      // geschrieben; hier bleibt nur die Kupplung, die sie traegt.
     }
     // Eine gedrehte Kupplung (aus dem Import) behaelt ihre Lage. Die Arm-Maske
     // zaehlt die LOKALEN Wuerfelachsen -- bei einer gedrehten Kupplung sind das
@@ -546,6 +548,10 @@ export function buildQDF(model) {
       lines.push(`hole-connector4{${CONNECTOR_MAT}, ${tuple(q, fx, fy, fz)}, 0, 0, ${mask}, ${mask - 3}, 3840, 0, 0}`);
     } else if (f.kind === "bearing2") {
       lines.push(`bearing2{${CONNECTOR_MAT}, ${tuple(q, fx, fy, fz)}, 1, ${mm(cs50)}, 0., 0}`);
+    } else if (f.kind === "bearing-connector4" && !f.rest) {
+      // Selbst gesetzte Lagerkupplung. Feldaufbau wie in den Herstellerdateien:
+      // vier Felder hinter der Lage, in 36 von 101 Vorkommen "1, 0, 0, 0".
+      lines.push(`bearing-connector4{${CONNECTOR_MAT}, ${tuple(q, fx, fy, fz)}, 1, 0, 0, 0}`);
     } else if (f.rest) {
       // Teile, die wir nur durchreichen (Flexikupplung, Bolzen, Lagerkupplung,
       // Rohrkappe): die Felder hinter der Lage stehen noch so da, wie sie beim

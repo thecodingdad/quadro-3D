@@ -2196,6 +2196,23 @@ export class Builder {
         return;
       }
     }
+    // Zweiter Weg fuer die Lagerkupplung: erst an eine Kupplung, das Rohr kommt
+    // spaeter. Die Herstellersoftware kann beides -- ans Rohr, dann erscheint
+    // aussen die Kupplung, oder an eine Kupplung, dann klemmt spaeter ein Rohr
+    // darin. Gewaehlt wird der freie Arm, der dem Klickpunkt am naechsten liegt.
+    if (part === "bearing" && pick.data.kind === "node" && pick.point) {
+      const n = this.model.nodes.get(pick.data.id);
+      if (n && !n.bearingOn && !n.part) {
+        const dir = this._freeArmTowards(n, pick.point);
+        if (!dir) { this.onNotice(t("notice_fitting_exists"), "warn"); return; }
+        let f = null;
+        this.recordHistory(() => { f = this.model.addBearingAtArm(n.id, dir, geometry().connectorSize); });
+        if (f) this._notePlaced(n.id, "node");
+        else this.onNotice(t("notice_fitting_exists"), "warn");
+        this.refresh();
+        return;
+      }
+    }
     if (pick.data.kind !== "tube" || !pick.point) { this.onNotice(t("notice_clamp_click_tube"), "info"); return; }
     const tb = this.model.tubes.get(pick.data.id);
     if (!tb || tb.arm || tb.link || tb.bow) { this.onNotice(t("notice_clamp_click_tube"), "info"); return; }
@@ -2205,6 +2222,32 @@ export class Builder {
     if (added) this._notePlaced(added.id, "node");
     else this.onNotice(t("notice_fitting_exists"), "warn");
     this.refresh();
+  }
+
+  /**
+   * Freier Arm einer Kupplung, der dem Klickpunkt am naechsten liegt. Belegt
+   * sind Richtungen, in denen schon ein Rohr steckt.
+   */
+  _freeArmTowards(node, point) {
+    const belegt = [];
+    for (const tb of this.model.tubes.values()) {
+      const other = tb.a === node.id ? this.model.nodes.get(tb.b)
+        : tb.b === node.id ? this.model.nodes.get(tb.a) : null;
+      if (!other) continue;
+      const d = [other.x - node.x, other.y - node.y, other.z - node.z];
+      const L = Math.hypot(d[0], d[1], d[2]) || 1;
+      belegt.push([d[0] / L, d[1] / L, d[2] / L]);
+    }
+    const zeiger = [point.x - node.x, point.y - node.y, point.z - node.z];
+    const Z = Math.hypot(zeiger[0], zeiger[1], zeiger[2]) || 1;
+    const z = [zeiger[0] / Z, zeiger[1] / Z, zeiger[2] / Z];
+    let best = null, bestDot = -2;
+    for (const d of DIRECTIONS) {
+      if (belegt.some((b) => b[0] * d[0] + b[1] * d[1] + b[2] * d[2] > 0.9)) continue;
+      const dot = z[0] * d[0] + z[1] * d[1] + z[2] * d[2];
+      if (dot > bestDot) { bestDot = dot; best = d; }
+    }
+    return best;
   }
 
   /**

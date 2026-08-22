@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
-import { clampOffset } from "./model.js";
+import { nodeClampOffset } from "./model.js";
 import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
@@ -2217,7 +2217,7 @@ export class SceneManager {
     const g = geometry();
     const cs = g.connectorSize;
     const stub = n.stub || [0, 1, 0];
-    const off = clampOffset(n.part, cs);
+    const off = nodeClampOffset(n, cs);
     const axis = new THREE.Vector3(n.x - stub[0] * off, n.y - stub[1] * off, n.z - stub[2] * off);
     const tube = n.clampOn ? model.tubes.get(n.clampOn.tubeId) : null;
     // Ohne bekanntes Rohr (importierte Kupplungen sitzen manchmal frei) liegt

@@ -160,6 +160,16 @@ export function clampOffset(part, cs = 5) {
   return part === "bearing" ? cs * 2 : cs;
 }
 
+/**
+ * Abstand der Kupplung, die eine Lagerkupplung traegt, von der Rohrachse.
+ * Sie ist ein gewoehnlicher Knoten -- die Lagerkupplung selbst ist ein
+ * Anbauteil, `bearingOn` verbindet die beiden.
+ */
+export function nodeClampOffset(node, cs = 5) {
+  if (node && node.bearingOn) return cs * 2;
+  return clampOffset(node && node.part, cs);
+}
+
 // Anbauteile, die sich per Klick weiterdrehen lassen: sie sitzen an einer
 // Kupplung und haben eine Achse, fuer die es mehrere Richtungen gibt.
 const ROTATABLE_FITTINGS = new Set([
@@ -299,7 +309,11 @@ export class BuildModel {
   }
 
   removeNode(id) {
-    if (!this.nodes.has(id)) return;
+    const weg = this.nodes.get(id);
+    if (!weg) return;
+    // Die Lagerkupplung gehoert zu der Kupplung, die sie traegt -- faellt die,
+    // faellt auch die Klemme.
+    if (weg.bearingOn) this.fittings.delete(weg.bearingOn);
     for (const t of [...this.tubes.values()]) {
       if (t.a === id || t.b === id) this.tubes.delete(t.id);
     }
@@ -752,6 +766,9 @@ export class BuildModel {
   }
 
   removeFitting(id) {
+    // Die Kupplung, die eine Lagerkupplung trug, steht danach frei -- ihr
+    // Verweis muss weg, sonst zeichnet die Szene weiter einen Stutzen ins Leere.
+    for (const n of this.nodes.values()) if (n.bearingOn === id) { n.bearingOn = null; n.stub = null; }
     this.fittings.delete(id);
   }
 
@@ -832,7 +849,7 @@ export class BuildModel {
     const ab = [b.x - a.x, b.y - a.y, b.z - a.z];
     const L = Math.hypot(ab[0], ab[1], ab[2]) || 1;
     const u = [ab[0] / L, ab[1] / L, ab[2] / L];
-    const off = clampOffset(node.part, cs);
+    const off = nodeClampOffset(node, cs);
     const axis = [node.x - node.stub[0] * off, node.y - node.stub[1] * off, node.z - node.stub[2] * off];
     // 45 Grad um die Rohrachse (Rodrigues). Acht Stellungen -- die Kupplungen
     // sitzen am Rohr, sie muessen sich nicht ins Achsraster fuegen.
@@ -861,6 +878,12 @@ export class BuildModel {
     const L2 = Math.hypot(ns[0], ns[1], ns[2]) || 1;
     const r4 = (v) => Math.round((v / L2) * 1e4) / 1e4;
     node.stub = [r4(ns[0]), r4(ns[1]), r4(ns[2])];
+    // Die Lagerkupplung sitzt auf der Rohrachse und bleibt liegen -- nur ihr
+    // Maul dreht mit, es zeigt weiter von der getragenen Kupplung weg.
+    if (node.bearingOn) {
+      const f = this.fittings.get(node.bearingOn);
+      if (f) f.quat = quatFromXAxis([-node.stub[0], -node.stub[1], -node.stub[2]]);
+    }
     return true;
   }
 
@@ -1160,10 +1183,40 @@ export class BuildModel {
     const m = this.tubeClampMount(tubeId, point, part, cs);
     if (!m) return null;
     const node = this.addNode(round(m.pos[0]), round(m.pos[1]), round(m.pos[2]));
-    node.part = part;
+    // Die Lagerkupplung ist ein ANBAUTEIL, das um das Rohr klemmt, und die
+    // Kupplung, die sie traegt, ein eigener Knoten -- genau so fuehrt die Datei
+    // beides (bearing-connector4 am Rohr, connector3 10 cm daneben). Frueher war
+    // beides EIN Knoten: der Wuerfel gehoerte dann der Klemme, ein Klick darauf
+    // waehlte kein Bauteil, an das sich etwas stecken laesst.
+    if (part === "bearing") {
+      const f = this.addFitting("bearing-connector4", m.achse[0], m.achse[1], m.achse[2],
+        { quat: quatFromXAxis([-m.stub[0], -m.stub[1], -m.stub[2]]) });
+      node.bearingOn = f.id;
+    } else {
+      node.part = part;
+    }
     node.clampOn = { tubeId, t: m.t };
     node.stub = m.stub;
     return node;
+  }
+
+  /**
+   * Lagerkupplung andersherum setzen: erst an eine Kupplung, das Rohr kommt
+   * spaeter. `dir` ist der freie Arm, an dem sie haengt -- die Klemme sitzt eine
+   * doppelte Kupplungslaenge davor, ihr Maul zeigt vom Knoten weg.
+   */
+  addBearingAtArm(nodeId, dir, cs = 5) {
+    const node = this.nodes.get(nodeId);
+    if (!node || node.bearingOn || node.part) return null;
+    const u = norm3(dir);
+    const off = cs * 2;
+    const achse = [node.x + u[0] * off, node.y + u[1] * off, node.z + u[2] * off];
+    if (this.isBelowGround(achse[1])) return null;
+    const f = this.addFitting("bearing-connector4", achse[0], achse[1], achse[2],
+      { quat: quatFromXAxis(u) });
+    node.bearingOn = f.id;
+    node.stub = [round(-u[0]), round(-u[1]), round(-u[2])];
+    return f;
   }
 
   /**
@@ -1179,7 +1232,9 @@ export class BuildModel {
     const pos = [g.axis[0] + g.stub[0] * off, g.axis[1] + g.stub[1] * off, g.axis[2] + g.stub[2] * off];
     if (this.isBelowGround(pos[1])) return null;
     for (const n of this.nodes.values()) {
-      if (n.part === part && Math.hypot(n.x - pos[0], n.y - pos[1], n.z - pos[2]) < 2) return null;
+      if (part === "bearing" ? n.bearingOn : n.part === part) {
+        if (Math.hypot(n.x - pos[0], n.y - pos[1], n.z - pos[2]) < 2) return null;
+      }
     }
     return { tubeId, pos, achse: g.axis, stub: g.stub, t: round(g.t) };
   }
@@ -1213,7 +1268,7 @@ export class BuildModel {
     if (!node || !node.clampOn) return false;
     const g = this._clampGeom(node.clampOn.tubeId, point, node.stub);
     if (!g) return false;
-    const off = clampOffset(node.part, cs);
+    const off = nodeClampOffset(node, cs);
     const pos = [g.axis[0] + node.stub[0] * off, g.axis[1] + node.stub[1] * off, g.axis[2] + node.stub[2] * off];
     if (this.isBelowGround(pos[1])) return false;
     const d = [pos[0] - node.x, pos[1] - node.y, pos[2] - node.z];

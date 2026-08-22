@@ -45,6 +45,13 @@ function neighborDirs(model, node) {
     const d = xAxisOf(f.quat);
     if (!dirs.some((e) => e[0] * d[0] + e[1] * d[1] + e[2] * d[2] > 0.9)) dirs.push(d);
   }
+  // Eine Kupplung, die von einer Lagerkupplung getragen wird, steckt mit einem
+  // Arm in deren Maul -- der ist belegt, obwohl dort kein Rohr sitzt. `stub`
+  // zeigt vom Rohr weg, der Arm also entgegengesetzt.
+  if (node.bearingOn && node.stub) {
+    const d = [-node.stub[0], -node.stub[1], -node.stub[2]];
+    if (!dirs.some((e) => e[0] * d[0] + e[1] * d[1] + e[2] * d[2] > 0.9)) dirs.push(d);
+  }
   // Die Lochzapfenkupplung steckt mit ihrem Zapfen in einem Arm der Kupplung --
   // der ist damit belegt, obwohl dort kein Rohr sitzt. Ohne ihn zaehlte eine
   // T-Kupplung des Ball Cage nur zwei Arme.
