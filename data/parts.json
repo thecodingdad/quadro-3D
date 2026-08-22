@@ -609,9 +609,9 @@
       "code": "TCP",
       "name": "Rohrkappe",
       "price": 2.49,
-      "note": "runde Kappe, verschließt ein offenes Rohrende",
+      "note": "runde Kappe, verschließt ein offenes Rohrende · aus Quadro.exe abgegriffen: tube-cap2 ist 24 mm lang und an einem Ende geschlossen, open-connector2 dagegen eine 50 mm lange, beidseitig offene Hülse",
       "name_en": "Tube cap",
-      "qdf": "open-connector2",
+      "qdf": "tube-cap2",
       "url": "https://quadroshop.com/products/tube-cap"
     },
     {

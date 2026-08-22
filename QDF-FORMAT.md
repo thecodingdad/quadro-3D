@@ -470,6 +470,19 @@ the arm direction **~**; fields 3, 4, 6 and 8 are open **?**.
 Four fields each: material, placement, flag, `0`. They are single small parts
 sitting on a socket. **✔**
 
+The three are easy to mix up, so here is what the software actually draws
+(measured from the meshes captured out of `Quadro.exe`, axis = local +X,
+origin = the connector centre the part sits on):
+
+| Element | Length | Along +X | Ends |
+|---|---:|---|---|
+| `open-connector2` | 50 mm | +25 … +75 | **both open**, inner radius 17 mm |
+| `adapter2` | 55 mm | +25 … +80 | one closed |
+| `tube-cap2` | 24 mm | −45 … −21 | one closed |
+
+So the tube cap is `tube-cap2`, and `open-connector2` is a through sleeve one
+connector length beside the cube. **✔**
+
 ### 5.4 Wheels
 
 `multi-wheel2`, `floating-wheel2`, `hub-cap2`, `casters2` and
