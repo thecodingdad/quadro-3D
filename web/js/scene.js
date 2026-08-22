@@ -203,13 +203,9 @@ function turnMask(mask, cols) {
 }
 
 /**
- * Armmaske -> { Modell, Drehung }. Die abgegriffenen Kupplungen liegen in je
- * einer festen Lage vor; welche der 24 Würfeldrehungen eine davon auf die
- * gesuchte Maske bringt, steht hier. Einmal gebaut, sobald die Modelle da sind.
- *
- * NICHT abgedeckt sind die acht Masken mit drei zueinander SENKRECHTEN Armen
- * (die Raumkupplung 3-armig, z. B. 21 = +X, +Y, +Z): dafür fehlt das Modell.
- * Diese Knoten fallen auf den gezeichneten Würfel zurück.
+ * Armmaske -> { Modell, Drehung }. Die acht abgegriffenen Kupplungen liegen in
+ * je einer festen Lage vor; jede Maske mit mindestens zwei Armen ist genau eine
+ * ihrer 24 Würfeldrehungen. Einmal gebaut, sobald die Modelle da sind.
  */
 let _maskTable = null;
 function maskTable(store) {
@@ -1497,10 +1493,11 @@ export class SceneManager {
 
   // Rutschen-Material je Art, SOLIDE (Gregor): gerade Rutsche rot, Bogenrutsche
   // gruen, Auslauf gelb, Dach grau. Im Aufbau-Modus hervorgehoben.
-  // Beide Seiten, immer: die selbst gezeichnete Rinne ist eine blosse Flaeche,
-  // und auch das abgegriffene Originalmodell braucht sie -- die Herstellersoftware
-  // zeichnet ohne Rueckseiten-Aussortierung, ihre Dreiecke sind deshalb nicht
-  // einheitlich nach aussen gewickelt. Mit FrontSide fehlt die halbe Rutschbahn.
+  // Beide Seiten, immer: die selbst gezeichnete Rinne ist eine blosse Flaeche --
+  // und die abgegriffene auch. Die Rutschbahn der Herstellersoftware hat KEINE
+  // Wandstaerke, sie ist ein einzelner Flaechenzug; von einer Seite betrachtet
+  // faellt mit FrontSide die halbe Rutsche weg. (Der Umlaufsinn selbst ist in
+  // den Modelldateien bereits gerichtet, siehe tmp/extracted/README.md.)
   _slideMatFor(kind, isCurrent, colorId) {
     const COL = {
       "slide2": 0xd23b3b, "slide-new2": 0xd23b3b,  // gerade Rutsche = rot

@@ -289,16 +289,16 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     `variant2` der Datei. Am Bestand gemessen führt `variant2` an den allermeisten Knoten mehr
     Arme als Rohre – gezeichnet stünden dort überall Stutzen ins Leere.
   - `maskTable()` in `scene.js` legt jede Maske über die **24 Würfeldrehungen** auf eines der
-    Modelle. Passt nichts (schiefe Richtung > 20°, zwei Teile auf einem Arm, weniger als zwei
-    Arme, **Bogenrohr** – dessen Krümmung läuft dem geraden 5-cm-Arm davon), zeichnet der alte
-    Pfad Würfel plus Stutzen. Ebenso auf der Qualitätsstufe **„niedrig"**.
-  - **Der Raumkupplung 3-armig fehlt bisher ihr Modell.** Die abgegriffene Datei
-    `connector3_3way_mask13` ist in Wahrheit ein ebenes T (Maske 13 = +X, +Y, −Y) und deshalb
-    nicht eingebunden; drei zueinander senkrechte Arme (z. B. Maske 21) hat der Mitschnitt nicht.
-    Solche Knoten laufen über den Rückfallpfad.
-  - **Beide Seiten rendern bleibt Pflicht.** Die Herstellersoftware zeichnet ohne
-    Rückseiten-Aussortierung; ihre Dreiecke sind nicht einheitlich nach außen gewickelt. Mit
-    `FrontSide` fehlt die halbe Rutschbahn.
+    acht Modelle. Passt nichts (schiefe Richtung > 20°, zwei Teile auf einem Arm, weniger als
+    zwei Arme, **Bogenrohr** – dessen Krümmung läuft dem geraden 5-cm-Arm davon), zeichnet der
+    alte Pfad Würfel plus Stutzen. Ebenso auf der Qualitätsstufe **„niedrig"**. Am größten
+    Beispielmodell greift der Rückfall noch an 6 von 239 Kupplungen.
+  - **Die Raumkupplung 3-armig trägt Maske 21** (+X, +Y, +Z – drei zueinander senkrechte Arme).
+    Maske 13 wäre +X, +Y, −Y und damit wieder ein ebenes T wie Maske 7; wer die Modelle neu
+    abgreift, muss die Maske richtig wählen.
+  - **Beide Seiten rendern bleibt Pflicht.** Der Umlaufsinn ist in den Modelldateien zwar
+    gerichtet, aber die Rutschbahn hat keine Wandstärke – sie ist ein einzelner Flächenzug.
+    Mit `FrontSide` fehlt von einer Seite die halbe Rutsche.
   Geladen wird erst, wenn ein Modell die Teile enthält, und danach zeichnet `onMeshesReady()`
   (in `main.js` auf `builder.refresh()`) einmal neu.
 - **Ansicht zurücksetzen passt ein:** `scene.resetCamera(model)` behält immer den Blickwinkel der

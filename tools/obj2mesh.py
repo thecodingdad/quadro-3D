@@ -35,22 +35,18 @@ TARGET = os.path.join(ROOT, "data", "models")
 # 0x10 +Z, 0x20 -Z) -- dieselbe Bitfolge wie `variant2` in der QDF-Datei.
 # Genommen wird jeweils die Fassung MIT Armen; das echte Teil hat sie, die
 # Herstellersoftware zeichnet sie nur nicht, weil sie im Rohr stecken.
+# Die Raumkupplung 3-armig traegt Maske 21 (+X, +Y, +Z) -- drei zueinander
+# SENKRECHTE Arme. Maske 13 waere +X, +Y, -Y und damit wieder ein ebenes T.
 CONNECTORS = {
     "straight": ("connectors/connector3_straight_mask3_stubs.obj", 3),
     "elbow":    ("connectors/connector3_elbow_mask5_stubs.obj", 5),
     "t":        ("connectors/connector3_t_mask7_stubs.obj", 7),
     "cross":    ("connectors/connector3_cross_mask15_stubs.obj", 15),
+    "3way":     ("connectors/connector3_3way_mask21_stubs.obj", 21),
     "4way":     ("connectors/connector3_4way_mask23_stubs.obj", 23),
     "5way":     ("connectors/connector3_5way_mask31_stubs.obj", 31),
     "6way":     ("connectors/connector3_6way_mask63_stubs.obj", 63),
 }
-
-# NICHT dabei: `connector3_3way_mask13_stubs.obj`. Die Maske 13 ist
-# 0x01|0x04|0x08 = +X, +Y, -Y -- zwei gegenueberliegende Arme plus einer quer,
-# also ein T in EINER Ebene und damit dieselbe Form wie Maske 7. Die
-# Raumkupplung 3-armig braucht drei zueinander SENKRECHTE Arme (z. B. Maske 21
-# = +X, +Y, +Z); dafuer liegt kein Mitschnitt vor. Solche Knoten bekommen
-# weiter den selbst gezeichneten Wuerfel (siehe maskTable in scene.js).
 
 # Rutschen und Dächer, benannt nach ihrer QDF-Elementart.
 SLIDES = {
