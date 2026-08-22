@@ -30,22 +30,28 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_SOURCE = os.path.join(ROOT, "tmp", "extracted", "models")
 TARGET = os.path.join(ROOT, "data", "models")
 
-# Kupplungen: Katalog-Kennung -> (Datei, Arm-Maske). Die Maske sagt, welche der
-# sechs Würfelflächen einen Arm trägt (0x01 +X, 0x02 -X, 0x04 +Y, 0x08 -Y,
+# Kupplungen: Katalog-Kennung -> (Dateirumpf, Arm-Maske). Die Maske sagt, welche
+# der sechs Würfelflächen einen Arm trägt (0x01 +X, 0x02 -X, 0x04 +Y, 0x08 -Y,
 # 0x10 +Z, 0x20 -Z) -- dieselbe Bitfolge wie `variant2` in der QDF-Datei.
-# Genommen wird jeweils die Fassung MIT Armen; das echte Teil hat sie, die
-# Herstellersoftware zeichnet sie nur nicht, weil sie im Rohr stecken.
 # Die Raumkupplung 3-armig traegt Maske 21 (+X, +Y, +Z) -- drei zueinander
 # SENKRECHTE Arme. Maske 13 waere +X, +Y, -Y und damit wieder ein ebenes T.
+#
+# Je Kupplung werden BEIDE Fassungen mitgenommen:
+#   `<rumpf>_stubs.obj` -- mit Armen, wie das echte Teil (Regelfall)
+#   `<rumpf>.obj`       -- Bohrungen gedeckelt, ohne Arme
+# Die zweite braucht die Szene am BOGENROHR: der Arm ist gerade und 5 cm lang,
+# der Bogen weicht auf dieser Strecke 3,1 mm von der Tangente ab. Zwischen Arm
+# (r 21) und Rohrwand (r 24,5) bleiben davon 0,4 mm -- weniger, als das
+# facettierte Rohr an seiner Innenseite verliert. Der Arm stiesse durch.
 CONNECTORS = {
-    "straight": ("connectors/connector3_straight_mask3_stubs.obj", 3),
-    "elbow":    ("connectors/connector3_elbow_mask5_stubs.obj", 5),
-    "t":        ("connectors/connector3_t_mask7_stubs.obj", 7),
-    "cross":    ("connectors/connector3_cross_mask15_stubs.obj", 15),
-    "3way":     ("connectors/connector3_3way_mask21_stubs.obj", 21),
-    "4way":     ("connectors/connector3_4way_mask23_stubs.obj", 23),
-    "5way":     ("connectors/connector3_5way_mask31_stubs.obj", 31),
-    "6way":     ("connectors/connector3_6way_mask63_stubs.obj", 63),
+    "straight": ("connectors/connector3_straight_mask3", 3),
+    "elbow":    ("connectors/connector3_elbow_mask5", 5),
+    "t":        ("connectors/connector3_t_mask7", 7),
+    "cross":    ("connectors/connector3_cross_mask15", 15),
+    "3way":     ("connectors/connector3_3way_mask21", 21),
+    "4way":     ("connectors/connector3_4way_mask23", 23),
+    "5way":     ("connectors/connector3_5way_mask31", 31),
+    "6way":     ("connectors/connector3_6way_mask63", 63),
 }
 
 # Rutschen und Dächer, benannt nach ihrer QDF-Elementart.
@@ -131,7 +137,11 @@ def write(name, data):
         json.dump(data, f, separators=(",", ":"))
         f.write("\n")
     size = os.path.getsize(path) / 1024
-    total = sum(len(m["idx"]) // 3 for m in data.values())
+    total = 0
+    for m in data.values():
+        total += len(m["idx"]) // 3
+        if "closed" in m:
+            total += len(m["closed"]["idx"]) // 3
     print("%-24s %2d Modelle, %6d Dreiecke, %7.1f KB" % (name, len(data), total, size))
 
 
@@ -142,8 +152,9 @@ def main():
 
     connectors = {}
     for key, (rel, mask) in CONNECTORS.items():
-        mesh = convert(os.path.join(source, rel))
+        mesh = convert(os.path.join(source, rel + "_stubs.obj"))
         mesh["mask"] = mask
+        mesh["closed"] = convert(os.path.join(source, rel + ".obj"))
         connectors[key] = mesh
     write("connectors.json", connectors)
 

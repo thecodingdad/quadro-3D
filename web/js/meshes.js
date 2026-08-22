@@ -14,14 +14,17 @@ const stores = {};   // Dateiname -> Promise auf { name -> record }
 
 /**
  * Ein Modell: `pos`/`nrm` als Float32Array (Position in cm), `idx` als
- * Uint16Array. `mask` gibt es nur bei Kupplungen -- die Bitfolge der Arme.
+ * Uint16Array. Kupplungen führen zusätzlich `mask` (die Bitfolge ihrer Arme)
+ * und unter `closed` dieselbe Kupplung ohne Arme, mit gedeckelten Bohrungen.
  */
 function toRecord(raw) {
   const pos = new Float32Array(raw.pos.length);
   for (let i = 0; i < raw.pos.length; i++) pos[i] = raw.pos[i] * POS_TO_CM;
   const nrm = new Float32Array(raw.nrm.length);
   for (let i = 0; i < raw.nrm.length; i++) nrm[i] = raw.nrm[i] * NRM_SCALE;
-  return { pos, nrm, idx: new Uint16Array(raw.idx), mask: raw.mask };
+  const rec = { pos, nrm, idx: new Uint16Array(raw.idx), mask: raw.mask };
+  if (raw.closed) rec.closed = toRecord(raw.closed);
+  return rec;
 }
 
 function load(file) {

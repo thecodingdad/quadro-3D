@@ -857,19 +857,25 @@ export class SceneManager {
    * vor -- welche der 24 Würfeldrehungen es auf die gesuchte Maske bringt, steht
    * in `maskTable()`.
    *
+   * Steckt an dem Knoten ein BOGENROHR, kommt die Fassung OHNE Arme
+   * (`rec.closed`, Bohrungen gedeckelt): der Arm ist gerade und 5 cm lang, der
+   * Bogen weicht auf dieser Strecke 3,1 mm von der Tangente ab, und die 0,4 mm,
+   * die zwischen Arm (r 2,1) und Rohrwand (r 2,45) davon bleiben, frisst schon
+   * die Facettierung des Rohrs -- der Arm stiesse durch die Wand. Sichtbar ist
+   * er dort ohnehin nie, er steckt im Rohr.
+   *
    * `null` kommt heraus, wenn eine Richtung mehr als ~20 Grad von ihrer Achse
-   * abweicht (Rampen, Sparren), wenn zwei Teile denselben Arm belegen, bei
-   * weniger als zwei Armen -- und am Bogenrohr: dessen Krümmung läuft dem
-   * geraden 5-cm-Arm davon, er stiesse durch die Rohrwand.
+   * abweicht (Rampen, Sparren), wenn zwei Teile denselben Arm belegen, oder bei
+   * weniger als zwei Armen.
    */
   _connMeshFor(dirs, cubeQuat) {
     const store = this._connMeshes;
     if (!store || !dirs.length) return null;
     const inv = cubeQuat.clone().invert();
     const v = new THREE.Vector3();
-    let mask = 0;
+    let mask = 0, bow = false;
     for (const e of dirs) {
-      if (e.bow) return null;
+      if (e.bow) bow = true;
       v.set(e.d[0], e.d[1], e.d[2]).applyQuaternion(inv);
       const bit = axisBit(v.x, v.y, v.z);
       if (!bit || mask & bit) return null;
@@ -879,8 +885,9 @@ export class SceneManager {
     if (!entry) return null;
     const rec = store[entry.id];
     if (!rec) return null;
+    const teil = bow && rec.closed ? rec.closed : rec;
     return {
-      geo: this._meshGeometry("conn:" + entry.id, rec),
+      geo: this._meshGeometry("conn:" + entry.id + (teil === rec ? "" : ":zu"), teil),
       quat: cubeQuat.clone().multiply(entry.quat),
     };
   }

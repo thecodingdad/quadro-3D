@@ -290,9 +290,13 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     Arme als Rohre – gezeichnet stünden dort überall Stutzen ins Leere.
   - `maskTable()` in `scene.js` legt jede Maske über die **24 Würfeldrehungen** auf eines der
     acht Modelle. Passt nichts (schiefe Richtung > 20°, zwei Teile auf einem Arm, weniger als
-    zwei Arme, **Bogenrohr** – dessen Krümmung läuft dem geraden 5-cm-Arm davon), zeichnet der
-    alte Pfad Würfel plus Stutzen. Ebenso auf der Qualitätsstufe **„niedrig"**. Am größten
-    Beispielmodell greift der Rückfall noch an 6 von 239 Kupplungen.
+    zwei Arme), zeichnet der alte Pfad Würfel plus Stutzen. Ebenso auf der Qualitätsstufe
+    **„niedrig"**. Am größten Beispielmodell greift der Rückfall noch an 2 von 239 Kupplungen.
+  - **Am Bogenrohr kommt die Fassung ohne Arme** (`rec.closed`, Bohrungen gedeckelt). Der Arm
+    ist gerade und 5 cm lang, der Bogen weicht auf dieser Strecke 3,1 mm von der Tangente ab –
+    von den 3,5 mm zwischen Arm (r 2,1) und Rohrwand (r 2,45) bleiben 0,4 mm, und die frisst
+    schon die Facettierung des Rohrs (0,47 mm bei 16 Segmenten). Zu sehen ist der Arm dort
+    ohnehin nie, er steckt im Rohr.
   - **Die Raumkupplung 3-armig trägt Maske 21** (+X, +Y, +Z – drei zueinander senkrechte Arme).
     Maske 13 wäre +X, +Y, −Y und damit wieder ein ebenes T wie Maske 7; wer die Modelle neu
     abgreift, muss die Maske richtig wählen.
