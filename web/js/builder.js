@@ -1027,6 +1027,13 @@ export class Builder {
         if (this._openingOccupied(center, c.dir)) continue;
         this.scene.addHandle(center, { clampOpening: true, center, dir: c.dir }, "dir");
       }
+      // Dasselbe fuer das noch leere Maul einer Lagerkupplung: der Punkt liegt
+      // GENAU auf der Achse, auf der das Rohr durchlaeuft.
+      for (const o of this.model.bearingOpenings()) {
+        if (this._openingOccupied(o.pos, o.dir)) continue;
+        this.scene.addHandle(o.pos,
+          { clampOpening: true, center: o.pos, dir: o.dir, bearingNode: o.nodeId }, "dir");
+      }
     }
     // Ohne gewaehlte Kupplung zeigen ALLE ihre Ankerpunkte -- so sieht man auf
     // einen Blick, wo sich weiterbauen laesst. Ein Klick auf eine Kupplung
@@ -1090,8 +1097,14 @@ export class Builder {
       : hasArmDirs ? node.armDirs
       : isSlope ? (this._slopeArmDirs(node) || DIAGONAL_DIRECTIONS)
       : DIRECTIONS;
+    // Der Arm, auf dem eine Lagerkupplung steckt, ist belegt -- dort gehoert
+    // kein Rohr hin. Das Rohr laeuft durch ihr MAUL, quer dazu; den Punkt dafuer
+    // setzt _buildHandles ueber `bearingOpenings()`.
+    const lagerArm = node.bearingOn && node.stub
+      ? [-node.stub[0], -node.stub[1], -node.stub[2]] : null;
     for (const d of dirs) {
       if (occupied.has(d.name)) continue;
+      if (lagerArm && (lagerArm[0] * d.vec[0] + lagerArm[1] * d.vec[1] + lagerArm[2] * d.vec[2]) > 0.9) continue;
       // Die Schraege der Winkelkupplung traegt keinen Namen aus DIRECTIONS, ihre
       // Belegung muss ueber die Richtung geprueft werden -- sonst bietet sie den
       // Punkt auch dann noch an, wenn das Rohr schon steckt.
@@ -1518,7 +1531,7 @@ export class Builder {
   }
 
   // Zweite, parallele Tube in die leere Oeffnung setzen (mittig an der Klemme).
-  _placeSecondTube(center, dir) {
+  _placeSecondTube(center, dir, bearingNode = null) {
     const tube = getTube(this.tubeId);
     if (!tube) return;
     const span = spacingFor(tube.length_cm);
@@ -1536,7 +1549,9 @@ export class Builder {
     this.recordHistory(() => {
       const n1 = this.model.addNode(round2(p1[0]), round2(p1[1]), round2(p1[2]));
       const n2 = this.model.addNode(round2(p2[0]), round2(p2[1]), round2(p2[2]));
-      this.model.addTube(n1.id, n2.id, tube.id, this.colorFor("tube"), tube.length_cm);
+      const tb = this.model.addTube(n1.id, n2.id, tube.id, this.colorFor("tube"), tube.length_cm);
+      // Rohr im Maul einer Lagerkupplung: Teil und Rohr gehoeren jetzt zusammen.
+      if (bearingNode && tb) this.model.noteBearingTube(bearingNode, tb.id);
       // Jedes Ende an seinen ausgerichteten Nachbar-Knoten (~Versatz) anbinden,
       // damit die Klemme beide Rohre als Paar zusammenhaelt.
       for (const nn of [n1, n2]) {
@@ -2204,6 +2219,15 @@ export class Builder {
     if (!pick) { this._pickFittingNode(null); return; }
     if (pick.data.kind === "node") {
       const n = this.model.nodes.get(pick.data.id);
+      // Lagerkupplung ohne Rohr: das MAUL dreht weiter, nicht das Teil um ein
+      // Rohr -- damit laesst sich waehlen, wo das Rohr spaeter durchlaeuft.
+      if (n && n.bearingOn && !n.clampOn) {
+        let turned = false;
+        this.recordHistory(() => { turned = this.model.turnBearingMouth(n.id); });
+        if (!turned) this.onNotice(t("notice_fitting_fixed"), "warn");
+        this.refresh();
+        return;
+      }
       if (n && n.clampOn) {
         // Weiterdrehen statt loeschen: der Anschluss rueckt um 90 Grad um das
         // Rohr weiter, das Eingesteckte dreht mit.
@@ -2444,7 +2468,7 @@ export class Builder {
       return;
     }
     if (h) {
-      if (h.data.clampOpening) { this._placeSecondTube(h.data.center, h.data.dir); return; }
+      if (h.data.clampOpening) { this._placeSecondTube(h.data.center, h.data.dir, h.data.bearingNode); return; }
       if (h.data.origin) {
         this.recordHistory(() => {
           // Erste Kupplung auf y = 0 -- genau wie in den Herstellerdateien, wo

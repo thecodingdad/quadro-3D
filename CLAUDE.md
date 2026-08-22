@@ -358,7 +358,12 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     der beides ist. Ihre Lage braucht **zwei** Achsen: lokales +X zeigt von der getragenen
     Kupplung weg, und das geklemmte Rohr läuft entlang des lokalen **+Y** (gemessen an allen 86
     eindeutigen Vorkommen). Nur +X festzulegen lässt die Rolle offen und die Klemme steht quer
-    zum Rohr statt darum – dafür gibt es `bearingQuat()`. Der Stutzen zur Klemme zählt in der Stückliste als Arm (`neighborDirs` in
+    zum Rohr statt darum – dafür gibt es `bearingQuat()`. Steckt noch kein Rohr darin, bietet
+    `bearingOpenings()` einen Ankerpunkt **im Maul** an, genau auf der Achse, auf der das Rohr
+    durchläuft – dieselbe Mechanik wie die freie Öffnung einer Rohrklammer (`clampOpening` →
+    `_placeSecondTube`). Der vom Teil belegte Arm der tragenden Kupplung wird dabei gesperrt,
+    sonst liefe das Rohr längs durch die Klemme statt quer hindurch. Ein Klick auf die Klemme
+    dreht das Maul um 90 Grad weiter (`turnBearingMouth`), solange nichts darin steckt. Der Stutzen zur Klemme zählt in der Stückliste als Arm (`neighborDirs` in
     `bom.js`), sonst stünde dort eine Kupplung mit einem Arm zu wenig.
     Und `bearing2` ist **nicht** dieses Teil: das ist das Radlager, das auf einer Kupplung sitzt
     (124 von 125 Vorkommen auf einer `connector3`), während die Lagerkupplung am Rohr sitzt

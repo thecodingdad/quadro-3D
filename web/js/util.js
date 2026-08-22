@@ -88,6 +88,18 @@ export function xAxisOf(q) {
   return [1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w)];
 }
 
+/** Die lokale +Y-Achse eines Teils in Weltkoordinaten (quat: Three x,y,z,w). */
+export function yAxisOf(q) {
+  const [x, y, z, w] = q;
+  return [2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w)];
+}
+
+/** Die lokale +Z-Achse eines Teils in Weltkoordinaten (quat: Three x,y,z,w). */
+export function zAxisOf(q) {
+  const [x, y, z, w] = q;
+  return [2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)];
+}
+
 /** Mittelpunkt aller Kupplungen -- Bezugspunkt fuer panelNormal. */
 export function modelMiddle(nodes) {
   const m = [0, 0, 0];

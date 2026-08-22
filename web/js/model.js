@@ -7,7 +7,7 @@ import { MERGE_EPS, FORMAT_VERSION, DIAGONAL_SNAP_TOL, DIRECTIONS } from "./conf
 // groesser als das laengste Rohr (75 cm + Kupplung): ein Rohr liegt damit in
 // hoechstens zwei Zellen je Achse.
 const COLL_CELL = 100;
-import { round2 as round, quatFromXAxis, quatFromBasis, xAxisOf } from "./util.js";
+import { round2 as round, quatFromXAxis, quatFromBasis, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
 
 // Wohin ein Anbauteil gehoert, gemessen an den 799 Vorkommen in den Dateien des
 // Herstellers: `at` ist der Anker (Kupplung oder Rohr), `offset` der Abstand in
@@ -1250,6 +1250,46 @@ export class BuildModel {
       }
     }
     return out;
+  }
+
+  /**
+   * Noch leere Maeuler von Lagerkupplungen: dort gehoert ein gerades Rohr
+   * hinein, so wie in die freie Oeffnung einer Rohrklammer. Der Punkt liegt
+   * GENAU auf der Rohrachse -- also im Maul, nicht daneben. `dir` ist die
+   * Lochachse (lokales +Y der Klemme).
+   */
+  bearingOpenings() {
+    const out = [];
+    for (const n of this.nodes.values()) {
+      if (!n.bearingOn || n.clampOn) continue;
+      const f = this.fittings.get(n.bearingOn);
+      if (!f || !f.quat) continue;
+      out.push({ nodeId: n.id, pos: [f.x, f.y, f.z], dir: yAxisOf(f.quat) });
+    }
+    return out;
+  }
+
+  /**
+   * Maul einer noch leeren Lagerkupplung um 90 Grad weiterdrehen -- damit laesst
+   * sich waehlen, in welcher Richtung das Rohr spaeter durchlaeuft. Steckt schon
+   * eines darin, gilt `rotateTubeClamp`.
+   */
+  turnBearingMouth(nodeId) {
+    const n = this.nodes.get(nodeId);
+    if (!n || !n.bearingOn || n.clampOn) return false;
+    const f = this.fittings.get(n.bearingOn);
+    if (!f || !f.quat) return false;
+    // +Y wandert auf +Z, die Ausrichtung (+X) bleibt.
+    f.quat = quatFromBasis(xAxisOf(f.quat), zAxisOf(f.quat),
+      cross3(xAxisOf(f.quat), zAxisOf(f.quat)));
+    return true;
+  }
+
+  /** Rohr im Maul einer Lagerkupplung vermerken. */
+  noteBearingTube(nodeId, tubeId, t = 0.5) {
+    const n = this.nodes.get(nodeId);
+    if (!n || !n.bearingOn) return;
+    n.clampOn = { tubeId, t: round(t) };
   }
 
   /**
