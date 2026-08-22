@@ -5,6 +5,7 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { clampOffset } from "./model.js";
+import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
 import { CONNECTOR_ARM_BITS } from "./qdfimport.js";
@@ -2651,6 +2652,14 @@ export class SceneManager {
     if (wantMeshes && (model.panels.size || (model.textiles && model.textiles.size))) {
       this._ensureMeshes("surfaces");
     }
+    // Verstaerkungsprofile: die abgegriffenen Modelle liegen bei den Anbauteilen.
+    // Sie decken die genormten Laeufe (80 und 60 cm) ab; was uebrig bleibt --
+    // etwa die krummen Abstaende eines gedrehten Aufbaus -- behaelt den
+    // gezeichneten Innenstab. `aluGedeckt` haelt fest, welche Rohre schon ein
+    // Profil haben.
+    const aluModelle = !!(wantMeshes && this._fitMeshes && this._fitMeshes.alu2_800
+      && [...model.tubes.values()].some((t) => t.reinforced));
+    const aluGedeckt = new Set();
 
     // Zustand eines Teils im Aufbaumodus: "done" | "current" | "future".
     const stateOf = (id) => {
@@ -2659,6 +2668,34 @@ export class SceneManager {
       if (asm.done.has(id)) return "done";
       return "future";
     };
+
+    // Verstaerkungsprofile als ganze Laeufe. Sie liegen NEBEN dem Rohr, mit
+    // Pfeilen darauf -- genau so zeigt sie die Herstellersoftware.
+    if (aluModelle && !reinforce) {
+      for (const lauf of reinforcementProfiles(model)) {
+        const zustand = lauf.tubes.map((id) => stateOf(id));
+        if (zustand.every((z) => z === "future")) continue;
+        const rec = this._fitMeshes[
+          Math.abs(lauf.len - 80) < 1 ? "alu2_800" : Math.abs(lauf.len - 60) < 1 ? "alu2_600" : null];
+        if (!rec) continue;
+        for (const id of lauf.tubes) aluGedeckt.add(id);
+        const ex = new THREE.Vector3(lauf.dir[0], lauf.dir[1], lauf.dir[2]).normalize();
+        // Die Rollachse ist frei: im Bestand kommen neun verschiedene vor, eine
+        // Regel gibt es dort nicht. Genommen wird die, die am ehesten nach oben
+        // zeigt -- damit liegt das Profil bei waagerechten Laeufen immer oben.
+        let ey = new THREE.Vector3(0, 1, 0);
+        if (Math.abs(ex.y) > 0.9) ey.set(0, 0, 1);
+        ey.addScaledVector(ex, -ey.dot(ex)).normalize();
+        const ez = new THREE.Vector3().crossVectors(ex, ey);
+        const mat = zustand.some((z) => z === "current") ? this._tubeHighlight("black")
+          : (asm && zustand.every((z) => z === "done")) ? this._fadedMaterial()
+          : this._rodMaterial();
+        this._batchAdd(this._meshGeometry("fit:" + (Math.abs(lauf.len - 80) < 1 ? "alu2_800" : "alu2_600"), rec),
+          mat, new THREE.Matrix4().makeBasis(ex, ey, ez)
+            .setPosition(new THREE.Vector3(lauf.from[0], lauf.from[1], lauf.from[2])),
+          null, null, null);
+      }
+    }
 
     // Kupplungen (Wuerfel)
     for (const n of model.nodes.values()) {
@@ -2930,8 +2967,10 @@ export class SceneManager {
 
       // Verstaerkungsprofil: dünner Innenstab im Bauen-Modus sichtbar.
       // Das Profil (ca. 2,5 cm) liegt im hohlen Rohr (5 cm Außen-Ø) und ragt
-      // durch die Kupplungen hindurch – deshalb volle Rohrlänge.
-      if (t.reinforced && !reinforce && st !== "future") {
+      // durch die Kupplungen hindurch – deshalb volle Rohrlänge. Liegen die
+      // abgegriffenen Modelle vor, zeichnet sie stattdessen `_addAluProfiles()`
+      // als ganze Laeufe NEBEN dem Rohr, so wie die Herstellersoftware.
+      if (t.reinforced && !reinforce && st !== "future" && !aluGedeckt.has(t.id)) {
         // Verstaerkungsprofil: ~30 mm Durchmesser (gemessen), passt in das hohle
         // Rohr (49 mm aussen, 3 mm Wandstaerke -> 43 mm Innen-Durchmesser).
         const rodRadius = 1.5;  // 15 mm Radius = 30 mm Durchmesser in cm

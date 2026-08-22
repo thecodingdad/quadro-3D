@@ -220,8 +220,11 @@ function panelMat(color, holes) {
  * zwischen zwei kollinearen verstaerkten Rohren und reicht hoechstens 40 cm
  * nach jeder Seite (daher die beiden vorkommenden Laengen 800 mm bei 75er
  * Rohren und 600 mm bei 25ern).
+ *
+ * Exportiert, weil `scene.js` dieselben Laeufe zeichnet -- so steht die
+ * Rechnung an EINER Stelle und Bild und Datei koennen nicht auseinanderlaufen.
  */
-function reinforcementProfiles(model) {
+export function reinforcementProfiles(model) {
   const nodeOf = (id) => model.nodes.get(id);
   const list = [...model.tubes.values()].filter((t) => t.reinforced && !t.arm && !t.link
     && nodeOf(t.a) && nodeOf(t.b));
@@ -245,7 +248,7 @@ function reinforcementProfiles(model) {
       const half = Math.min(40, abstand(joint, nodeOf(t1.a === id ? t1.b : t1.a)),
         abstand(joint, nodeOf(t2.a === id ? t2.b : t2.a)));
       out.push({ from: [joint.x + d2[0] * half, joint.y + d2[1] * half, joint.z + d2[2] * half],
-        dir: d1, len: 2 * half });
+        dir: d1, len: 2 * half, tubes: [t1.id, t2.id] });
       gedeckt.add(t1.id).add(t2.id);
     }
   }
@@ -254,7 +257,8 @@ function reinforcementProfiles(model) {
   for (const t of list) {
     if (gedeckt.has(t.id)) continue;
     const a = nodeOf(t.a), b = nodeOf(t.b);
-    out.push({ from: [a.x, a.y, a.z], dir: richtung(a, b), len: Math.min(80, abstand(a, b)) });
+    out.push({ from: [a.x, a.y, a.z], dir: richtung(a, b),
+      len: Math.min(80, abstand(a, b)), tubes: [t.id] });
   }
   return out;
 }

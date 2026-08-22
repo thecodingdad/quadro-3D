@@ -108,16 +108,12 @@ FITTINGS = {
     # Winkelkupplung: sitzt auf dem Stutzen einer Kupplung, am anderen Ende
     # steckt das Schrägrohr. Ihre Lage ist die des Knotens, auf dem sie sitzt.
     "connector45_2": "connector45_2.obj",
+    # Alu-Verstärkungsprofil, beide Längen. Es liegt bewusst NEBEN dem Rohr:
+    # so zeigt es die Herstellersoftware, mit Pfeilen auf das Rohr, das es
+    # verstärkt -- die Pfeile stecken im Modell.
+    "alu2_800": "alu2.obj",
+    "alu2_600": "alu2_600.obj",
 }
-
-# NOCH NICHT dabei: `alu2` (und `alu2_600`). Beide Längen liegen abgegriffen
-# vor, es fehlt aber die LAGE. Der Import behält sie nicht: eine alu2-Zeile
-# setzt nur `reinforced = true` an den Rohren, über die sie läuft, und die Szene
-# zeichnet daraufhin einen dünnen Stab IM Rohr. Das abgegriffene Profil liegt
-# dagegen gar nicht auf der Rohrachse -- sein Körper sitzt rund 40 mm diagonal
-# daneben (y 14..65, z -65..-14 mm). Wer es einbauen will, muss die Profil-Läufe
-# als eigene Teile ins Modell aufnehmen (qdfexport.js rechnet sie beim Speichern
-# ohnehin schon aus) und vorher klären, worauf sich dieser Versatz bezieht.
 
 # Flächen. Die Datei führt ihre Kantenmaße, also braucht es je Größe ein
 # Modell; der Schlüssel ist das Maßpaar aus der QDF-Zeile in Millimetern

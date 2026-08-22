@@ -339,6 +339,14 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     `_surfaceMeshFor()` das Achsenkreuz. Passt kein Maß genau (gedrehte Aufbauten mit 39 statt
     40 cm Spannweite), zeichnet der alte Pfad. Die **Lochplatte** hat keines: die Software
     zeichnet ihre Löcher nicht, unsere Fassung schon.
+  - **Das Verstärkungsprofil liegt NEBEN dem Rohr**, mit Pfeilen darauf – so zeigt es die
+    Herstellersoftware, und die Pfeile stecken im Modell. Gezeichnet werden ganze **Läufe**, nicht
+    Einzelrohre: `reinforcementProfiles()` steht dafür in `qdfexport.js` und wird von `scene.js`
+    mitbenutzt, damit Bild und Datei nicht auseinanderlaufen. Abgegriffen sind 800 und 600 mm;
+    ein Lauf mit krummer Länge (gedrehte Aufbauten) behält den gezeichneten Innenstab, `aluGedeckt`
+    hält die schon versorgten Rohre fest. Die **Rollachse** ist frei wählbar – im Bestand kommen
+    neun verschiedene vor, eine Regel gibt es dort nicht; genommen wird die, die am ehesten nach
+    oben zeigt.
   - **Die Winkelkupplung hat eine EIGENE Lage**, nicht die des Würfels: der Würfel ist
     drehsymmetrisch, sie nicht. An **559 von 726** Vorkommen im Bestand tragen `connector3` und
     `connector45_2` an derselben Stelle verschiedene Quaternionen. Der Import merkt sie als
@@ -346,10 +354,7 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     zurück – ohne das zeigt jede Winkelkupplung in dieselbe Richtung, und ein Rundlauf verdreht
     sie. Fehlt sie (im Editor gesetzt), wird sie aus Hülsenachse und Armrichtung gebaut.
   - **Ohne Modell und warum** – wer eines nachziehen will, muss vorher genau das klären:
-    `alu2` liegt in beiden Längen (800 und 600 mm) abgegriffen vor, aber der Import behält seine
-    **Lage** nicht – eine `alu2`-Zeile setzt nur `reinforced` an den Rohren, über die sie läuft –
-    und das Profil liegt gar nicht auf der Rohrachse, sein Körper sitzt rund 40 mm diagonal
-    daneben; `lattice2` wird zwar anstandslos gelesen, aber von der Software **nie gezeichnet**
+    `lattice2` wird zwar anstandslos gelesen, aber von der Software **nie gezeichnet**
     (auch nicht im Herstellermodell, in dem es vorkommt); `display2` ist nur in 350×350
     abgegriffen (zwei Dreiecke, flach – skalieren genügt); `flexi-connector3` steht **zweimal je
     Gelenk** in der Datei und liegt auf einem Knoten, den die App schon als Kupplung zeichnet
