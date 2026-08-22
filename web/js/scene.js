@@ -5,7 +5,7 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { clampOffset } from "./model.js";
-import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes } from "./meshes.js";
+import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes } from "./meshes.js";
 import { CONNECTOR_ARM_BITS } from "./qdfimport.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -23,14 +23,15 @@ const ONE = new THREE.Vector3(1, 1, 1);
 export const QUALITY_LEVELS = ["low", "medium", "high"];
 // notch = Segmente je Eck-Aussparung einer Platte. 0 heisst rechtwinklig --
 // das passt zur Stufe "low", auf der auch die Kupplungen kantig sind.
-// meshes = die aus der Herstellersoftware abgegriffenen Modelle für Kupplungen,
-// Rutschen und Dächer benutzen (siehe meshes.js). Auf "low" bleibt es bei den
-// selbst gezeichneten Formen: der kantige Würfel kostet 12 Dreiecke, das echte
-// Teil je nach Armzahl 224 bis 624 -- und genau dafür ist die Stufe da.
+// meshes = die aus der Herstellersoftware abgegriffenen Modelle benutzen (siehe
+// meshes.js). Auf ALLEN Stufen: die Teile sollen überall gleich aussehen, sonst
+// steht auf "low" eine andere Kupplung als daneben in der Anleitung. Die Stufe
+// steuert weiter alles, was wir selbst zeichnen -- Rohre, Platten, Schatten,
+// Kantenglättung -- nur eben nicht mehr die Form der abgegriffenen Teile.
 const QUALITY = {
-  low:    { conn: null,      tube: 8,  bow: 8,  notch: 0,  shadow: 0,    antialias: false, meshes: false },
-  medium: { conn: [16, 10],  tube: 16, bow: 14, notch: 6,  shadow: 1024, antialias: true,  meshes: true  },
-  high:   { conn: [48, 32],  tube: 44, bow: 32, notch: 16, shadow: 2048, antialias: true,  meshes: true  },
+  low:    { conn: null,      tube: 8,  bow: 8,  notch: 0,  shadow: 0,    antialias: false, meshes: true },
+  medium: { conn: [16, 10],  tube: 16, bow: 14, notch: 6,  shadow: 1024, antialias: true,  meshes: true },
+  high:   { conn: [48, 32],  tube: 44, bow: 32, notch: 16, shadow: 2048, antialias: true,  meshes: true },
 };
 const DEFAULT_QUALITY = "medium";
 
@@ -164,6 +165,10 @@ const AXIS_TOL = 0.94;
 
 // Halbmesser des abgegriffenen Bogenrohrs (cm): 35er Rohr + Kupplung.
 const BOW_MESH_R = 40;
+
+// So weit rueckt der Import den Punkt des Spielsacks vor (BAG_OFFSET in
+// qdfimport.js). Das abgegriffene Modell braucht den Punkt aus der Datei.
+const BAG_OFFSET = 20;
 
 /** Bit der Würfelachse, auf der diese Richtung liegt -- 0, wenn sie zu schief ist. */
 function axisBit(x, y, z) {
@@ -837,11 +842,13 @@ export class SceneManager {
    * Formen; schlaegt sie fehl, bleibt es dabei.
    */
   _ensureMeshes(which) {
-    const feld = { slides: "_slideMeshes", tubes: "_tubeMeshes" }[which] || "_connMeshes";
+    const feld = { slides: "_slideMeshes", tubes: "_tubeMeshes", fittings: "_fitMeshes" }[which]
+      || "_connMeshes";
     if (this[feld] !== undefined) return this[feld];
     this[feld] = null;   // laeuft -> nicht noch einmal anfordern
     const laden = which === "slides" ? loadSlideMeshes()
-      : which === "tubes" ? loadTubeMeshes() : loadConnectorMeshes();
+      : which === "tubes" ? loadTubeMeshes()
+      : which === "fittings" ? loadFittingMeshes() : loadConnectorMeshes();
     laden.then((rec) => {
       if (!rec) return;
       this[feld] = rec;
@@ -1088,14 +1095,30 @@ export class SceneManager {
     let geo = null, mat = null;
     const cs = geometry().connectorSize;
 
-    // Abgegriffenes Originalmodell, wenn es zu dieser Art eines gibt -- unter den
-    // Anbauteilen ist das bisher nur das grosse Dach; es liegt bei den Rutschen,
-    // weil die Datei es als Dach fuehrt.
-    const echt = this._q().meshes && this._slideMeshes ? this._slideMeshes[f.kind] : null;
+    // Abgegriffenes Originalmodell, wenn es zu dieser Art eines gibt. Alle
+    // Anbauteile sitzen auf ihrer Lage aus der Datei, also reicht _placeFitting.
+    // Zwei Arten brauchen trotzdem noch etwas: der Spielsack haengt IMMER nach
+    // unten (seine Datei-Lage wuerde ihn kippen), und im Baellebad steht Wasser,
+    // das die Herstellersoftware nicht kennt.
+    const echt = this._q().meshes && this._fitMeshes ? this._fitMeshes[f.kind] : null;
     if (echt) {
-      const mesh = new THREE.Mesh(
-        this._meshGeometry("slide:" + f.kind, echt), this._fittingMaterial(hex, false));
-      return [this._placeFitting(mesh, f, q)];
+      const geoEcht = this._meshGeometry("fit:" + f.kind, echt);
+      const matEcht = this._fittingMaterial(
+        f.kind === "floating-wheel2" && !f.color ? 0x8f9296 : hex, false);
+      const mesh = this._placeFitting(new THREE.Mesh(geoEcht, matEcht), f, q);
+      // Der Spielsack: der Import ruecht seinen Punkt um BAG_OFFSET auf die
+      // Mitte seines Feldes vor (qdfimport.js), das Modell erwartet aber den
+      // Punkt, wie er in der Datei steht -- also wieder zurueck. Seine eigene
+      // Lage darf er dabei behalten: die Herstellersoftware zeichnet ihn genau
+      // so, unsere Aufrichtung war ein Behelf fuer die gezeichnete Form.
+      if (f.kind === "bag2") {
+        mesh.position.addScaledVector(new THREE.Vector3(0, 0, 1).applyQuaternion(q), -BAG_OFFSET);
+      }
+      const teile = [mesh];
+      const wasser = f.kind === "pool2" || f.kind === "pool-small2"
+        ? this._poolWater(f, q) : null;
+      if (wasser) teile.push(wasser);
+      return teile;
     }
 
     switch (f.kind) {
@@ -1340,6 +1363,29 @@ export class SceneManager {
   }
 
   /** Anbauteil an seinen Platz drehen und setzen. */
+  /**
+   * Wasserquader im Baellebad, 75 % der Wandhoehe. Die Herstellersoftware
+   * zeichnet nur die Folie; das Wasser ist unsere Zutat und bleibt auch am
+   * abgegriffenen Becken. Masse wie bei der gezeichneten Folie -- Bezugspunkt
+   * ist die Oberkante der Frontwand, von dort `h` nach unten.
+   */
+  _poolWater(f, q) {
+    const pw = f.w || 0, ph = f.h || 0, pd = f.d || 0;
+    if (!pw || !ph || !pd) return null;
+    const tief = Math.abs(pd), dz = pd < 0 ? -1 : 1;
+    const ein = POOL_INSET, dick = POOL_SKIN;
+    const breite = pw - 2 * ein, laenge = tief - 2 * ein, hoehe = ph - ein;
+    const h = hoehe * 0.75;
+    const geo = this._cachedGeo(
+      `poolwater${breite}x${h}x${laenge}@${ph},${dz}`,
+      () => {
+        const g = new THREE.BoxGeometry(breite - 2 * dick, h, laenge - 2 * dick);
+        g.translate(0, -ph + dick + h / 2, dz * tief / 2);
+        return g;
+      });
+    return this._placeFitting(new THREE.Mesh(geo, this._waterMaterial()), f, q);
+  }
+
   _placeFitting(mesh, f, q) {
     mesh.quaternion.copy(q);
     mesh.position.set(f.x, f.y, f.z);
@@ -2481,10 +2527,8 @@ export class SceneManager {
     const wantMeshes = qual.meshes;
     if (wantMeshes && model.nodes.size) this._ensureMeshes("connectors");
     if (wantMeshes && [...model.tubes.values()].some((t) => t.bow)) this._ensureMeshes("tubes");
-    // Das grosse Dach ist ein Anbauteil, liegt aber bei den Rutschen.
-    const wantsSlideMeshes = model.slides.size
-      || [...(model.fittings ? model.fittings.values() : [])].some((f) => f.kind === "roof-large2");
-    if (wantMeshes && wantsSlideMeshes) this._ensureMeshes("slides");
+    if (wantMeshes && model.slides.size) this._ensureMeshes("slides");
+    if (wantMeshes && model.fittings && model.fittings.size) this._ensureMeshes("fittings");
 
     // Zustand eines Teils im Aufbaumodus: "done" | "current" | "future".
     const stateOf = (id) => {

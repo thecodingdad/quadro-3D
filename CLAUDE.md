@@ -283,15 +283,17 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
 
 - `catalog.js` lädt `../data/parts.json` relativ – die App muss unter `/web/` ausgeliefert werden.
 - **Abgegriffene Originalmodelle** (`data/models/*.json`, erzeugt aus `tmp/extracted/models/` mit
-  `tools/obj2mesh.py`): Kupplungen, Rutschen und Dächer zeichnet die Szene damit statt aus
-  Primitiven. Vier Dinge, die dabei zählen:
+  `tools/obj2mesh.py`): Kupplungen, das Bogenrohr, Rutschen, Dächer und die Anbauteile zeichnet
+  die Szene damit statt aus Primitiven – auf **allen** Qualitätsstufen, damit ein Teil überall
+  gleich aussieht. Vier Dateien, je eine Gruppe: `connectors`, `tubes`, `slides`, `fittings`.
+  Was dabei zählt:
   - **Die Armmaske kommt aus den Rohren, die wirklich anstecken** (`tubeDirsAt`), nicht aus
     `variant2` der Datei. Am Bestand gemessen führt `variant2` an den allermeisten Knoten mehr
     Arme als Rohre – gezeichnet stünden dort überall Stutzen ins Leere.
   - `maskTable()` in `scene.js` legt jede Maske über die **24 Würfeldrehungen** auf eines der
     acht Modelle. Passt nichts (schiefe Richtung > 20°, zwei Teile auf einem Arm, weniger als
-    zwei Arme), zeichnet der alte Pfad Würfel plus Stutzen. Ebenso auf der Qualitätsstufe
-    **„niedrig"**. Am größten Beispielmodell greift der Rückfall noch an 2 von 239 Kupplungen.
+    zwei Arme), zeichnet der alte Pfad Würfel plus Stutzen. Am größten Beispielmodell greift
+    der Rückfall noch an 2 von 239 Kupplungen.
   - **Das Bogenrohr kommt ebenfalls aus dem Mitschnitt** (`data/models/tubes.json`,
     `_bowMeshFor()`). Das ist keine Kosmetik: der selbst gezeichnete Bogen bog schon an der
     Kupplungsfläche ein und ließ dem geraden 5-cm-Arm nur 0,4 mm Luft – weniger, als die
@@ -309,6 +311,19 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   - **Beide Seiten rendern bleibt Pflicht.** Der Umlaufsinn ist in den Modelldateien zwar
     gerichtet, aber die Rutschbahn hat keine Wandstärke – sie ist ein einzelner Flächenzug.
     Mit `FrontSide` fehlt von einer Seite die halbe Rutsche.
+  - **Anbauteile** sitzen alle auf ihrer Lage aus der Datei, `_placeFitting()` genügt. Zwei
+    Ausnahmen: der **Spielsack** – der Import rückt seinen Punkt um `BAG_OFFSET` (20 cm) auf die
+    Feldmitte vor, das Modell erwartet den Punkt aus der Datei, also wieder zurück; und das
+    **Bällebad**, das seinen Wasserquader behält (den zeichnet die Herstellersoftware nicht).
+  - **Ohne Modell und warum** – wer eines nachziehen will, muss vorher genau das klären:
+    `panel2`/`textil2`/`display2`/`lattice2` führen ihre Kantenmaße in der Datei, ein Modell mit
+    EINER Größe deckt das nicht ab (`lattice2` ist ohnehin nicht abgegriffen); `alu2` kommt mit
+    800 **und** 600 mm vor, abgegriffen ist nur die lange Fassung; `clamp2`/`clip2` haben einen
+    festen Lochabstand, der echte hängt an den geklemmten Rohren; `connector45_2` wird nicht als
+    Anbauteil gesetzt, sondern am Knoten aus Hülse, Körper und 45°-Arm gebaut;
+    `flexi-connector3` steht **zweimal je Gelenk** in der Datei und liegt auf einem Knoten, den
+    die App schon als Kupplung zeichnet (`part = "flexi"`) – das Modell käme doppelt und über
+    den Würfel.
   Geladen wird erst, wenn ein Modell die Teile enthält, und danach zeichnet `onMeshesReady()`
   (in `main.js` auf `builder.refresh()`) einmal neu.
 - **Ansicht zurücksetzen passt ein:** `scene.resetCamera(model)` behält immer den Blickwinkel der

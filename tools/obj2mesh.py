@@ -66,7 +66,48 @@ SLIDES = {
     "curved-slide2": "curved-slide2.obj",
     "slide-end2": "slide-end2.obj",
     "roof2": "roof2.obj",
+}
+
+# Anbauteile. Alle sitzen auf ihrer Lage aus der Datei (Punkt + Quaternion),
+# genau wie `_placeFitting` in scene.js sie setzt -- deshalb genügt hier die
+# Elementart als Schlüssel.
+#
+# NICHT dabei und warum:
+#   tube2                       gerades Rohr -- ein Zylinder, da gibt der
+#                               Mitschnitt nichts her (round-tube2 siehe TUBES)
+#   panel2, textil2, display2   die Datei führt ihre Kantenmaße; ein Modell mit
+#                               EINER festen Größe deckt das nicht ab
+#   lattice2                    ebenfalls bemaßt -- und gar nicht abgegriffen
+#   alu2                        kommt mit 800 UND 600 mm vor, abgegriffen ist
+#                               nur die lange Fassung
+#   alu-connector2, wood-bed2,  kommen im Bestand nicht vor, die App kennt sie
+#   chairseatback2              nicht
+#   clamp2, clip2               Doppelrohrverbinder: der Lochabstand hängt an den
+#                               geklemmten Rohren, das Modell hat einen festen
+#   connector45_2               wird nicht als Anbauteil gesetzt, sondern aus
+#                               Hülse, Körper und 45°-Arm am Knoten gebaut
+#   flexi-connector3            steht in der Datei zweimal je Gelenk und liegt
+#                               auf einem Knoten, den die App schon als Kupplung
+#                               zeichnet (`part = "flexi"`) -- das Modell käme
+#                               doppelt und über den Würfel
+FITTINGS = {
+    "multi-wheel2": "multi-wheel2.obj",
+    "floating-wheel2": "floating-wheel2.obj",
+    "hub-cap2": "hub-cap2.obj",
+    "casters2": "casters2.obj",
+    "steering-lock2": "steering-lock2.obj",
+    "bearing2": "bearing2.obj",
+    "bearing-connector4": "bearing-connector4.obj",
+    "adapter2": "adapter2.obj",
+    "open-connector2": "open-connector2.obj",
+    "tube-cap2": "tube-cap2.obj",
+    "hole-connector4": "hole-connector4.obj",
+    "bolt2": "bolt2.obj",
+    "textil-round2": "textil-round2.obj",
     "roof-large2": "roof-large2.obj",
+    "bag2": "bag2.obj",
+    "pool2": "pool2.obj",
+    "pool-small2": "pool-small2.obj",
 }
 
 POS_SCALE = 10      # mm -> 0,1 mm
@@ -162,6 +203,9 @@ def main():
 
     slides = {key: convert(os.path.join(source, rel)) for key, rel in SLIDES.items()}
     write("slides.json", slides)
+
+    write("fittings.json",
+          {key: convert(os.path.join(source, rel)) for key, rel in FITTINGS.items()})
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ const SCHALE = [
   "icons/icon-512.png",
   "data/parts.json",
   "data/models/connectors.json",
+  "data/models/fittings.json",
   "data/models/slides.json",
   "data/models/tubes.json",
   "web/index.html",

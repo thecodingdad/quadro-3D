@@ -59,3 +59,8 @@ export function loadTubeMeshes() {
 export function loadSlideMeshes() {
   return load("slides.json");
 }
+
+/** Anbauteile: Räder, Klemmen, Tücher, Bällebad ... nach QDF-Elementart. */
+export function loadFittingMeshes() {
+  return load("fittings.json");
+}
