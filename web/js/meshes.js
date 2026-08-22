@@ -64,3 +64,11 @@ export function loadSlideMeshes() {
 export function loadFittingMeshes() {
   return load("fittings.json");
 }
+
+/**
+ * Flächen (Platten, Tücher). Der Schlüssel führt das Maßpaar aus der QDF-Zeile
+ * mit: `panel2_350x150` = Feld 3 (lokale Y-Achse) x Feld 5 (lokale X-Achse).
+ */
+export function loadSurfaceMeshes() {
+  return load("surfaces.json");
+}

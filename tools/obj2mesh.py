@@ -75,17 +75,10 @@ SLIDES = {
 # NICHT dabei und warum:
 #   tube2                       gerades Rohr -- ein Zylinder, da gibt der
 #                               Mitschnitt nichts her (round-tube2 siehe TUBES)
-#   panel2, textil2, display2   die Datei führt ihre Kantenmaße; ein Modell mit
-#                               EINER festen Größe deckt das nicht ab
-#   lattice2                    ebenfalls bemaßt -- und gar nicht abgegriffen
-#   alu2                        kommt mit 800 UND 600 mm vor, abgegriffen ist
-#                               nur die lange Fassung
+#   display2, lattice2          bemaßt und im Bestand nicht (display2) bzw. gar
+#                               nicht abgegriffen (lattice2)
 #   alu-connector2, wood-bed2,  kommen im Bestand nicht vor, die App kennt sie
 #   chairseatback2              nicht
-#   clamp2, clip2               Doppelrohrverbinder: der Lochabstand hängt an den
-#                               geklemmten Rohren, das Modell hat einen festen
-#   connector45_2               wird nicht als Anbauteil gesetzt, sondern aus
-#                               Hülse, Körper und 45°-Arm am Knoten gebaut
 #   flexi-connector3            steht in der Datei zweimal je Gelenk und liegt
 #                               auf einem Knoten, den die App schon als Kupplung
 #                               zeichnet (`part = "flexi"`) -- das Modell käme
@@ -108,6 +101,43 @@ FITTINGS = {
     "bag2": "bag2.obj",
     "pool2": "pool2.obj",
     "pool-small2": "pool-small2.obj",
+    # Klemmen. Die lokale +X-Achse ist die Richtung des umschlossenen Rohrs --
+    # genau so schreibt sie qdfexport.js (quatFromX(c.dir)).
+    "clamp2": "clamp2.obj",
+    "clip2": "clip2.obj",
+    # Winkelkupplung: sitzt auf dem Stutzen einer Kupplung, am anderen Ende
+    # steckt das Schrägrohr. Ihre Lage ist die des Knotens, auf dem sie sitzt.
+    "connector45_2": "connector45_2.obj",
+}
+
+# NOCH NICHT dabei: `alu2` (und `alu2_600`). Beide Längen liegen abgegriffen
+# vor, es fehlt aber die LAGE. Der Import behält sie nicht: eine alu2-Zeile
+# setzt nur `reinforced = true` an den Rohren, über die sie läuft, und die Szene
+# zeichnet daraufhin einen dünnen Stab IM Rohr. Das abgegriffene Profil liegt
+# dagegen gar nicht auf der Rohrachse -- sein Körper sitzt rund 40 mm diagonal
+# daneben (y 14..65, z -65..-14 mm). Wer es einbauen will, muss die Profil-Läufe
+# als eigene Teile ins Modell aufnehmen (qdfexport.js rechnet sie beim Speichern
+# ohnehin schon aus) und vorher klären, worauf sich dieser Versatz bezieht.
+
+# Flächen. Die Datei führt ihre Kantenmaße, also braucht es je Größe ein
+# Modell; der Schlüssel ist das Maßpaar aus der QDF-Zeile in Millimetern
+# (Feld 3 = lokale Y-Achse, Feld 5 = lokale X-Achse).
+#
+# Genommen wird genau das, was wirklich vorkommt -- über 233 Herstellerdateien
+# gezählt: Platten nur 350x350 (2792x), 150x350 und 350x150 (zusammen 106x)
+# sowie 250x250 (16x), Tücher nur 350x750 (63x), 600x750 (11x), 590x750 (7x)
+# und 550x750 (1x). Die halbe Platte gibt es hier nur einmal -- 150x350 ist
+# dieselbe, um 90 Grad um ihre Normale gedreht; das macht die Szene.
+# Die Lochplatte hat kein Modell: die Software zeichnet ihre Löcher nicht,
+# unsere gezeichnete Fassung schon.
+SURFACES = {
+    "panel2_350x350": "panel2_350x350.obj",
+    "panel2_350x150": "panel2_350x150.obj",
+    "panel2_250x250": "panel2_250x250.obj",
+    "textil2_350x750": "textil2_350x750.obj",
+    "textil2_550x750": "textil2_550x750.obj",
+    "textil2_590x750": "textil2_590x750.obj",
+    "textil2_600x750": "textil2_600x750.obj",
 }
 
 POS_SCALE = 10      # mm -> 0,1 mm
@@ -206,6 +236,9 @@ def main():
 
     write("fittings.json",
           {key: convert(os.path.join(source, rel)) for key, rel in FITTINGS.items()})
+
+    write("surfaces.json",
+          {key: convert(os.path.join(source, rel)) for key, rel in SURFACES.items()})
 
 
 if __name__ == "__main__":

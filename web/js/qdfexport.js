@@ -323,7 +323,17 @@ export function buildQDF(model) {
     // Die Winkelkupplung ERSETZT die Kupplung nicht, sie steckt auf ihr: in den
     // Herstellerdateien steht an derselben Lage beides, 726 von 732 Vorkommen.
     lines.push(`connector3{${CONNECTOR_MAT}, ${tuple(q, n.x, n.y, n.z)}, 1, 0, ${mask}, ${63 - mask}, ${RENDER_MASK}, 0}`);
-    if (c45) lines.push(`connector45_2{${CONNECTOR_MAT}, ${tuple(q, n.x, n.y, n.z)}, 1, 0, 0}`);
+    // Die Winkelkupplung hat eine EIGENE Lage -- nicht die des Wuerfels. Der
+    // Wuerfel ist drehsymmetrisch, sie nicht: an 559 der 726 Vorkommen in den
+    // Herstellerdateien tragen connector3 und connector45_2 an derselben Stelle
+    // verschiedene Quaternionen. Kam sie aus einer Datei, geht sie unveraendert
+    // wieder hinaus; sonst bleibt es bei der Wuerfel-Lage.
+    if (c45) {
+      const q45 = n.c45quat && n.c45quat.length === 4
+        ? encodeQuat([n.c45quat[3], n.c45quat[0], n.c45quat[1], n.c45quat[2]])
+        : q;
+      lines.push(`connector45_2{${CONNECTOR_MAT}, ${tuple(q45, n.x, n.y, n.z)}, 1, 0, 0}`);
+    }
     stats.connectors++;
   }
 

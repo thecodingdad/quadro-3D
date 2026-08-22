@@ -494,10 +494,10 @@
       "name_en": "Panel 80 x 80 cm",
       "w": 80,
       "h": 80,
-      "price": 12.99,
-      "buildable": true,
+      "price": 0,
+      "buildable": false,
       "colored": true,
-      "note": "großes Feld aus vier 75er-Rohren",
+      "note": "GIBT ES NICHT – im Shop nicht gelistet und in keiner der 233 Herstellerdateien mit Platten; dort kommen nur 40x40, 40x20 und 30x30 vor. Bleibt im Katalog, damit ältere Entwürfe mit dieser Kennung weiter laden",
       "url": "https://quadroshop.com/collections/panels"
     },
     {
@@ -507,10 +507,10 @@
       "name_en": "Panel 80 x 20 cm",
       "w": 80,
       "h": 20,
-      "price": 8.99,
-      "buildable": true,
+      "price": 0,
+      "buildable": false,
       "colored": true,
-      "note": "75er x 15er Feld",
+      "note": "GIBT ES NICHT – siehe panel_80x80",
       "url": "https://quadroshop.com/collections/panels"
     },
     {
@@ -548,9 +548,9 @@
       "w": 70,
       "h": 120,
       "price": 0,
-      "buildable": true,
+      "buildable": false,
       "colored": true,
-      "note": "großes Rechteck-Panel; L2-fix · gehört zum Pool-/Bällebad-Set, im Shop nicht einzeln gelistet",
+      "note": "GIBT ES NICHT als Platte – gehört zum Pool-/Bällebad-Set und wird dort als Teil des Beckens gezeichnet; frei setzbar war sie ein Versehen",
       "url": "https://quadroshop.com/collections/pools"
     },
     {

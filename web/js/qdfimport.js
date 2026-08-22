@@ -369,7 +369,16 @@ export function parseQDF(text, opts = {}) {
         // Kardinale Huelsenachse: Richtung, in der die C45-Huelse auf einen Arm
         // der Basiskupplung gesteckt ist (= +X-Arm des connector45-Quaternions,
         // auf die naechste Achse gerundet). Steuert die Adapter-Darstellung.
-        nd._c45axis = nearestCardinal(rotateByQuat(decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]), [1, 0, 0]));
+        const qc = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
+        nd._c45axis = nearestCardinal(rotateByQuat(qc, [1, 0, 0]));
+        // EIGENE Lage der Winkelkupplung (Three-Order x,y,z,w). Sie ist NICHT
+        // die des Wuerfels: an 559 der 726 Vorkommen im Bestand tragen
+        // connector3 und connector45_2 an derselben Stelle verschiedene
+        // Quaternionen -- der Wuerfel ist ja drehsymmetrisch, die Winkelkupplung
+        // nicht. Ohne sie zeigt jede Winkelkupplung in dieselbe Richtung.
+        const cn = Math.hypot(qc[0], qc[1], qc[2], qc[3]) || 1;
+        const cq = (v) => Math.round((v / cn) * 1e4) / 1e4;
+        nd.c45quat = [cq(qc[1]), cq(qc[2]), cq(qc[3]), cq(qc[0])];
       } else {
         // connector3: Bei 45°-Drehung (Diagonalkupplung) die rotierten Arm-Richtungen
         // speichern. Dann braucht man beim Weiterbauen KEINEN C45-Adapter.
@@ -1000,6 +1009,7 @@ export function parseQDF(text, opts = {}) {
       if (n.partQuat) o.partQuat = n.partQuat;   // Ausrichtung der Klemm-Kupplung
       if (n.c45body) o.c45body = true;
       if (n.c45axis) o.c45axis = n.c45axis;
+      if (n.c45quat) o.c45quat = n.c45quat; // eigene Lage der Winkelkupplung
       if (n.armDirs) o.armDirs = n.armDirs; // rotierte Arm-Richtungen (45-gedrehte Kupplung)
       if (n.arms) o.arms = n.arms; // variant2: echte Arm-Stutzen (inkl. offener Arme)
       if (n.quat) o.quat = n.quat; // Wuerfel-Orientierung der Kupplung (Three x,y,z,w)

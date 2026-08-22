@@ -315,15 +315,48 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     Ausnahmen: der **Spielsack** – der Import rückt seinen Punkt um `BAG_OFFSET` (20 cm) auf die
     Feldmitte vor, das Modell erwartet den Punkt aus der Datei, also wieder zurück; und das
     **Bällebad**, das seinen Wasserquader behält (den zeichnet die Herstellersoftware nicht).
+  - **Teile mit Maßen in der Datei** führen ihre Kantenmaße als QDF-Felder 3 und 5, ein Modell
+    mit EINER Größe deckt sie nicht ab. Abgegriffen ist inzwischen jedes Maß aus Korpus und
+    Katalog, benannt `<element>_<Feld3>x<Feld5>.obj`: `panel2` in neun Größen (350×350, 350×150,
+    150×350, 750×750, 750×150, 250×250, 650×1150, 1150×350, 1150×1550), `textil2` in vier
+    (350×750, 550×750, 590×750, 600×750), `alu2` in beiden Längen (`alu2.obj` = 800 mm,
+    `alu2_600.obj` = 600 mm). Die Platte ist dabei **reine Skalierung** – immer 22 Dreiecke,
+    Kiste = Maß + 50 mm, Dicke 47,1 mm; das Alu-Profil dagegen nicht (800 mm hat 268, 600 mm
+    nur 220 Dreiecke).
+  - **Die Lochplatte gibt es in der Herstellersoftware nicht.** Die Datei unterscheidet sie
+    nicht (kein Feld dafür), und geprüft ist auch, dass es nicht an der Darstellung liegt: alle
+    neun Platten-Materialien liefern dieselben 22 Dreiecke, und die einzigen `.bmp`-Zeichenketten
+    der Binärdatei gehören zu einem Datei-Dialog, nicht zu einer eingebauten Textur.
+    `hole_panel_40x40.obj` ist deshalb ein **Nachbau** (`tools/make_hole_panel.py`): alles außer
+    der Deckfläche stammt unverändert aus dem Mitschnitt, die Deckfläche ist mit 3 × 3 Löchern
+    neu vernetzt. Raster 120 mm, Durchmesser 90 mm, Wandtiefe 16 mm sind aus dem Herstellerbild
+    **geschätzt** – wer die echten Maße hat, erzeugt die Datei mit drei Zahlen neu.
+  - **Flächen** (`data/models/surfaces.json`) gibt es je Maßpaar, weil die Datei die Kantenmaße
+    führt. Gebraucht werden nur die, die es wirklich gibt – über 233 Herstellerdateien gezählt:
+    Platten **40x40** (2792×), **40x20** (106×) und **30x30** (16×), Tücher **80x40** (63×),
+    **80x65** (11×), **80x64** (7×) und **80x60** (1×). Andere Größen führt der Katalog nicht
+    mehr als setzbar. Die halbe Platte liegt in einer Drehung vor, quer dreht
+    `_surfaceMeshFor()` das Achsenkreuz. Passt kein Maß genau (gedrehte Aufbauten mit 39 statt
+    40 cm Spannweite), zeichnet der alte Pfad. Die **Lochplatte** hat keines: die Software
+    zeichnet ihre Löcher nicht, unsere Fassung schon.
+  - **Die Winkelkupplung hat eine EIGENE Lage**, nicht die des Würfels: der Würfel ist
+    drehsymmetrisch, sie nicht. An **559 von 726** Vorkommen im Bestand tragen `connector3` und
+    `connector45_2` an derselben Stelle verschiedene Quaternionen. Der Import merkt sie als
+    `node.c45quat`, `_c45Placement()` setzt das Modell damit, und der Export schreibt sie
+    zurück – ohne das zeigt jede Winkelkupplung in dieselbe Richtung, und ein Rundlauf verdreht
+    sie. Fehlt sie (im Editor gesetzt), wird sie aus Hülsenachse und Armrichtung gebaut.
   - **Ohne Modell und warum** – wer eines nachziehen will, muss vorher genau das klären:
-    `panel2`/`textil2`/`display2`/`lattice2` führen ihre Kantenmaße in der Datei, ein Modell mit
-    EINER Größe deckt das nicht ab (`lattice2` ist ohnehin nicht abgegriffen); `alu2` kommt mit
-    800 **und** 600 mm vor, abgegriffen ist nur die lange Fassung; `clamp2`/`clip2` haben einen
-    festen Lochabstand, der echte hängt an den geklemmten Rohren; `connector45_2` wird nicht als
-    Anbauteil gesetzt, sondern am Knoten aus Hülse, Körper und 45°-Arm gebaut;
-    `flexi-connector3` steht **zweimal je Gelenk** in der Datei und liegt auf einem Knoten, den
-    die App schon als Kupplung zeichnet (`part = "flexi"`) – das Modell käme doppelt und über
-    den Würfel.
+    `alu2` liegt in beiden Längen (800 und 600 mm) abgegriffen vor, aber der Import behält seine
+    **Lage** nicht – eine `alu2`-Zeile setzt nur `reinforced` an den Rohren, über die sie läuft –
+    und das Profil liegt gar nicht auf der Rohrachse, sein Körper sitzt rund 40 mm diagonal
+    daneben; `lattice2` wird zwar anstandslos gelesen, aber von der Software **nie gezeichnet**
+    (auch nicht im Herstellermodell, in dem es vorkommt); `display2` ist nur in 350×350
+    abgegriffen (zwei Dreiecke, flach – skalieren genügt); `flexi-connector3` steht **zweimal je
+    Gelenk** in der Datei und liegt auf einem Knoten, den die App schon als Kupplung zeichnet
+    (`part = "flexi"`) – das Modell käme doppelt und über den Würfel.
+  - **`clip2` ist abgegriffen**, brauchte aber einen Trick: in Feld 4 muss **0** stehen. Mit der
+    `3` der einzigen Korpuszeile lädt die Datei und die Software zeichnet nichts (siehe
+    `QDF-FORMAT.md` §5.3).
   Geladen wird erst, wenn ein Modell die Teile enthält, und danach zeichnet `onMeshesReady()`
   (in `main.js` auf `builder.refresh()`) einmal neu.
 - **Ansicht zurücksetzen passt ein:** `scene.resetCamera(model)` behält immer den Blickwinkel der

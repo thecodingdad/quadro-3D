@@ -420,7 +420,13 @@ clip2{2, {2., 0., 0., 2., 0., 260., 0.}, 1, 0, 3}
 | 1 | placement, anchor = a point on the tube, local +X = tube direction | ✔ |
 | 2 | active flag | ~ |
 | 3 | 0, except two `clamp2` lines carrying step numbers | ? |
-| 4 | `clip2` only: `3` in the single line we have | ? |
+| 4 | `clip2` only: **must be `0` for the part to be drawn** | ✔ |
+
+Field 4 of `clip2` was worth chasing: with the `3` of the single corpus line
+the software loads the file and draws nothing at all, with `0` the clip appears
+(208 triangles, 50 × 95 × 57 mm). Field counts matter as well — four or seven
+fields make the software reject the **whole file**, five and six are accepted.
+That is how the mesh in `tmp/extracted/models/clip2.obj` was obtained. **✔**
 
 The double-tube connector is a figure eight holding **two parallel tubes**
 about 50 mm apart; the file stores only one point, and the second tube has to

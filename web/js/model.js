@@ -1947,7 +1947,7 @@ export class BuildModel {
       const rec = versetzt(n, "n", "nodes");
       this.nodes.set(rec.id, {
         id: rec.id, x: rec.x, y: rec.y, z: rec.z,
-        c45: !!n.c45, c45body: !!n.c45body, c45axis: n.c45axis || null,
+        c45: !!n.c45, c45body: !!n.c45body, c45axis: n.c45axis || null, c45quat: n.c45quat || null,
         armDirs: n.armDirs || null, arms: n.arms || null, quat: n.quat || null,
         part: n.part || null, clampOn: n.clampOn ? { ...n.clampOn } : null,
         stub: n.stub || null, ownConnector: !!n.ownConnector, c45file: !!n.c45file,
@@ -2267,6 +2267,7 @@ export class BuildModel {
       if (!n) continue;
       dreheOrt(n);
       if (n.quat) n.quat = spinAroundY(n.quat, grad);
+      if (n.c45quat) n.c45quat = spinAroundY(n.c45quat, grad);
       if (n.partQuat) n.partQuat = spinAroundY(n.partQuat, grad);
       if (n.stub) n.stub = dreheDir(n.stub);
       if (n.c45axis) n.c45axis = dreheDir(n.c45axis);
@@ -2361,7 +2362,7 @@ export class BuildModel {
       if (!target) continue;
       // Kennzeichen der verschwindenden Kupplung uebernehmen, soweit die
       // ueberlebende noch keines hat (Schraegen-Traeger, Wuerfel-Drehung).
-      for (const key of ["c45", "c45body", "c45axis", "quat", "arms", "armDirs"]) {
+      for (const key of ["c45", "c45body", "c45axis", "c45quat", "quat", "arms", "armDirs"]) {
         if (!target[key] && n[key]) target[key] = n[key];
       }
       this._replaceNodeRefs(id, target.id);
@@ -2868,6 +2869,7 @@ export class BuildModel {
         if (n.partQuat) o.partQuat = n.partQuat; // Ausrichtung der Klemm-Kupplung aus der Datei
         if (n.c45body) o.c45body = true; // Adapter-Koerper am Arm-Ende der C45
         if (n.c45axis) o.c45axis = n.c45axis; // kardinale Huelsenachse des Adapters
+        if (n.c45quat) o.c45quat = n.c45quat; // eigene Lage der Winkelkupplung (Three x,y,z,w)
         if (n.armDirs) o.armDirs = n.armDirs; // gespeicherte Arm-Richtungen (rotierte Kupplung)
         if (n.arms) o.arms = n.arms; // echte Arm-Stutzen aus variant2 (Darstellung)
         if (n.quat) o.quat = n.quat; // Wuerfel-Orientierung der Kupplung (Three x,y,z,w)
@@ -2949,7 +2951,8 @@ export class BuildModel {
     let maxSeq = 0;
     for (const n of data.nodes) {
       this.nodes.set(n.id, { id: n.id, x: n.x, y: n.y, z: n.z, c45: !!n.c45, c45body: !!n.c45body,
-        c45axis: n.c45axis || null, armDirs: n.armDirs || null, arms: n.arms || null, quat: n.quat || null,
+        c45axis: n.c45axis || null, c45quat: n.c45quat || null,
+        armDirs: n.armDirs || null, arms: n.arms || null, quat: n.quat || null,
         part: n.part || null, clampOn: n.clampOn || null, stub: n.stub || null,
         ownConnector: !!n.ownConnector, c45file: !!n.c45file, unused: !!n.unused,
         partQuat: n.partQuat || null });

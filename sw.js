@@ -22,6 +22,7 @@ const SCHALE = [
   "data/models/connectors.json",
   "data/models/fittings.json",
   "data/models/slides.json",
+  "data/models/surfaces.json",
   "data/models/tubes.json",
   "web/index.html",
   "web/css/style.css",

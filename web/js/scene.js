@@ -5,7 +5,8 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { clampOffset } from "./model.js";
-import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes } from "./meshes.js";
+import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
+  loadSurfaceMeshes } from "./meshes.js";
 import { CONNECTOR_ARM_BITS } from "./qdfimport.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -842,13 +843,14 @@ export class SceneManager {
    * Formen; schlaegt sie fehl, bleibt es dabei.
    */
   _ensureMeshes(which) {
-    const feld = { slides: "_slideMeshes", tubes: "_tubeMeshes", fittings: "_fitMeshes" }[which]
-      || "_connMeshes";
+    const feld = { slides: "_slideMeshes", tubes: "_tubeMeshes", fittings: "_fitMeshes",
+      surfaces: "_surfMeshes" }[which] || "_connMeshes";
     if (this[feld] !== undefined) return this[feld];
     this[feld] = null;   // laeuft -> nicht noch einmal anfordern
     const laden = which === "slides" ? loadSlideMeshes()
       : which === "tubes" ? loadTubeMeshes()
-      : which === "fittings" ? loadFittingMeshes() : loadConnectorMeshes();
+      : which === "fittings" ? loadFittingMeshes()
+      : which === "surfaces" ? loadSurfaceMeshes() : loadConnectorMeshes();
     laden.then((rec) => {
       if (!rec) return;
       this[feld] = rec;
@@ -892,6 +894,114 @@ export class SceneManager {
       geo: this._meshGeometry("conn:" + entry.id, rec),
       quat: cubeQuat.clone().multiply(entry.quat),
     };
+  }
+
+  /**
+   * Abgegriffenes Modell zu einer Flaeche (Platte oder Tuch), passend zu ihrer
+   * Spannweite. Geliefert wird Geometrie samt Lage-Matrix, oder `null` -- dann
+   * zeichnet der Aufrufer wie bisher.
+   *
+   * Achsen wie in der Datei (siehe rectLine in qdfexport.js): lokales X entlang
+   * der Kante A->B, lokales Z die Normale, Y = Z x X. Der Bezugspunkt ist die
+   * Mitte der vier Ecken, also die Rohrachsen-Ebene -- der Versatz auf den
+   * Rohrscheitel steckt schon im Modell (dessen Z laeuft von -22 bis +25 mm).
+   *
+   * Der Schluessel ist das Masspaar in Millimetern, Feld 3 (lokale Y-Achse)
+   * zuerst. Die halbe Platte liegt nur in EINER Drehung vor; kommt sie quer,
+   * wird das Kreuz um 90 Grad um die Normale gedreht.
+   */
+  _surfaceMeshFor(art, xAxis, zAxis, spanX, spanZ, center, nrmArr, side) {
+    const store = this._surfMeshes;
+    if (!store) return null;
+    const cs = geometry().connectorSize;
+    const mm = (cm) => Math.round((cm - cs) * 10);
+    const key = `${art}_${mm(spanZ)}x${mm(spanX)}`;
+    const quer = `${art}_${mm(spanX)}x${mm(spanZ)}`;
+    const rec = store[key] || store[quer];
+    if (!rec) return null;
+    const gedreht = !store[key];
+    const nrm = new THREE.Vector3(nrmArr[0], nrmArr[1], nrmArr[2]).normalize()
+      .multiplyScalar((side || 1) < 0 ? -1 : 1);
+    // Rechtshaendiges Dreibein zur gewaehlten Normalen, X bleibt die Kante A->B.
+    const ex = gedreht ? zAxis.clone() : xAxis.clone();
+    ex.addScaledVector(nrm, -ex.dot(nrm)).normalize();
+    const ey = new THREE.Vector3().crossVectors(nrm, ex).normalize();
+    return {
+      geo: this._meshGeometry("surf:" + (gedreht ? quer : key), rec),
+      matrix: new THREE.Matrix4().makeBasis(ex, ey, nrm).setPosition(center),
+    };
+  }
+
+  /**
+   * Drehung des Kupplungswuerfels an diesem Knoten. Importierte Kupplungen
+   * drehen exakt um ihre Quaternion aus der Datei, damit die Arme aus den
+   * Flaechen kommen -- auch bei Rampenwinkeln (30°/60°). Kardinale Kupplungen
+   * sind invariant. Manuell gebaute Schraegen (ohne quat) drehen 45 Grad um die
+   * Schraegen-Achse.
+   */
+  _nodeCubeQuat(model, n) {
+    const quat = new THREE.Quaternion();
+    if (n.quat && n.quat.length === 4) {
+      quat.set(n.quat[0], n.quat[1], n.quat[2], n.quat[3]).normalize();
+    } else {
+      const sa = this._slopeRotationAxis(model, n);
+      if (sa) quat.setFromAxisAngle(sa, Math.PI / 4);
+    }
+    return quat;
+  }
+
+  /**
+   * Basiskupplung einer Winkelkupplung: der Knoten, auf dessen Stutzen sie
+   * steckt. Beim Import ist das der Knoten am anderen Ende der Arm-Kante des
+   * Adapter-Koerpers, im Editor der Knoten selbst. Die Datei fuehrt die
+   * `connector45_2` genau dort und mit dessen Lage (siehe qdfexport.js).
+   */
+  _c45BaseNode(model, n) {
+    if (!n.c45body) return n;
+    for (const t of model.tubes.values()) {
+      if (!t.arm) continue;
+      if (t.a === n.id) return model.nodes.get(t.b) || null;
+      if (t.b === n.id) return model.nodes.get(t.a) || null;
+    }
+    return null;
+  }
+
+  /**
+   * Lage-Matrix für das abgegriffene Modell der Winkelkupplung, oder `null`.
+   *
+   * Sie hat eine EIGENE Drehung, nicht die des Würfels: der Würfel ist
+   * drehsymmetrisch, die Winkelkupplung nicht, und an 559 der 726 Vorkommen im
+   * Bestand tragen `connector3` und `connector45_2` an derselben Stelle
+   * verschiedene Quaternionen. Aus der Datei kommt sie als `c45quat`.
+   *
+   * Fehlt sie (im Editor gesetzt), wird sie gebaut: lokales +X ist die Achse,
+   * auf der die Hülse steckt (`c45axis`), lokales +Y die Querkomponente des
+   * 45-Grad-Arms -- im Modell läuft die Hülse von 15 bis 95 mm auf +X und der
+   * Arm bis 93 mm auf +Y.
+   */
+  _c45Placement(model, n) {
+    const basis = this._c45BaseNode(model, n);
+    if (!basis) return null;
+    const pos = new THREE.Vector3(basis.x, basis.y, basis.z);
+    if (basis.c45quat && basis.c45quat.length === 4) {
+      const q = new THREE.Quaternion(
+        basis.c45quat[0], basis.c45quat[1], basis.c45quat[2], basis.c45quat[3]).normalize();
+      return new THREE.Matrix4().compose(pos, q, ONE);
+    }
+    const achse = n.c45axis || basis.c45axis;
+    if (!achse) return null;
+    const ex = new THREE.Vector3(achse[0], achse[1], achse[2]).normalize();
+    // Richtung des 45-Grad-Arms: zum Adapter-Koerper, sonst aus der Schraege.
+    const ziel = n.c45body ? n : null;
+    const arm = ziel
+      ? new THREE.Vector3(ziel.x - basis.x, ziel.y - basis.y, ziel.z - basis.z)
+      : (this._c45ArmDirAt ? null : null);
+    if (!arm || arm.lengthSq() < 1e-6) return null;
+    const ey = arm.addScaledVector(ex, -arm.dot(ex));
+    if (ey.lengthSq() < 1e-6) return null;
+    ey.normalize();
+    const ez = new THREE.Vector3().crossVectors(ex, ey);
+    return new THREE.Matrix4().makeBasis(ex, ey, ez).setPosition(pos);
   }
 
   /**
@@ -1586,7 +1696,11 @@ export class SceneManager {
       "slide-end2": 0xf0c020,                       // Auslauf = gelb
       "roof2": 0x37a23f,                            // Dach-Tuch = gruen, durchsichtig
     };
-    const transp = kind === "roof2"; // Dach-Tuch durchsichtig wie ein Textil (Gregor)
+    // Das Dach ist deckend wie jedes andere Teil. Es war einmal durchscheinend
+    // gedacht ("Tuch"), war damit aber das einzige halbdurchsichtige Stueck im
+    // Bild -- und seit es aus dem abgegriffenen Modell kommt, ist es ohnehin ein
+    // Formteil und kein Tuch.
+    const transp = false;
     // Im Editor gesetzte Rutschen tragen die gewaehlte Baufarbe; importierte
     // ohne Farbangabe behalten die feste Farbe ihrer Art.
     const hex = colorId ? colorHex(colorId) : (COL[kind] || 0x9aa3ad);
@@ -2528,7 +2642,14 @@ export class SceneManager {
     if (wantMeshes && model.nodes.size) this._ensureMeshes("connectors");
     if (wantMeshes && [...model.tubes.values()].some((t) => t.bow)) this._ensureMeshes("tubes");
     if (wantMeshes && model.slides.size) this._ensureMeshes("slides");
-    if (wantMeshes && model.fittings && model.fittings.size) this._ensureMeshes("fittings");
+    // Anbauteile-Datei traegt auch Klemmen und die Winkelkupplung.
+    const wantsFitMeshes = (model.fittings && model.fittings.size)
+      || (model.clamps && model.clamps.size)
+      || [...model.nodes.values()].some((n) => n.c45);
+    if (wantMeshes && wantsFitMeshes) this._ensureMeshes("fittings");
+    if (wantMeshes && (model.panels.size || (model.textiles && model.textiles.size))) {
+      this._ensureMeshes("surfaces");
+    }
 
     // Zustand eines Teils im Aufbaumodus: "done" | "current" | "future".
     const stateOf = (id) => {
@@ -2569,17 +2690,7 @@ export class SceneManager {
       // schliesst das Rohrende selbst ab.
       if (!n.c45body && n.part !== "hole_1" && !(model.hasWheelCap && model.hasWheelCap(n))) {
         const pos = new THREE.Vector3(n.x, n.y, n.z);
-        const quat = new THREE.Quaternion();
-        // Importierte Kupplung: Wuerfel exakt um ihre Quaternion drehen, damit die
-        // Arme aus den Flaechen kommen -- auch bei Rampenwinkeln (30°/60°). Kardinale
-        // Kupplungen sind invariant. Manuell gebaute Schraegen (ohne quat) drehen wie
-        // bisher 45° um die Schraegen-Achse (_slopeRotationAxis).
-        if (n.quat && n.quat.length === 4) {
-          quat.set(n.quat[0], n.quat[1], n.quat[2], n.quat[3]).normalize();
-        } else {
-          const sa = this._slopeRotationAxis(model, n);
-          if (sa) quat.setFromAxisAngle(sa, Math.PI / 4);
-        }
+        const quat = this._nodeCubeQuat(model, n);
         // Das abgegriffene Originalteil, wenn es zum Anschlussbild passt: EIN
         // Mesh mit Bohrungen und Armen, also auch keine Stutzen mehr dazu.
         const dirs = tubeDirsAt.get(n.id) || [];
@@ -2620,7 +2731,16 @@ export class SceneManager {
         const c45base = (asm && st === "done")
           ? this._fadedMaterial() : this._c45Material();
         const c45mat = matFor(n.id, c45base);
-        if (n.c45body) {
+        // Abgegriffenes Originalteil: EIN Mesh auf der Basiskupplung, mit deren
+        // Lage -- genau dort und so fuehrt die Datei die connector45_2. Huelse,
+        // Koerper und 45-Grad-Arm stecken darin, es braucht keinen Zusammenbau.
+        const echtC45 = wantMeshes && this._fitMeshes
+          ? this._fitMeshes["connector45_2"] : null;
+        const c45lage = echtC45 ? this._c45Placement(model, n) : null;
+        if (c45lage) {
+          this._batchAdd(this._meshGeometry("fit:connector45_2", echtC45), c45mat,
+            c45lage, "node", n.id, this.pickNodes);
+        } else if (n.c45body) {
           // Import: n ist der Adapter-Koerper am Diagonal-Fuss; die Basis sitzt
           // am anderen Ende der Arm-Kante. Huelse laeuft kardinal von der Basis.
           const ad = this._c45AdapterGeo(model, n);
@@ -2861,13 +2981,26 @@ export class SceneManager {
         [xAxis.x, xAxis.y, xAxis.z], [zAxis.x, zAxis.y, zAxis.z],
         [center.x, center.y, center.z], middle,
       );
+      const mat = st === "future" ? this._ghostMaterial()
+        : (asm && st === "done") ? this._fadedMaterial(true)
+        : this._panelMaterial(p.color, st === "current", false);
+      // Abgegriffenes Originalteil, wenn es die Groesse gibt. Es bringt seinen
+      // Versatz auf den Rohrscheitel selbst mit, also OHNE `lift` und mit der
+      // rohen Eckenmitte. Die Lochplatte hat keines -- die Software zeichnet
+      // ihre Loecher nicht.
+      const echteFlaeche = wantMeshes && !(getPanel(p.panelId) || {}).holes
+        ? this._surfaceMeshFor("panel2", xAxis, zAxis, u.length(), w.length(),
+          center.clone(), nrm, p.side)
+        : null;
+      if (echteFlaeche) {
+        this._batchAdd(echteFlaeche.geo, matFor(p.id, mat), echteFlaeche.matrix,
+          "panel", p.id, this.pickPanels);
+        continue;
+      }
       const lift = (geometry().tubeRadius || 2.45) - thickness / 2;
       const sgn = (p.side || 1) < 0 ? -1 : 1;
       center.add(new THREE.Vector3(nrm[0], nrm[1], nrm[2]).multiplyScalar(lift * sgn));
       const geo = this._panelGeometry(p.panelId, u.length(), w.length(), thickness);
-      const mat = st === "future" ? this._ghostMaterial()
-        : (asm && st === "done") ? this._fadedMaterial(true)
-        : this._panelMaterial(p.color, st === "current", false);
       // Gleiches Mass + gleiche Farbe teilen sich Geometrie und Material -> ein
       // Buendel. In grossen Modellen sind die Platten sonst der groesste
       // verbliebene Posten (56 Platten = 56 Draw-Calls).
@@ -2908,6 +3041,22 @@ export class SceneManager {
       const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
       const q = new THREE.Quaternion().setFromRotationMatrix(
         new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
+      // Abgegriffenes Originalteil: dort laeuft das umschlossene Rohr entlang
+      // dem lokalen +X und das zweite Loch liegt in -Z -- die Achsen, die auch
+      // qdfexport.js schreibt (quatFromX(c.dir)), nicht die des gezeichneten
+      // Koerpers. Also ein eigenes Kreuz statt des obigen.
+      const echt = wantMeshes && this._fitMeshes
+        ? this._fitMeshes[klammer ? "clip2" : "clamp2"] : null;
+      if (echt) {
+        const zM = off ? off.clone().normalize().negate() : yAxis.clone();
+        const yM = new THREE.Vector3().crossVectors(zM, dir).normalize();
+        const qM = new THREE.Quaternion().setFromRotationMatrix(
+          new THREE.Matrix4().makeBasis(dir, yM, zM));
+        this._batchAdd(this._meshGeometry("fit:" + (klammer ? "clip2" : "clamp2"), echt), mat,
+          new THREE.Matrix4().compose(new THREE.Vector3(c.x, c.y, c.z), qM, ONE),
+          "clamp", c.id, this.pickClamps);
+        continue;
+      }
       this._batchAdd(this._clampBodyGeometry(klammer, d), mat,
         new THREE.Matrix4().compose(new THREE.Vector3(c.x, c.y, c.z), q, ONE),
         "clamp", c.id, this.pickClamps);
@@ -2931,9 +3080,20 @@ export class SceneManager {
       const xAxis = u.clone().normalize();
       const zAxis = w.clone().normalize();
       const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
-      const geo = new THREE.BoxGeometry(u.length(), 0.6, w.length());
       const mat = matFor(tx.id,
         st === "future" ? this._ghostMaterial() : this._panelMaterial(tx.color, st === "current", false));
+      // Abgegriffenes Originaltuch, wenn es die Groesse gibt. Die Normale
+      // bestimmt hier dieselbe Regel wie bei der Platte, damit das Tuch nicht
+      // je nach Ecken-Reihenfolge einmal oben und einmal unten liegt.
+      const echtesTuch = wantMeshes ? this._surfaceMeshFor("textil2", xAxis, zAxis,
+        u.length(), w.length(), center.clone(),
+        panelNormal([xAxis.x, xAxis.y, xAxis.z], [zAxis.x, zAxis.y, zAxis.z],
+          [center.x, center.y, center.z], middle), tx.side) : null;
+      if (echtesTuch) {
+        this._batchAdd(echtesTuch.geo, mat, echtesTuch.matrix, "textile", tx.id, this.pickTextiles);
+        continue;
+      }
+      const geo = new THREE.BoxGeometry(u.length(), 0.6, w.length());
       const mesh = new THREE.Mesh(geo, mat);
       mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
       mesh.position.copy(center);
