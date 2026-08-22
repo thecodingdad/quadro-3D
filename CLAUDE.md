@@ -385,6 +385,13 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     `QDF-FORMAT.md` §5.3).
   Geladen wird erst, wenn ein Modell die Teile enthält, und danach zeichnet `onMeshesReady()`
   (in `main.js` auf `builder.refresh()`) einmal neu.
+- **Bau-Richtungen folgen der Kupplung, nicht der Welt.** `_armDirsOf()` in `builder.js` nimmt
+  die sechs Würfelachsen aus `node.quat` – damit baut eine um 22,5° gedrehte Kupplung ihr Rohr
+  auch um 22,5° gedreht, und `extend()` gibt die Lage an den neuen Knoten weiter, sonst knickte
+  das nächste Rohr wieder auf die Weltachsen zurück. Das ältere `node.armDirs` aus dem Import ist
+  nur noch Rückfall: es wurde beim Einlesen mit `nearestNamedDir` auf die nächste **benannte**
+  Richtung gerundet und konnte deshalb nur 0° und 45°. `_occupiedDirs()` prüft gegen dieselbe
+  Liste – wer die eine ändert, muss die andere mitziehen.
 - **Ansicht zurücksetzen passt ein:** `scene.resetCamera(model)` behält immer den Blickwinkel der
   Vorgabe (`_defaultCam`), rückt aber Bildmitte und Abstand so, dass die Kiste um alle Teile ins
   Bild passt. Gerechnet wird mit den **acht Ecken** (eine Kugel um die Kiste ließe flache Modelle

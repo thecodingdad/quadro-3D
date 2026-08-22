@@ -2674,6 +2674,10 @@ export class BuildModel {
       return { collision: true };
     }
     const to = this.addNode(target.x, target.y, target.z);
+    // Der neue Knoten steht in derselben Lage wie der, von dem gebaut wird --
+    // sonst boete er am Ende einer gedrehten Reihe wieder die Weltachsen an und
+    // das naechste Rohr knickte weg.
+    if (from.quat && !to.quat) to.quat = from.quat.slice();
     const tube = this.addTube(from.id, to.id, tubeId, color, length);
     return { node: to, tube };
   }

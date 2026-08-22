@@ -2699,7 +2699,11 @@ export function initUI({ scene, model, builder }) {
   // `_fittingMeshes` für sie in den Default). Hervorgehoben wird deshalb die
   // Kupplung bzw. das Rohr, an der sie sitzen -- sonst bliebe der Klick auf die
   // Zeile ohne jede Wirkung.
-  const UNDRAWN_FITTINGS = new Set(["flexi-connector3", "bolt2", "bearing-connector4", "tube-cap2"]);
+  // Anbauteile, die die Szene NICHT zeichnet -- ihre Hervorhebung braucht einen
+  // sichtbaren Ersatz in der Naehe. Seit die abgegriffenen Modelle da sind, ist
+  // das nur noch die Flexikupplung; Bolzen, Lagerkupplung und Rohrkappe werden
+  // gezeichnet und heben sich selbst hervor.
+  const UNDRAWN_FITTINGS = new Set(["flexi-connector3"]);
 
   /** Sichtbarer Stellvertreter für ein Teil, das nicht gezeichnet wird. */
   function visibleStandIn(f) {

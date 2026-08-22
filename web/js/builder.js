@@ -5,7 +5,7 @@ import { geometry, getTube, spacingFor, getPanel, defaultPanel, diagonalTubeId, 
 import { computeBuildPlan, connectorLabelInfo } from "./buildplan.js";
 import { infeasibleConnectors, inferConnectorType } from "./bom.js";
 import { t } from "./i18n.js";
-import { round2, panelNormal, modelMiddle } from "./util.js";
+import { round2, panelNormal, modelMiddle, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
 import { TUBE_FITTINGS, POOL_KINDS } from "./model.js";
 
 // Kupplungen, die auf einem Rohr sitzen statt im Raster: QDF-Art -> Katalogteil.
@@ -1076,10 +1076,34 @@ export class Builder {
   }
 
   /** Ankerpunkte einer einzelnen Kupplung (Bau-Modus). */
+  /**
+   * Die sechs Arm-Richtungen einer Kupplung -- ihre EIGENEN Wuerfelachsen, nicht
+   * die der Welt. Eine gedrehte Kupplung (aus der Datei oder vom Schraegbau)
+   * traegt ihre Lage in `quat`; von dort kommen die Achsen exakt, in jedem
+   * Winkel. `armDirs` aus aelteren Staenden ist nur der Rueckfall -- die wurden
+   * beim Einlesen auf die naechste benannte Richtung GERUNDET und konnten
+   * deshalb nur 0 und 45 Grad, eine 22,5-Grad-Kupplung stand damit schief.
+   *
+   * Liefert `null` fuer die ungedrehte Kupplung; dort gelten die Weltachsen.
+   */
+  _armDirsOf(node) {
+    if (node.quat && node.quat.length === 4) {
+      const ex = xAxisOf(node.quat), ey = yAxisOf(node.quat), ez = zAxisOf(node.quat);
+      const neg = (v) => [-v[0], -v[1], -v[2]];
+      return [
+        { name: "+X", vec: ex }, { name: "-X", vec: neg(ex) },
+        { name: "+Y", vec: ey }, { name: "-Y", vec: neg(ey) },
+        { name: "+Z", vec: ez }, { name: "-Z", vec: neg(ez) },
+      ];
+    }
+    return (node.armDirs && node.armDirs.length) ? node.armDirs : null;
+  }
+
   _addBuildHandles(node, gap) {
-    // Rotierte Kupplung (armDirs aus QDF-Import): eigene Arm-Richtungen verwenden,
-    // die Kupplung ist bereits korrekt ausgerichtet.
-    const hasArmDirs = node.armDirs && node.armDirs.length > 0;
+    // Gedrehte Kupplung: ihre eigenen Arm-Richtungen verwenden, sie ist bereits
+    // korrekt ausgerichtet.
+    const armDirs = this._armDirsOf(node);
+    const hasArmDirs = !!armDirs;
     // Schraeg-Konnektor: liegt auf einer Schraege (hat schon ein Diagonalrohr) =
     // ist bereits 45-Grad gedreht.
     const isSlope = !hasArmDirs && this._hasDiagonalTube(node);
@@ -1094,7 +1118,7 @@ export class Builder {
     const dirs = c45Dir ? [{ name: "c45", vec: c45Dir }]
       : (node.stub && node.part === "hole_1")
       ? [{ name: "stub", vec: node.stub }]   // auch nach 45-Grad-Drehungen gueltig
-      : hasArmDirs ? node.armDirs
+      : hasArmDirs ? armDirs
       : isSlope ? (this._slopeArmDirs(node) || DIAGONAL_DIRECTIONS)
       : DIRECTIONS;
     // Der Arm, auf dem eine Lagerkupplung steckt, ist belegt -- dort gehoert
@@ -1203,12 +1227,13 @@ export class Builder {
     const occ = new Set();
     // Rotierte Kupplung (armDirs aus QDF-Import): Belegung gegen gespeicherte
     // Arm-Richtungen pruefen (nicht gegen DIRECTIONS/DIAGONAL_DIRECTIONS).
-    if (node.armDirs && !node.c45body) {
+    const eigene = node.c45body ? null : this._armDirsOf(node);
+    if (eigene) {
       for (const nb of this.model.neighbors(node.id)) {
         if (!nb) continue;
         const dx = nb.x - node.x, dy = nb.y - node.y, dz = nb.z - node.z;
         const len = Math.hypot(dx, dy, dz) || 1;
-        for (const d of node.armDirs) {
+        for (const d of eigene) {
           if ((dx * d.vec[0] + dy * d.vec[1] + dz * d.vec[2]) / len > ARM_ALIGN_TOL) {
             occ.add(d.name);
           }
