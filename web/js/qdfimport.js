@@ -147,6 +147,25 @@ function isDiag45(d) {
   return Math.abs(a[0] - Math.SQRT1_2) < 0.04 && Math.abs(a[1] - Math.SQRT1_2) < 0.04 && a[2] < 0.04;
 }
 
+/**
+ * Zuschlag zu einem Mass (cm). Die Datei fuehrt jedes Mass als PAAR: Grundmass
+ * und direkt dahinter eine Zahl, die fast immer 0 ist. Wo sie es nicht ist,
+ * gehoert sie DAZU -- die Strecke ist die Summe.
+ *
+ * Gemessen an den Herstellerdateien: von den 729 tube2-Zeilen mit einem
+ * Zuschlag trifft das ferne Rohrende eine Kupplung in 665 Faellen MIT und in
+ * 3 Faellen OHNE ihn; bei Platten liegen 74 von 96 mit Zuschlag auf allen vier
+ * Ecken, ohne nur 25. Vorkommen tut das in gedrehten Aufbauten (22,5 Grad):
+ * dort steckt das Rohr schraeg im Kupplungswuerfel, der Mittenabstand ist
+ * darum groesser als Rohrlaenge + Kupplung.
+ *
+ * Das Teil selbst wird davon nicht laenger -- die Katalog-Zuordnung laeuft
+ * weiter ueber das Grundmass.
+ */
+function padOf(rest, i) {
+  return typeof rest[i] === "number" ? rest[i] / 10 : 0;
+}
+
 // renderRange-Filter (aus dem Referenz-Viewer): Der Viewer rendert NUR Rohre/
 // Platten OHNE renderRangeStart-Feld; Datensätze MIT diesem Feld sind Alternativ-
 // Pass-/Hilfsgeometrie -- meist exakte Duplikate. Wir verwerfen sie wie der Viewer.
@@ -423,7 +442,8 @@ export function parseQDF(text, opts = {}) {
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const sx = p.tuple[4] / 10, sy = p.tuple[5] / 10, sz = p.tuple[6] / 10;
       const lenCm = (typeof p.rest[3] === "number" ? p.rest[3] : 350) / 10;
-      const R = lenCm + conn;
+      const pad = padOf(p.rest, 4);              // Zuschlag zum Mass (siehe padOf)
+      const R = lenCm + pad + conn;
       const T = rotateByQuat(q, [1, 0, 0]);
       const N = rotateByQuat(q, [0, 1, 0]);
       const cx = sx + N[0] * R, cy = sy + N[1] * R, cz = sz + N[2] * R;
@@ -439,7 +459,8 @@ export function parseQDF(text, opts = {}) {
         tubeId: curvedTubeId, color: materials.get(mat) || FALLBACK_COLOR,
         length: null, bow: true, bowCenter: [round(cx), round(cy), round(cz)],
         // Wie beim geraden Rohr: eigene Lage aus der Datei (Tangente T, Normale N).
-        geom: { p0: [round(sx), round(sy), round(sz)], dir: T.map(r6), up: N.map(r6), len: lenCm },
+        geom: { p0: [round(sx), round(sy), round(sz)], dir: T.map(r6), up: N.map(r6), len: lenCm,
+          ...(pad ? { pad: round(pad) } : {}) },
       });
     } else if (p.name === "tube2") {
       if (!p.tuple || p.tuple.length < 7) continue;
@@ -447,8 +468,10 @@ export function parseQDF(text, opts = {}) {
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const sx = p.tuple[4] / 10, sy = p.tuple[5] / 10, sz = p.tuple[6] / 10;
       const lenCm = (typeof p.rest[3] === "number" ? p.rest[3] : 350) / 10;
+      const pad = padOf(p.rest, 4);              // Zuschlag zum Mass (siehe padOf)
+      // Das TEIL richtet sich nach dem Grundmass -- laenger wird es nicht.
       const def = nearestTube(tubeCatalog, lenCm);
-      const span = lenCm + conn;
+      const span = lenCm + pad + conn;
       // Dank √-Dekodierung ist dir die ECHTE Richtung: kardinal, sauberes 45°
       // (C45-Diagonale) oder ein echter Rampen-Winkel (z.B. 30°/60°, Doppelrohr).
       const dir = rotateByQuat(q, [1, 0, 0]);
@@ -468,7 +491,8 @@ export function parseQDF(text, opts = {}) {
       // 4,7 % der Rohre des Bestands trifft das gerechnete Ende die Kupplung
       // naemlich nicht (die Herstellersoftware rundet dort selbst).
       tubes.push({ id: "t" + seq++, a: a.id, b: b.id, tubeId: def.id, color, length: def.length_cm,
-        geom: { p0: [round(sx), round(sy), round(sz)], dir: dir.map((v) => Math.round(v * 1e6) / 1e6), len: lenCm } });
+        geom: { p0: [round(sx), round(sy), round(sz)], dir: dir.map((v) => Math.round(v * 1e6) / 1e6),
+          len: lenCm, ...(pad ? { pad: round(pad) } : {}) } });
     } else if (p.name === "hole-connector4") {
       // Lochzapfenkupplung: sie umschliesst ein Rohr und bietet quer dazu einen
       // offenen Anschluss. Der Punkt ist die Muendung dieses Anschlusses, das
@@ -521,8 +545,8 @@ export function parseQDF(text, opts = {}) {
       // 1550 x 775 spannt gemessen genau von -775 bis +775 um den Mittelpunkt.
       // Erstes Feld = lokales Y, zweites = lokales X (wie bei den Platten).
       if (spec.sized && typeof p.rest[3] === "number" && typeof p.rest[5] === "number") {
-        f.w = round(p.rest[3] / 10);
-        f.h = round(p.rest[5] / 10);
+        f.w = round(p.rest[3] / 10 + padOf(p.rest, 4));
+        f.h = round(p.rest[5] / 10 + padOf(p.rest, 6));
       }
       // Lochzapfenkupplung: Arm-Maske entscheidet ueber ein- oder dreiarmig.
       if (spec.masked && typeof p.rest[4] === "number") f.mask = p.rest[4];
@@ -610,10 +634,14 @@ export function parseQDF(text, opts = {}) {
       const cx = p.tuple[4] / 10, cy = p.tuple[5] / 10, cz = p.tuple[6] / 10;
       const dimW = (typeof p.rest[3] === "number" ? p.rest[3] : 0) / 10;
       const dimH = (typeof p.rest[5] === "number" ? p.rest[5] : 0) / 10;
+      // Zuschlaege gehoeren zur Spannweite, nicht zum Teil (siehe padOf): das
+      // KATALOGTEIL sucht die Platte weiter ueber die Grundmasse, ihre Ecken
+      // liegen aber um die Zuschlaege weiter aussen.
+      const padW = padOf(p.rest, 4), padH = padOf(p.rest, 6);
       if (!(dimW > 0) || !(dimH > 0)) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
       const panelId = panelIdForDims(dimW + conn, dimH + conn);
       if (!panelId) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
-      const nodesFound = findPanelCorners(q, cx, cy, cz, (dimW + conn) / 2, (dimH + conn) / 2);
+      const nodesFound = findPanelCorners(q, cx, cy, cz, (dimW + padW + conn) / 2, (dimH + padH + conn) / 2);
       if (!nodesFound) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
       const mat = typeof p.rest[0] === "number" ? p.rest[0] : null;
       panels.push({ id: "p" + seq++, nodes: nodesFound.map((n) => n.id), panelId,
@@ -621,7 +649,8 @@ export function parseQDF(text, opts = {}) {
         // Eigene Lage wie beim Rohr: auf Schraegen liegt die Platte in der Datei
         // bis zu 1,2 cm anders als aus dem Rohrpaar gerechnet.
         geom: { quat: [q[1], q[2], q[3], q[0]].map((v) => Math.round(v * 1e4) / 1e4),
-          p: [round(cx), round(cy), round(cz)], w: round(dimW), h: round(dimH) } });
+          p: [round(cx), round(cy), round(cz)], w: round(dimW), h: round(dimH),
+          ...(padW ? { padW: round(padW) } : {}), ...(padH ? { padH: round(padH) } : {}) } });
 
     } else if (p.name === "textil2") {
       // Netz/Stoff: gleiche Struktur wie panel2 (Zentrum + Maße + Quat). Maße z.B.
@@ -633,7 +662,9 @@ export function parseQDF(text, opts = {}) {
       const dimW = (typeof p.rest[3] === "number" ? p.rest[3] : 0) / 10;
       const dimH = (typeof p.rest[5] === "number" ? p.rest[5] : 0) / 10;
       if (!(dimW > 0) || !(dimH > 0)) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
-      const wGrid = dimW + conn, hGrid = dimH + conn; // Netz-Spannweite (z.B. 40 x 80)
+      // Spannweite mit Zuschlag (siehe padOf); die Netzgroesse selbst rundet
+      // weiter auf das Rastermass.
+      const wGrid = dimW + padOf(p.rest, 4) + conn, hGrid = dimH + padOf(p.rest, 6) + conn;
       const nodesFound = findPanelCorners(q, cx, cy, cz, wGrid / 2, hGrid / 2);
       if (!nodesFound) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
       const mat = typeof p.rest[0] === "number" ? p.rest[0] : null;
@@ -733,7 +764,8 @@ export function parseQDF(text, opts = {}) {
     if (!p.tuple || p.tuple.length < 7) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
     const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
     const sx = p.tuple[4] / 10, sy = p.tuple[5] / 10, sz = p.tuple[6] / 10;
-    const lenCm = (typeof p.rest[3] === "number" ? p.rest[3] : 800) / 10;
+    const lenCm = (typeof p.rest[3] === "number" ? p.rest[3] : 800) / 10
+      + padOf(p.rest, 4);                        // Zuschlag zum Mass (siehe padOf)
     // Dank √-Dekodierung hat das Alu-Profil dieselbe echte Richtung wie das Rohr,
     // das es verstaerkt (Diagonalen sauber 45°) -- es trifft die Rohre direkt.
     const sx2 = sx, sy2 = sy, sz2 = sz;

@@ -139,9 +139,7 @@ where parts do not sit on whole grid steps: of the 729 `tube2` lines with a
 non-zero second number, the far end lands on a connector in 665 cases when the
 two are added, and in 3 cases when the second number is ignored. For panels
 the same test gives all four corners on connectors for 74 of 96 panels with
-the addition, and 25 without. **✔** *(This app currently ignores the addition
-and gets away with it because imported parts keep their own geometry —
-see §6.)*
+the addition, and 25 without. **✔**
 
 ### 3.5 Editing-step fields at the end of a line
 
@@ -593,7 +591,9 @@ are free of three.js and DOM, so they can be run and tested under Node.
 **Reading.** Several passes: materials and connectors first (so tube ends have
 something to snap to), then tubes, then panels, nets and pools, then the
 aluminium profiles, then the double-tube connectors. Tube ends snap to the
-nearest connector within 55 mm. Lines carrying a step range are skipped
+nearest connector within 55 mm. Sizes are read as a pair and added up (§3.4);
+the catalogue part is still chosen by the base size, since the addition is
+extra distance, not extra tube. Lines carrying a step range are skipped
 (§3.5). Elements we cannot draw are still read, named and counted — the ones
 we cannot even name (`wood2` and friends) are ignored.
 
@@ -612,12 +612,19 @@ clamps, fittings, slides. Three things are worth knowing:
   per tube — that is how the manufacturer's files have it.
 - `camera2` is never written: what its 25 fields do is unknown, and the
   software falls back to its own default view.
+- Size additions are written back where they came from, and the two sizes of
+  an imported panel keep the order the file had them in.
 
 **What a round trip does not preserve.** Diagonals are normalised to 45°;
 parts with no QDF equivalent are dropped; panel sizes are written from the
 catalogue rather than measured, so a panel on a slope moves by up to a
 centimetre; and the step-range history is not kept — a file saved here has no
 history at all.
+
+Round-trip fidelity, measured over the 239 files: 20 385 of 20 513 tubes come
+back out with exactly the same anchor and length (99.4 %), and re-importing our
+own output and exporting it again gives a byte-identical file for 231 of them —
+the eight that differ do so in the last digits of a quaternion only.
 
 What it *does* preserve is every part. Importing and re-exporting
 `Universal II+Rutsche+Pool` gives the same line count for every element type —

@@ -13,7 +13,9 @@
 //      verdreht dar.
 //   2. Rohre und Platten speichern das TEILEMASS, nicht die Rasterspannweite:
 //      ein 40-cm-Feld steht als 350 (= 35 cm Rohr) in der Datei. Die Kupplung
-//      steuert die fehlenden 5 cm bei (geometry.connectorSize).
+//      steuert die fehlenden 5 cm bei (geometry.connectorSize). Hinter jedem
+//      Mass steht ein Zuschlag, meist 0 -- in gedrehten Aufbauten traegt er den
+//      Rest (siehe padOf in qdfimport.js); er geht unveraendert wieder hinaus.
 //   3. Gedrehte Kupplungen behalten ihre Lage, und ihre Arm-Maske (variant2)
 //      zaehlt die LOKALEN Wuerfelachsen, nicht die Weltachsen.
 //
@@ -339,7 +341,10 @@ export function buildQDF(model) {
       const q = t.bow && g.up
         ? encodeQuat(quatFromAxes(g.dir, g.up, cross(g.dir, g.up)))
         : encodeQuat(quatFromX(g.dir));
-      lines.push(`${t.bow ? "round-tube2" : "tube2"}{${mat}, ${tuple(q, g.p0[0], g.p0[1], g.p0[2])}, 1, ${mm(g.len)}, 0., 0}`);
+      // Der Zuschlag hinter dem Mass gehoert dazu: in gedrehten Aufbauten
+      // steckt das Rohr schraeg im Kupplungswuerfel, ohne ihn landet das ferne
+      // Ende neben der Kupplung (siehe padOf in qdfimport.js).
+      lines.push(`${t.bow ? "round-tube2" : "tube2"}{${mat}, ${tuple(q, g.p0[0], g.p0[1], g.p0[2])}, 1, ${mm(g.len)}, ${mm(g.pad || 0)}, 0}`);
       if (t.bow) stats.bows++; else stats.tubes++;
       continue;
     }
@@ -443,7 +448,10 @@ export function buildQDF(model) {
     // Schraegen weicht die aus dem Rohrpaar gerechnete Mitte um bis zu 1,2 cm ab.
     if (p.geom && p.geom.p && p.geom.quat) {
       const g = p.geom;
-      lines.push(`panel2{${panelMat(p.color)}, ${tuple(encodeQuat([g.quat[3], g.quat[0], g.quat[1], g.quat[2]]), g.p[0], g.p[1], g.p[2])}, 1, ${mm(g.h)}, 0., ${mm(g.w)}, 0., 0}`);
+      // Reihenfolge wie in der Datei: `w` ist das ERSTE Mass (lokale Y-Achse),
+      // `h` das zweite -- so hat der Import sie gelesen. Andersherum kam jede
+      // nicht-quadratische Platte gedreht heraus (alle 106 im Bestand).
+      lines.push(`panel2{${panelMat(p.color)}, ${tuple(encodeQuat([g.quat[3], g.quat[0], g.quat[1], g.quat[2]]), g.p[0], g.p[1], g.p[2])}, 1, ${mm(g.w)}, ${mm(g.padW || 0)}, ${mm(g.h)}, ${mm(g.padH || 0)}, 0}`);
       stats.panels++;
       continue;
     }
