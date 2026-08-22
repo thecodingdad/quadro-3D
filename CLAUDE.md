@@ -292,11 +292,17 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     acht Modelle. Passt nichts (schiefe Richtung > 20°, zwei Teile auf einem Arm, weniger als
     zwei Arme), zeichnet der alte Pfad Würfel plus Stutzen. Ebenso auf der Qualitätsstufe
     **„niedrig"**. Am größten Beispielmodell greift der Rückfall noch an 2 von 239 Kupplungen.
-  - **Am Bogenrohr kommt die Fassung ohne Arme** (`rec.closed`, Bohrungen gedeckelt). Der Arm
-    ist gerade und 5 cm lang, der Bogen weicht auf dieser Strecke 3,1 mm von der Tangente ab –
-    von den 3,5 mm zwischen Arm (r 2,1) und Rohrwand (r 2,45) bleiben 0,4 mm, und die frisst
-    schon die Facettierung des Rohrs (0,47 mm bei 16 Segmenten). Zu sehen ist der Arm dort
-    ohnehin nie, er steckt im Rohr.
+  - **Das Bogenrohr kommt ebenfalls aus dem Mitschnitt** (`data/models/tubes.json`,
+    `_bowMeshFor()`). Das ist keine Kosmetik: der selbst gezeichnete Bogen bog schon an der
+    Kupplungsfläche ein und ließ dem geraden 5-cm-Arm nur 0,4 mm Luft – weniger, als die
+    Facettierung des Rohrs frisst (0,47 mm bei 16 Segmenten), der Arm stieß durch die Wand.
+    Der abgegriffene Bogen läuft an beiden Enden erst 25 mm **gerade** in der Kupplungsachse,
+    dort liegt seine Wand bei 25 mm von der Achse und der Arm (r 21) steckt sauber darin.
+    Seine Lage baut `_bowMeshFor()` aus Knoten und `bowCenter` (lokales +X = Tangente am
+    Anfang, +Y = zum Kreismittelpunkt), also auch für im Editor gesetzte Bögen. Passt der
+    Bogen nicht zum Modell (Halbmesser ≠ 40 cm, kein Viertelkreis – etwa die 135°-Winkelrohre),
+    zeichnet die Szene weiter ihren eigenen Schlauch; **dort** kann der Kupplungsarm wieder
+    durch die Wand stoßen.
   - **Die Raumkupplung 3-armig trägt Maske 21** (+X, +Y, +Z – drei zueinander senkrechte Arme).
     Maske 13 wäre +X, +Y, −Y und damit wieder ein ebenes T wie Maske 7; wer die Modelle neu
     abgreift, muss die Maske richtig wählen.

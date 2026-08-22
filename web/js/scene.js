@@ -5,7 +5,7 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { clampOffset } from "./model.js";
-import { loadConnectorMeshes, loadSlideMeshes } from "./meshes.js";
+import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes } from "./meshes.js";
 import { CONNECTOR_ARM_BITS } from "./qdfimport.js";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -161,6 +161,9 @@ const CUBE_SNAP_MS = 320;   // Dauer des Kameraschwenks beim Klick
 // ein Kupplungsmodell dazu passt? cos(20°) ≈ 0,94. Alles Schiefere (Rampen,
 // Sparren) bekommt weiter den selbst gezeichneten Würfel.
 const AXIS_TOL = 0.94;
+
+// Halbmesser des abgegriffenen Bogenrohrs (cm): 35er Rohr + Kupplung.
+const BOW_MESH_R = 40;
 
 /** Bit der Würfelachse, auf der diese Richtung liegt -- 0, wenn sie zu schief ist. */
 function axisBit(x, y, z) {
@@ -834,10 +837,11 @@ export class SceneManager {
    * Formen; schlaegt sie fehl, bleibt es dabei.
    */
   _ensureMeshes(which) {
-    const feld = which === "slides" ? "_slideMeshes" : "_connMeshes";
+    const feld = { slides: "_slideMeshes", tubes: "_tubeMeshes" }[which] || "_connMeshes";
     if (this[feld] !== undefined) return this[feld];
     this[feld] = null;   // laeuft -> nicht noch einmal anfordern
-    const laden = which === "slides" ? loadSlideMeshes() : loadConnectorMeshes();
+    const laden = which === "slides" ? loadSlideMeshes()
+      : which === "tubes" ? loadTubeMeshes() : loadConnectorMeshes();
     laden.then((rec) => {
       if (!rec) return;
       this[feld] = rec;
@@ -857,13 +861,6 @@ export class SceneManager {
    * vor -- welche der 24 Würfeldrehungen es auf die gesuchte Maske bringt, steht
    * in `maskTable()`.
    *
-   * Steckt an dem Knoten ein BOGENROHR, kommt die Fassung OHNE Arme
-   * (`rec.closed`, Bohrungen gedeckelt): der Arm ist gerade und 5 cm lang, der
-   * Bogen weicht auf dieser Strecke 3,1 mm von der Tangente ab, und die 0,4 mm,
-   * die zwischen Arm (r 2,1) und Rohrwand (r 2,45) davon bleiben, frisst schon
-   * die Facettierung des Rohrs -- der Arm stiesse durch die Wand. Sichtbar ist
-   * er dort ohnehin nie, er steckt im Rohr.
-   *
    * `null` kommt heraus, wenn eine Richtung mehr als ~20 Grad von ihrer Achse
    * abweicht (Rampen, Sparren), wenn zwei Teile denselben Arm belegen, oder bei
    * weniger als zwei Armen.
@@ -873,9 +870,8 @@ export class SceneManager {
     if (!store || !dirs.length) return null;
     const inv = cubeQuat.clone().invert();
     const v = new THREE.Vector3();
-    let mask = 0, bow = false;
+    let mask = 0;
     for (const e of dirs) {
-      if (e.bow) bow = true;
       v.set(e.d[0], e.d[1], e.d[2]).applyQuaternion(inv);
       const bit = axisBit(v.x, v.y, v.z);
       if (!bit || mask & bit) return null;
@@ -885,10 +881,42 @@ export class SceneManager {
     if (!entry) return null;
     const rec = store[entry.id];
     if (!rec) return null;
-    const teil = bow && rec.closed ? rec.closed : rec;
     return {
-      geo: this._meshGeometry("conn:" + entry.id + (teil === rec ? "" : ":zu"), teil),
+      geo: this._meshGeometry("conn:" + entry.id, rec),
       quat: cubeQuat.clone().multiply(entry.quat),
+    };
+  }
+
+  /**
+   * Bogenrohr als abgegriffenes Originalmodell. Seine Lage ist dieselbe wie in
+   * der Datei: Ursprung im Knoten, lokales +X die Tangente am Bogenanfang,
+   * lokales +Y zum Kreismittelpunkt. Beides steht hier aus der Geometrie zur
+   * Verfügung, also braucht es die Datei-Lage (`t.geom`) nicht -- auch im
+   * Editor gesetzte Bögen kommen so durch.
+   *
+   * Das Modell ist ein festes Viertel mit 40 cm Halbmesser; weicht ein Bogen
+   * davon ab (Winkelrohre mit 135 Grad, ein Zuschlag am Maß), zeichnet der
+   * Aufrufer weiter seinen eigenen Schlauch.
+   */
+  _bowMeshFor(va, vb, center) {
+    const store = this._tubeMeshes;
+    const rec = store && store["round-tube2"];
+    if (!rec) return null;
+    const C = new THREE.Vector3(center[0], center[1], center[2]);
+    const u = va.clone().sub(C), w = vb.clone().sub(C);
+    const R = (u.length() + w.length()) / 2;
+    if (Math.abs(R - BOW_MESH_R) > 0.5) return null;
+    u.normalize(); w.normalize();
+    // Viertelkreis? Sonst passt das Modell nicht.
+    if (Math.abs(u.dot(w)) > 0.02) return null;
+    const N = u.clone().negate();                       // lokales +Y: zum Mittelpunkt
+    const T = w.clone().addScaledVector(u, -u.dot(w));  // lokales +X: Tangente am Anfang
+    if (T.lengthSq() < 1e-6) return null;
+    T.normalize();
+    const B = new THREE.Vector3().crossVectors(T, N);
+    return {
+      geo: this._meshGeometry("tube:round-tube2", rec),
+      matrix: new THREE.Matrix4().makeBasis(T, N, B).setPosition(va),
     };
   }
 
@@ -2452,6 +2480,7 @@ export class SceneManager {
     // gezeichneten Formen, danach zeichnet onMeshesReady() neu.
     const wantMeshes = qual.meshes;
     if (wantMeshes && model.nodes.size) this._ensureMeshes("connectors");
+    if (wantMeshes && [...model.tubes.values()].some((t) => t.bow)) this._ensureMeshes("tubes");
     // Das grosse Dach ist ein Anbauteil, liegt aber bei den Rutschen.
     const wantsSlideMeshes = model.slides.size
       || [...(model.fittings ? model.fittings.values() : [])].some((f) => f.kind === "roof-large2");
@@ -2675,6 +2704,14 @@ export class SceneManager {
           : (asm && st === "done") ? this._fadedMaterial()
           : this._tubeMaterial(t.color);
         const bowFinalMat = matFor(t.id, bowMat);
+        // Abgegriffenes Originalteil, wenn es passt: EIN Mesh, an beiden Enden
+        // geschlossen und mit dem geraden Vorlauf, in dem der Kupplungsarm steckt.
+        const echterBogen = wantMeshes ? this._bowMeshFor(va, vb, t.bowCenter) : null;
+        if (echterBogen) {
+          this._batchAdd(echterBogen.geo, bowFinalMat, echterBogen.matrix,
+            "tube", t.id, st !== "future" ? this.pickTubes : null);
+          continue;
+        }
         const bowMesh = new THREE.Mesh(
           new THREE.TubeGeometry(bowCurve, 24, tubeRadius, qual.bow, false),
           bowFinalMat

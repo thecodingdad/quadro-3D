@@ -14,17 +14,14 @@ const stores = {};   // Dateiname -> Promise auf { name -> record }
 
 /**
  * Ein Modell: `pos`/`nrm` als Float32Array (Position in cm), `idx` als
- * Uint16Array. Kupplungen führen zusätzlich `mask` (die Bitfolge ihrer Arme)
- * und unter `closed` dieselbe Kupplung ohne Arme, mit gedeckelten Bohrungen.
+ * Uint16Array. `mask` gibt es nur bei Kupplungen -- die Bitfolge ihrer Arme.
  */
 function toRecord(raw) {
   const pos = new Float32Array(raw.pos.length);
   for (let i = 0; i < raw.pos.length; i++) pos[i] = raw.pos[i] * POS_TO_CM;
   const nrm = new Float32Array(raw.nrm.length);
   for (let i = 0; i < raw.nrm.length; i++) nrm[i] = raw.nrm[i] * NRM_SCALE;
-  const rec = { pos, nrm, idx: new Uint16Array(raw.idx), mask: raw.mask };
-  if (raw.closed) rec.closed = toRecord(raw.closed);
-  return rec;
+  return { pos, nrm, idx: new Uint16Array(raw.idx), mask: raw.mask };
 }
 
 function load(file) {
@@ -51,6 +48,11 @@ function load(file) {
 /** Kupplungen, nach Katalog-Kennung ("straight", "t", "6way" ...). */
 export function loadConnectorMeshes() {
   return load("connectors.json");
+}
+
+/** Rohre, nach QDF-Elementart -- bisher nur das Bogenrohr ("round-tube2"). */
+export function loadTubeMeshes() {
+  return load("tubes.json");
 }
 
 /** Rutschen und Dächer, nach QDF-Elementart ("slide2", "roof2" ...). */
