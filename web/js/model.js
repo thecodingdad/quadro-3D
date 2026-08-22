@@ -1,7 +1,7 @@
 // Datenmodell des Bauwerks: Graph aus Knoten (Kupplungen) und Kanten (Rohren).
 // Bewusst ohne Three.js-Abhaengigkeit, damit es testbar und Backend-tauglich bleibt.
 
-import { MERGE_EPS, FORMAT_VERSION, DIAGONAL_SNAP_TOL } from "./config.js";
+import { MERGE_EPS, FORMAT_VERSION, DIAGONAL_SNAP_TOL, DIRECTIONS } from "./config.js";
 
 // Zellweite des Rasters, mit dem die Kollisionspruefung Nachbarn sucht. Etwas
 // groesser als das laengste Rohr (75 cm + Kupplung): ein Rohr liegt damit in
@@ -165,6 +165,30 @@ export function clampOffset(part, cs = 5) {
  * Sie ist ein gewoehnlicher Knoten -- die Lagerkupplung selbst ist ein
  * Anbauteil, `bearingOn` verbindet die beiden.
  */
+/**
+ * Lage einer Lagerkupplung. Sie braucht ZWEI Achsen, nicht nur eine:
+ * lokales +X zeigt von der getragenen Kupplung weg, und das geklemmte Rohr
+ * laeuft entlang des lokalen +Y -- gemessen an allen 86 eindeutigen Vorkommen
+ * in den Herstellerdateien. Nur +X festzulegen laesst die Rolle offen, und die
+ * Klemme steht dann quer zum Rohr statt darum.
+ *
+ * `rohr` darf fehlen (noch nichts eingeklemmt) -- dann tut es irgendeine
+ * Querrichtung.
+ */
+function bearingQuat(ausrichtung, rohr) {
+  const ex = norm3(ausrichtung);
+  let ey = rohr ? norm3(rohr) : [0, 1, 0];
+  // Querkomponente zu +X; faellt sie weg (Rohr parallel zur Ausrichtung), eine
+  // beliebige andere nehmen.
+  let rest = [ey[0] - ex[0] * dot3(ey, ex), ey[1] - ex[1] * dot3(ey, ex), ey[2] - ex[2] * dot3(ey, ex)];
+  if (Math.hypot(rest[0], rest[1], rest[2]) < 1e-3) {
+    const alt = Math.abs(ex[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+    rest = [alt[0] - ex[0] * dot3(alt, ex), alt[1] - ex[1] * dot3(alt, ex), alt[2] - ex[2] * dot3(alt, ex)];
+  }
+  ey = norm3(rest);
+  return quatFromBasis(ex, ey, cross3(ex, ey));
+}
+
 export function nodeClampOffset(node, cs = 5) {
   if (node && node.bearingOn) return cs * 2;
   return clampOffset(node && node.part, cs);
@@ -882,7 +906,7 @@ export class BuildModel {
     // Maul dreht mit, es zeigt weiter von der getragenen Kupplung weg.
     if (node.bearingOn) {
       const f = this.fittings.get(node.bearingOn);
-      if (f) f.quat = quatFromXAxis([-node.stub[0], -node.stub[1], -node.stub[2]]);
+      if (f) f.quat = bearingQuat([-node.stub[0], -node.stub[1], -node.stub[2]], u);
     }
     return true;
   }
@@ -1190,7 +1214,7 @@ export class BuildModel {
     // waehlte kein Bauteil, an das sich etwas stecken laesst.
     if (part === "bearing") {
       const f = this.addFitting("bearing-connector4", m.achse[0], m.achse[1], m.achse[2],
-        { quat: quatFromXAxis([-m.stub[0], -m.stub[1], -m.stub[2]]) });
+        { quat: bearingQuat([-m.stub[0], -m.stub[1], -m.stub[2]], this._tubeDir(this.tubes.get(tubeId))) });
       node.bearingOn = f.id;
     } else {
       node.part = part;
@@ -1198,6 +1222,34 @@ export class BuildModel {
     node.clampOn = { tubeId, t: m.t };
     node.stub = m.stub;
     return node;
+  }
+
+  /**
+   * Freie Arme, an die eine Lagerkupplung passt: je Kupplung jede Achsrichtung,
+   * in der kein Rohr steckt und die nicht schon belegt ist. Der Punkt liegt
+   * dort, wo die Klemme zu liegen kaeme -- eine doppelte Kupplungslaenge weiter.
+   */
+  bearingArmMounts(cs = 5) {
+    const off = cs * 2;
+    const out = [];
+    for (const n of this.nodes.values()) {
+      if (n.part || n.bearingOn || n.unused || n.c45body) continue;
+      const belegt = [];
+      for (const t of this.tubes.values()) {
+        const other = t.a === n.id ? this.nodes.get(t.b) : t.b === n.id ? this.nodes.get(t.a) : null;
+        if (!other) continue;
+        belegt.push(norm3([other.x - n.x, other.y - n.y, other.z - n.z]));
+      }
+      if (!belegt.length) continue;   // freie Kupplung ohne Rohr: nichts zu tragen
+      for (const richtung of DIRECTIONS) {
+        const d = richtung.vec;
+        if (belegt.some((b) => dot3(b, d) > 0.9)) continue;
+        const pos = [n.x + d[0] * off, n.y + d[1] * off, n.z + d[2] * off];
+        if (this.isBelowGround(pos[1])) continue;
+        out.push({ nodeId: n.id, dir: d, pos });
+      }
+    }
+    return out;
   }
 
   /**
@@ -1212,8 +1264,10 @@ export class BuildModel {
     const off = cs * 2;
     const achse = [node.x + u[0] * off, node.y + u[1] * off, node.z + u[2] * off];
     if (this.isBelowGround(achse[1])) return null;
+    // Noch kein Rohr in der Klemme: das Maul zeigt in eine Querrichtung, die
+    // ein spaeter eingeklemmtes Rohr haben kann. Genommen wird die waagerechte.
     const f = this.addFitting("bearing-connector4", achse[0], achse[1], achse[2],
-      { quat: quatFromXAxis(u) });
+      { quat: bearingQuat(u, null) });
     node.bearingOn = f.id;
     node.stub = [round(-u[0]), round(-u[1]), round(-u[2])];
     return f;

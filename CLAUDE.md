@@ -355,7 +355,10 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     dann erscheint die Kupplung außen (`addTubeClamp`), oder an einen freien Arm einer Kupplung,
     dann klemmt später ein Rohr darin (`addBearingAtArm`). In beiden Fällen entsteht dieselbe
     Form wie beim Laden – ein **Anbauteil** plus ein **gewöhnlicher Knoten**, nie ein Knoten,
-    der beides ist. Der Stutzen zur Klemme zählt in der Stückliste als Arm (`neighborDirs` in
+    der beides ist. Ihre Lage braucht **zwei** Achsen: lokales +X zeigt von der getragenen
+    Kupplung weg, und das geklemmte Rohr läuft entlang des lokalen **+Y** (gemessen an allen 86
+    eindeutigen Vorkommen). Nur +X festzulegen lässt die Rolle offen und die Klemme steht quer
+    zum Rohr statt darum – dafür gibt es `bearingQuat()`. Der Stutzen zur Klemme zählt in der Stückliste als Arm (`neighborDirs` in
     `bom.js`), sonst stünde dort eine Kupplung mit einem Arm zu wenig.
     Und `bearing2` ist **nicht** dieses Teil: das ist das Radlager, das auf einer Kupplung sitzt
     (124 von 125 Vorkommen auf einer `connector3`), während die Lagerkupplung am Rohr sitzt

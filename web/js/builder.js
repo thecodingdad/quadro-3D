@@ -1376,6 +1376,15 @@ export class Builder {
         const mesh = this.scene.addHandle(m.pos, { clampTube: m }, "dir");
         this._tubeHandles.set(m.tubeId, { mesh, art: "clamp", ruhe: m });
       }
+      // Die Lagerkupplung geht auch andersherum: erst an einen freien Arm einer
+      // Kupplung, das Rohr klemmt spaeter darin. Dafuer je freiem Arm ein Punkt,
+      // dort, wo die Klemme zu liegen kaeme.
+      if (this.fittingKind === "bearing-clamp") {
+        const cs = geometry().connectorSize;
+        for (const m of this.model.bearingArmMounts(cs)) {
+          this.scene.addHandle(m.pos, { bearingArm: m }, "dir");
+        }
+      }
     }
   }
 
@@ -2171,6 +2180,15 @@ export class Builder {
   _clickTubeClamp(e) {
     const part = TUBE_CLAMP_PARTS[this.fittingKind];
     const h = this.scene.pickHandle(e.clientX, e.clientY);
+    if (h && h.data && h.data.bearingArm) {
+      const m = h.data.bearingArm;
+      let f = null;
+      this.recordHistory(() => { f = this.model.addBearingAtArm(m.nodeId, m.dir, geometry().connectorSize); });
+      if (f) this._notePlaced(m.nodeId, "node");
+      else this.onNotice(t("notice_fitting_exists"), "warn");
+      this.refresh();
+      return;
+    }
     if (h && h.data && h.data.clampTube) {
       const m = h.data.clampTube;
       let added = null;
@@ -2242,7 +2260,8 @@ export class Builder {
     const Z = Math.hypot(zeiger[0], zeiger[1], zeiger[2]) || 1;
     const z = [zeiger[0] / Z, zeiger[1] / Z, zeiger[2] / Z];
     let best = null, bestDot = -2;
-    for (const d of DIRECTIONS) {
+    for (const richtung of DIRECTIONS) {
+      const d = richtung.vec;
       if (belegt.some((b) => b[0] * d[0] + b[1] * d[1] + b[2] * d[2] > 0.9)) continue;
       const dot = z[0] * d[0] + z[1] * d[1] + z[2] * d[2];
       if (dot > bestDot) { bestDot = dot; best = d; }
