@@ -203,6 +203,8 @@ export function initUI({ scene, model, builder }) {
       renderSyncLine();
       renderLibHint();
       renderLibSort();
+      renderTabs();          // der Schliessen-Knopf jedes Tabs traegt einen Tooltip
+      renderFittingButton();
       syncProjectionButton();
       // Dynamische UI-Texte aktualisieren
       setMode(builder.mode);
@@ -1387,6 +1389,7 @@ export function initUI({ scene, model, builder }) {
         || (builder.mode === "c45" && g.kinds.includes(C45_ENTRY));
       g.btn.classList.toggle("active", aktiv);
       g.btn.lastChild.textContent = t(g.key);
+      g.btn.title = t(g.key);          // sonst bliebe der Tooltip in der alten Sprache
     }
   };
   renderFittingButton();

@@ -262,7 +262,16 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   Fundstellen-Kommentare im Code bleiben, aber die Beschreibung des Formats hat genau einen Ort;
   wer ein Feld entschlüsselt, trägt es dort ein und streicht es aus „Was wir nicht wissen".
 - **Neue UI-Texte:** immer in **beide** Dictionaries (`de` und `en`) in `i18n.js`, dann `t('key')`
-  bzw. `data-i18n`/`data-i18n-title` im HTML. Nie Strings in `ui.js` hardcoden.
+  bzw. `data-i18n`/`data-i18n-title`/`data-i18n-placeholder`/`data-i18n-aria` im HTML. Nie Strings
+  in `ui.js` hardcoden.
+- **Sofort umschalten, nicht erst beim Neuladen:** `applyTranslations()` erwischt nur, was im HTML
+  steht. Alles, was `ui.js` selbst baut, muss der Sprachwechsel-Handler (`langBtn`) **neu
+  zeichnen** – sonst bleibt es in der alten Sprache stehen, bis es zufällig neu gebaut wird.
+  Besonders leicht zu übersehen sind `title`-Attribute, die nur einmal beim Anlegen gesetzt
+  werden (so blieben die Tooltips der Anbauteil-Gruppen und der Tab-Schließen-Knöpfe stehen).
+  Prüfen lässt sich das im Browser: alle sichtbaren Texte und Attribute einsammeln, Sprache
+  umschalten, noch einmal einsammeln – was gleich bleibt und Buchstaben enthält, ist verdächtig
+  (Dateinamen, Tab-Namen und „QUADRO" sind die erlaubten Ausnahmen).
 - **Statuszeile (unten links):** `setStatusHint()` setzt den dauerhaften Hinweis zum laufenden
   Werkzeug (aus `setMode`), `flash()` legt eine kurze Rückmeldung für 3,5 s darüber und stellt
   danach den Hinweis wieder her. Nichts sonst schreibt in `#status`.

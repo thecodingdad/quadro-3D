@@ -132,6 +132,8 @@ const de = {
   btn_lib_clear: '🗑',
   btn_lib_clear_title: 'Bibliothek leeren',
   lib_search: 'Suchen…',
+  aria_menu: 'Menü',
+  title_sidebar_resize: 'Breite ziehen',
   lib_only_feasible: 'Nur mit meinem Bestand baubar',
   lib_sort: 'Sortierung',
   lib_sort_name: 'Alphabetisch',
@@ -576,6 +578,8 @@ const en = {
   btn_lib_clear: '🗑',
   btn_lib_clear_title: 'Clear library',
   lib_search: 'Search…',
+  aria_menu: 'Menu',
+  title_sidebar_resize: 'Drag to resize',
   lib_only_feasible: 'Only buildable with my inventory',
   lib_sort: 'Sort by',
   lib_sort_name: 'Alphabetical',
@@ -929,5 +933,9 @@ export function applyTranslations() {
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  // Beschriftungen fuer Screenreader an Knoepfen, die nur ein Zeichen zeigen.
+  document.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+    el.setAttribute('aria-label', t(el.dataset.i18nAria));
   });
 }
