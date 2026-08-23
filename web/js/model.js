@@ -1089,24 +1089,30 @@ export class BuildModel {
       const o = arms[0];
       const d = [n.x - o.x, n.y - o.y, n.z - o.z];
       const L = Math.hypot(d[0], d[1], d[2]) || 1;
-      out.push({ pos: [n.x, n.y, n.z], dir: [d[0] / L, d[1] / L, d[2] / L], nodeId: n.id });
+      const dir = [d[0] / L, d[1] / L, d[2] / L];
+      // Der Punkt selbst liegt mitten im Kupplungswuerfel -- dort waere der
+      // gruene Ankerpunkt verdeckt und nicht anklickbar. Der Griff steht
+      // deshalb ein Stueck weiter aussen, genau wie bei _fittingNodeMounts.
+      out.push({ pos: [n.x, n.y, n.z], dir, nodeId: n.id,
+        handle: [n.x + dir[0] * 7, n.y + dir[1] * 7, n.z + dir[2] * 7] });
     }
     return out;
   }
 
   /**
-   * Steckt auf diesem Knoten eine Radkappe? Dann ersetzt sie dort die Kupplung:
-   * das Rohrende steckt in der Kappe, die das Schwimmrad haelt. Hat der Knoten
-   * mehrere Arme, bleibt die Kupplung stehen -- dort schliesst die Kappe nur
-   * einen freien Stutzen ab.
+   * Steckt auf diesem Knoten eine Kappe, die die Kupplung ersetzt? Radkappe und
+   * Rohrkappe stecken beide ueber dem Rohrende -- an einem Ende mit nur einem
+   * Rohr sitzt dann keine Kupplung mehr, auch keine einarmige. Hat der Knoten
+   * mehrere Arme, bleibt die Kupplung: dort schliesst die Kappe nur einen
+   * freien Stutzen ab.
    *
-   * Die ROHRKAPPE zaehlt hier NICHT mit: sie sitzt auf der Kupplung, nicht an
-   * ihrer Stelle. In den Herstellerdateien stehen an derselben Stelle beide
-   * Zeilen -- die Kupplung und die Kappe darauf (Spieltisch: connector3 und
-   * tube-cap2, beide auf -800/-50/-800).
+   * (Die Herstellerdateien fuehren an der Stelle einer Rohrkappe zusaetzlich
+   * eine `connector3` -- Spieltisch: beide auf -800/-50/-800. Wir zeichnen und
+   * zaehlen dort trotzdem nur die Kappe: sie steckt auf dem Rohr, eine
+   * einarmige Kupplung braucht es dafuer nicht.)
    */
   hasWheelCap(node) {
-    if (!this._fittingAt(node, "hub-cap2")) return false;
+    if (!this._fittingAt(node, "hub-cap2") && !this._fittingAt(node, "tube-cap2")) return false;
     return this.degree(node.id) <= 1;
   }
 

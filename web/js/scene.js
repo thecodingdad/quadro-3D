@@ -1292,15 +1292,7 @@ export class SceneManager {
     if (echt) {
       const geoEcht = this._meshGeometry("fit:" + f.kind, echt);
       const matEcht = this._fittingMaterial(hex, false);
-      // Die Rohrkappe liegt im abgegriffenen Modell auf der MINUS-X-Seite ihres
-      // Nullpunkts (x -4,5 bis -2,1 cm), waehrend ihre Achse in der Datei nach
-      // AUSSEN zeigt -- ungedreht steckte sie im Kupplungswuerfel. Gedreht sitzt
-      // sie 2,1 bis 4,5 cm vor dem Knoten, also genau auf dessen Aussenflaeche
-      // (2,5 cm). Alle anderen Teile liegen auf der Plus-X-Seite.
-      const qT = f.kind === "tube-cap2"
-        ? q.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI))
-        : q;
-      const mesh = this._placeFitting(new THREE.Mesh(geoEcht, matEcht), f, qT);
+      const mesh = this._placeFitting(new THREE.Mesh(geoEcht, matEcht), f, q);
       // Der Spielsack: der Import ruecht seinen Punkt um BAG_OFFSET auf die
       // Mitte seines Feldes vor (qdfimport.js), das Modell erwartet aber den
       // Punkt, wie er in der Datei steht -- also wieder zurueck. Seine eigene

@@ -380,10 +380,14 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     **erzwingt** diesen Stutzen: ohne Rohr wird dort sonst keiner gezeichnet und keiner
     gerechnet. Dafür steht es in `ARM_FITTINGS` (`scene.js` **und** `bom.js`), und der Export
     setzt sein Bit in der Arm-Maske der Kupplung – in allen 67 Vorkommen des Bestands steht es
-    dort auch. Die Rohrkappe sitzt **auf** der Kupplung (Spieltisch: `connector3` und
-    `tube-cap2` beide auf −800/−50/−800), ersetzt sie also nicht; nur die **Radkappe** tut das
-    (`hasWheelCap`). Ihr Modell liegt als einziges auf der **Minus**-X-Seite seines Nullpunkts,
-    deshalb dreht `_fittingMeshes` es um 180 Grad, sonst steckte die Kappe im Würfel.
+    dort auch. Die **Rohrkappe** steckt dagegen über dem Rohrende und **ersetzt** dort die
+    einarmige Kupplung (`hasWheelCap`, wie die Radkappe): ihr Modell liegt als einziges auf der
+    **Minus**-X-Seite seines Nullpunkts, sitzt vom Knoten aus also 2,1 bis 4,5 cm nach INNEN und
+    schiebt sich damit 2 cm über das Rohr. Nicht drehen – gedreht stünde sie frei in der Luft
+    vor dem Rohrende. (Die Herstellerdateien führen an derselben Stelle zusätzlich eine
+    `connector3` – Spieltisch: beide auf −800/−50/−800; wir zeichnen und zählen dort nur die
+    Kappe.) Ihre Ankerpunkte kommen aus `_wheelCapMounts` und brauchen wie alle Punkte an einer
+    Kupplung ein `handle` weiter außen, sonst steckt der grüne Punkt im Würfel.
   - **`flexi-connector3` ist das Scharnier**, nicht die ganze Flexikupplung: je Gelenk stehen
     zwei davon plus ein `bolt2` in der Datei. Am Katalogteil `flexi_hinge` hängt deshalb das
     `qdf`, nicht am Teil `flexi` – sonst zählte die Stückliste jedes Gelenk als zwei ganze
