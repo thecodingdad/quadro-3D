@@ -144,7 +144,7 @@ const POOL_INSET = 2.5;
 const ARM_FITTINGS = new Set(["adapter2", "bearing2", "steering-lock2", "open-connector2"]);
 
 // Teile, die es nur in Schwarz gibt -- sie nehmen keine Farbe an.
-const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2"]);
+const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2", "tube-cap2"]);
 
 // Farbschema der normalen Ansicht (die Szene bringt ihren eigenen Himmel mit).
 // Die Werte sind die Gegenstuecke zu --bg/--line in style.css.

@@ -370,10 +370,12 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     **+Y** (an den Modellen gemessen). Import und Export rechnen das ineinander um
     (`clampQuat` in `qdfexport.js`), Speicherstände von vorher schiebt die Migration auf
     **Format 2** zurecht.
-  - **Radlager (`bearing2`) und Schwimmrad (`floating-wheel2`) gibt es nur in Schwarz** – weder
-    die Baufarbe noch die aus der Datei färbt sie um (`BLACK_FITTINGS`, in `scene.js` und
-    `qdfexport.js`). In den Herstellerdateien tragen sie durchgehend Material 1 (125 bzw. 76
-    Vorkommen). Das **Multirad** dagegen kommt in Farben (Material 6–9).
+  - **Radlager (`bearing2`), Schwimmrad (`floating-wheel2`) und Rohrkappe (`tube-cap2`) gibt es
+    nur in Schwarz** – weder die Baufarbe noch die aus der Datei färbt sie um
+    (`BLACK_FITTINGS`, in `scene.js` und `qdfexport.js`). Radlager und Schwimmrad tragen in den
+    Herstellerdateien durchgehend Material 1 (125 bzw. 76 Vorkommen); die neun Rohrkappen des
+    Bestands stehen dort zwar auf Rot, das Teil gibt es aber nur schwarz. Das **Multirad**
+    dagegen kommt in Farben (Material 6–9).
   - **Rohrkappe und offenes Verbinderende sind zwei Teile**, nicht eins: `tube-cap2` ist 24 mm
     lang und an einem Ende geschlossen (Katalog `tube_cap`), `open-connector2` eine 50 mm lange,
     beidseitig offene Hülse auf einem Stutzen (Katalog `open_end`). Das offene Verbinderende

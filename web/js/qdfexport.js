@@ -68,7 +68,7 @@ const MATERIALS = [
 const TUBE_MAT = { black: 1, red: 2, green: 3, blue: 4, yellow: 5 };
 
 // Teile, die es nur in Schwarz gibt -- ihre Farbe steht nicht zur Wahl.
-const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2"]);
+const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2", "tube-cap2"]);
 const PANEL_MAT = { red: 6, green: 7, blue: 8, yellow: 9, black: 1, white: 14 };
 // Lochplatten: dieselbe Farbe, eigene Materialnummer -- daran erkennen wir sie
 // beim Einlesen wieder (siehe MATERIALS). Weiss hat keine Lochplatte.
