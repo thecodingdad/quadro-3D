@@ -155,6 +155,16 @@ const BG_DARK = 0x171b21;
 const GRID_SIZE = 1280;
 const GRID_CELL = 20;    // cm je Linie -- zwei Linien je Rasterfeld
 
+// Die Wiese um das Raster herum. Sie muss deutlich groesser sein als das
+// Raster, sonst endet die Welt gleich hinter dem Aufbau; ihr Rand liegt am
+// besten so weit draussen, dass er bei einem eingepassten Modell gar nicht ins
+// Bild kommt. Baeume und Buesche stehen im Ring dahinter -- ausserhalb des
+// Rasters, damit sie nicht in ein grosses Modell hineinragen.
+const GROUND_AREA = 3200;                     // Kantenlaenge der Wiese, cm
+const GRASS_TILE = 25;                        // cm je Graskachel (Halmgroesse)
+const TREE_RING = [GRID_SIZE / 2 + 120, GROUND_AREA / 2 - 120];
+const BUSH_RING = [GRID_SIZE / 2 + 60, GROUND_AREA / 2 - 100];
+
 const GRID_LIGHT = [0xb8c0cc, 0xd6dce4];   // Hauptlinien, Nebenlinien
 const GRID_DARK = [0x3a4351, 0x2a313b];
 
@@ -4310,14 +4320,14 @@ export class SceneManager {
     }
     const tex = new THREE.CanvasTexture(cv);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(64, 64);   // 1600 cm / 64 ≈ 25 cm pro Kachel
+    tex.repeat.set(GROUND_AREA / GRASS_TILE, GROUND_AREA / GRASS_TILE);   // Halme bleiben gleich gross
     return tex;
   }
 
   // Grasfläche als texturierter Boden (keine 3D-Halme). Empfängt Schatten der
   // Bauteile; Cull-Maske ist inaktiv wenn _grassMesh null ist.
   _buildGrass(opts = {}) {
-    const area = opts.area || 1600;
+    const area = opts.area || GROUND_AREA;
     const env = new THREE.Group();
     env.name = "grass-env";
 
@@ -4461,9 +4471,9 @@ export class SceneManager {
     this._applyBackground();
   }
 
-  // Prozedurale Bäume am Rand der Grasfläche (Ring r 620–780 cm; die Fläche
-  // reicht bis 790). Frueher standen sie bei 450–700 cm und ragten damit in
-  // grosse Modelle hinein.
+  // Prozedurale Bäume auf der Wiese, im Ring HINTER dem Raster (TREE_RING).
+  // Frueher standen sie naeher an der Mitte und ragten in grosse Modelle
+  // hinein; seit das Raster gewachsen ist, richten sie sich nach dessen Kante.
   // Geometrien und Materialien werden einmalig geteilt; per-Baum nur Transform.
   _buildTrees() {
     const trunkMat  = new THREE.MeshLambertMaterial({ color: 0x6b5a3e }); // graubraun (Obstbaumrinde)
@@ -4484,11 +4494,14 @@ export class SceneManager {
     let seed = 137;
     const rng = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0x100000000; };
 
-    for (let i = 0; i < 60; i++) {
-      const r = 620 + rng() * 160;          // 620–780 cm vom Mittelpunkt
+    // Mehr Baeume als frueher: der Ring ist mit der Wiese gewachsen, bei 60
+    // Stueck stuenden sie vereinzelt in der Landschaft.
+    const rand = GROUND_AREA / 2 - 10;
+    for (let i = 0; i < 160; i++) {
+      const r = TREE_RING[0] + rng() * (TREE_RING[1] - TREE_RING[0]);
       const θ = rng() * Math.PI * 2;
       const tx = Math.cos(θ) * r, tz = Math.sin(θ) * r;
-      if (Math.abs(tx) > 790 || Math.abs(tz) > 790) continue; // außerhalb der Fläche
+      if (Math.abs(tx) > rand || Math.abs(tz) > rand) continue; // außerhalb der Fläche
 
       const sc = 0.65 + rng() * 0.75;       // Skalierung 0.65–1.4
       const ox2 = (rng() - 0.5) * 60, oz2 = (rng() - 0.5) * 60;
@@ -4531,11 +4544,11 @@ export class SceneManager {
     let seed = 138;
     const rng = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0x100000000; };
 
-    for (let i = 0; i < 40; i++) {
-      const r = 450 + rng() * 450;          // 450–900 cm vom Mittelpunkt
+    for (let i = 0; i < 90; i++) {
+      const r = BUSH_RING[0] + rng() * (BUSH_RING[1] - BUSH_RING[0]);
       const θ = rng() * Math.PI * 2;
       const tx = Math.cos(θ) * r, tz = Math.sin(θ) * r;
-      if (Math.abs(tx) > 790 || Math.abs(tz) > 790) continue;
+      if (Math.abs(tx) > GROUND_AREA / 2 - 10 || Math.abs(tz) > GROUND_AREA / 2 - 10) continue;
 
       const sc = 0.5 + rng() * 0.5;
       const ox = (rng() - 0.5) * 40, oz = (rng() - 0.5) * 40;
