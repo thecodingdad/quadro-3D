@@ -3308,7 +3308,9 @@ export function initUI({ scene, model, builder }) {
         // Abschnitt.
         const farben = bomByColor && (bucket !== "screws" || it.colored)
           ? farbigeToepfe[bucket] : null;
-        const name = partName(it) + (it.code ? ` (${it.code})` : "");
+        // Nur der Name -- die Katalog-Kennung (CH1, CBR ...) sagt beim Eintragen
+        // nichts und machte die Zeilen unnoetig lang.
+        const name = partName(it);
         // Dasselbe Sinnbild wie in der Stückliste; Zubehör wird über seine
         // QDF-Art nachgeschlagen, alles andere über die Teile-Kennung.
         const icon = bomIcon(bucket, it.id, it.qdf);
