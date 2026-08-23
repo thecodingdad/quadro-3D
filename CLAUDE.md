@@ -401,7 +401,10 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     `holeArmMounts()`/`addHoleClamp()`, ein weiterer Klick dreht sie um 90° um die Lochachse
     (`turnHoleClamp`, gesperrt sobald ein Rohr an einem Arm hängt). Ihr Modell liegt bei den
     **Anbauteilen** (`hole-connector4_<maske>`), obwohl sie ein Knoten ist – deshalb steht sie
-    mit in der Bedingung, die `fittings.json` nachlädt.
+    mit in der Bedingung, die `fittings.json` nachlädt. Der Stutzen, auf dem sie steckt, ist
+    **belegt** (`holeClampDirsAt`): dort geht kein Rohr und kein weiteres Teil mehr hin – nur die
+    **Multirad-Arretierung** (`onClamp: true` in `FITTING_MOUNTS`), die sie festhält; so steht
+    sie auch in den Herstellerdateien direkt daneben.
   - **`flexi-connector3` ist das Scharnier**, nicht die ganze Flexikupplung: je Gelenk stehen
     zwei davon plus ein `bolt2` in der Datei. Am Katalogteil `flexi_hinge` hängt deshalb das
     `qdf`, nicht am Teil `flexi` – sonst zählte die Stückliste jedes Gelenk als zwei ganze

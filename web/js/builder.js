@@ -6,7 +6,7 @@ import { computeBuildPlan, connectorLabelInfo } from "./buildplan.js";
 import { infeasibleConnectors, inferConnectorType } from "./bom.js";
 import { t } from "./i18n.js";
 import { round2, panelNormal, modelMiddle, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
-import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, HOLE_MASKS } from "./model.js";
+import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, holeClampDirsAt, HOLE_MASKS } from "./model.js";
 
 // Kupplungen, die auf einem Rohr sitzen statt im Raster: QDF-Art -> Katalogteil.
 // Teile, die sich um ein Rohr klemmen lassen. Die Lochzapfenkupplung gehört
@@ -1246,6 +1246,10 @@ export class Builder {
 
   _occupiedDirs(node) {
     const occ = new Set();
+    // Ein Stutzen, auf dem eine Lochzapfenkupplung steckt, ist belegt -- dort
+    // gehoert kein Rohr mehr hin (nur die Multirad-Arretierung haelt sie fest,
+    // die laeuft ueber die Anbauteil-Ankerpunkte).
+    const durchKlemme = holeClampDirsAt(this.model, node, geometry().connectorSize);
     // Rotierte Kupplung (armDirs aus QDF-Import): Belegung gegen gespeicherte
     // Arm-Richtungen pruefen (nicht gegen DIRECTIONS/DIAGONAL_DIRECTIONS).
     const eigene = node.c45body ? null : this._armDirsOf(node);
@@ -1258,6 +1262,11 @@ export class Builder {
           if ((dx * d.vec[0] + dy * d.vec[1] + dz * d.vec[2]) / len > ARM_ALIGN_TOL) {
             occ.add(d.name);
           }
+        }
+      }
+      for (const k of durchKlemme) {
+        for (const d of eigene) {
+          if (k[0] * d.vec[0] + k[1] * d.vec[1] + k[2] * d.vec[2] > ARM_ALIGN_TOL) occ.add(d.name);
         }
       }
       return occ;
@@ -1292,6 +1301,10 @@ export class Builder {
       const [ux, uy, uz] = u;
       for (const d of DIRECTIONS) if (ux * d.vec[0] + uy * d.vec[1] + uz * d.vec[2] > DIR_ALIGN_TOL) occ.add(d.name);
       for (const d of DIAGONAL_DIRECTIONS) if (ux * d.vec[0] + uy * d.vec[1] + uz * d.vec[2] > DIR_ALIGN_TOL) occ.add(d.name);
+    }
+    for (const [kx, ky, kz] of durchKlemme) {
+      for (const d of DIRECTIONS) if (kx * d.vec[0] + ky * d.vec[1] + kz * d.vec[2] > DIR_ALIGN_TOL) occ.add(d.name);
+      for (const d of DIAGONAL_DIRECTIONS) if (kx * d.vec[0] + ky * d.vec[1] + kz * d.vec[2] > DIR_ALIGN_TOL) occ.add(d.name);
     }
     return occ;
   }

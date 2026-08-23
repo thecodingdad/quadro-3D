@@ -1140,6 +1140,16 @@ export function initUI({ scene, model, builder }) {
       `<rect x="2.5" y="2.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>` +
       `<line x1="2.5" y1="8" x2="13.5" y2="8" stroke="currentColor" stroke-width="1.3"/>`],
   ];
+  /**
+   * Sinnbild einer Lochzapfenkupplung: Stutzen von links, Ring darauf, dazu
+   * ihre Arme. `arme` ist eine Liste von Strichen [x1,y1,x2,y2].
+   */
+  const HOLE_ICON = (arme) =>
+    `<line x1="1.4" y1="8" x2="5.2" y2="8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>` +
+    arme.map(([x1, y1, x2, y2]) =>
+      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`).join("") +
+    `<circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/>`;
+
   // Eigenes Sinnbild je Teil -- vorher trug jede Zeile einer Gruppe dasselbe
   // Gruppen-Icon, in der aufgeklappten Liste war damit nichts zu unterscheiden.
   const FITTING_ICONS = {
@@ -1164,9 +1174,14 @@ export function initUI({ scene, model, builder }) {
     "bearing-clamp": `<line x1="1.5" y1="10.5" x2="14.5" y2="10.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>` +
       `<rect x="5.4" y="7.4" width="5.2" height="6.2" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/>` +
       `<rect x="6.6" y="2.4" width="2.8" height="5.4" rx="1.2" fill="currentColor"/>`,
-    "hole-connector4": `<line x1="1.5" y1="10.5" x2="14.5" y2="10.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>` +
-      `<rect x="5.4" y="7.4" width="5.2" height="6.2" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.3"/>` +
-      `<circle cx="8" cy="4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/>`,
+    // Lochzapfenkupplungen: der Ring sitzt auf dem Stutzen einer Kupplung (der
+    // dicke Strich von links), quer dazu stehen ihre eigenen ein bis drei Arme.
+    // Der Doppelrohrverbinder darunter hat dagegen ZWEI Ringe nebeneinander --
+    // daran sind sie im Menue auseinanderzuhalten.
+    "hole_1": HOLE_ICON([[8, 10.9, 8, 14.6]]),
+    "hole_2": HOLE_ICON([[8, 10.9, 8, 14.6], [8, 5.1, 8, 1.4]]),
+    "hole_t": HOLE_ICON([[8, 10.9, 8, 14.6], [8, 5.1, 8, 1.4], [10.9, 8, 14.6, 8]]),
+    "hole-connector4": HOLE_ICON([[8, 10.9, 8, 14.6]]),
     // Doppelrohrverbinder: eine "8" mit den beiden Rohren mittendurch.
     "double_tube": `<line x1="1" y1="5.2" x2="15" y2="5.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<line x1="1" y1="10.8" x2="15" y2="10.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
@@ -1268,9 +1283,8 @@ export function initUI({ scene, model, builder }) {
 
   // Manche Teile führen ihr Sinnbild unter der QDF-Art, andere unter der
   // Teile-Kennung; die Klemm-Kupplungen teilen sich eins mit den Anbauteilen.
-  const ICON_ALIAS = { hole_1: "hole-connector4", hole_2: "hole-connector4",
-    hole_t: "hole-connector4",
-    bearing: "bearing-clamp", tube_cap: "tube-cap2", open_end: "open-connector2" };
+  const ICON_ALIAS = { bearing: "bearing-clamp", tube_cap: "tube-cap2",
+    open_end: "open-connector2" };
   function teileIcon(id, kind) {
     return FITTING_ICONS[kind] || SLIDE_ICONS[kind] || CONNECTOR_ICONS[id]
       || FITTING_ICONS[id] || FITTING_ICONS[ICON_ALIAS[id]] || null;

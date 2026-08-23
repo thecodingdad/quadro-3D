@@ -19,7 +19,10 @@ const FITTING_MOUNTS = {
   // freien Stutzen der Kupplung. Sie ERZWINGT diesen Stutzen -- ohne Rohr
   // rechnet und zeichnet ihn sonst niemand (genau wie in der Herstellersoftware).
   "open-connector2": { at: "node", offset: 0 },
-  "steering-lock2":  { at: "node", offset: 0 },   // Multirad-Arretierung, sitzt am Ende des Stutzens
+  // Multirad-Arretierung: sitzt am Ende des Stutzens. Sie darf als EINZIGE auf
+  // einen Stutzen, auf dem schon eine Lochzapfenkupplung steckt -- sie haelt
+  // diese dort fest.
+  "steering-lock2":  { at: "node", offset: 0, onClamp: true },
 };
 
 /**
@@ -255,6 +258,25 @@ export function holeArmDirs(node) {
   }
   // Ohne Lage (aeltere Staende) bleibt nur der gemerkte Stutzen.
   if (!out.length && node.stub) out.push(node.stub.slice());
+  return out;
+}
+
+/**
+ * In welchen Richtungen steckt an dieser Kupplung eine Lochzapfenkupplung? Ihr
+ * Loch sitzt auf dem Stutzen, der ist damit BELEGT -- dort gehoert weder ein
+ * Rohr noch ein weiteres Teil hin. Einzige Ausnahme ist die Multirad-
+ * Arretierung: sie haelt die Lochzapfenkupplung fest (so steht sie auch in den
+ * Herstellerdateien, mitten auf dem Stutzen daneben).
+ */
+export function holeClampDirsAt(model, node, cs = 5) {
+  const out = [];
+  for (const h of model.nodes.values()) {
+    if (!isHolePart(h.part) || h.id === node.id) continue;
+    const d = [h.x - node.x, h.y - node.y, h.z - node.z];
+    const L = Math.hypot(d[0], d[1], d[2]);
+    if (L < 0.5 || L > cs * 1.2) continue;
+    out.push([d[0] / L, d[1] / L, d[2] / L]);
+  }
   return out;
 }
 
@@ -1246,8 +1268,12 @@ export class BuildModel {
         const L = Math.hypot(d[0], d[1], d[2]) || 1;
         taken.add(cardinalName([d[0] / L, d[1] / L, d[2] / L]));
       }
+      // Auf einem Stutzen mit Lochzapfenkupplung ist kein Platz mehr -- ausser
+      // fuer die Multirad-Arretierung, die sie genau dort festhaelt.
+      const durchKlemme = spec.onClamp ? [] : holeClampDirsAt(this, n);
       for (const dir of (spec.dirs === "down" ? [[0, -1, 0]] : CARDINALS)) {
         if (taken.has(cardinalName(dir))) continue;
+        if (durchKlemme.some((k) => dot3(k, dir) > 0.9)) continue;
         const pos = [n.x + dir[0] * spec.offset, n.y + dir[1] * spec.offset, n.z + dir[2] * spec.offset];
         if (this.isBelowGround(pos[1])) continue;
         // Der Ankerpunkt liegt weiter aussen als das Teil selbst: Teile, die
@@ -1337,6 +1363,7 @@ export class BuildModel {
         belegt.push(norm3([other.x - n.x, other.y - n.y, other.z - n.z]));
       }
       if (!belegt.length) continue;   // freie Kupplung ohne Rohr: nichts zu tragen
+      belegt.push(...holeClampDirsAt(this, n, cs));
       for (const richtung of DIRECTIONS) {
         const d = richtung.vec;
         if (belegt.some((b) => dot3(b, d) > 0.9)) continue;
@@ -1428,6 +1455,7 @@ export class BuildModel {
         if (other) belegt.push(norm3([other.x - n.x, other.y - n.y, other.z - n.z]));
       }
       if (!belegt.length) continue;   // freie Kupplung ohne Rohr: nichts zu tragen
+      belegt.push(...holeClampDirsAt(this, n, cs));
       for (const richtung of DIRECTIONS) {
         const d = richtung.vec;
         if (belegt.some((b) => dot3(b, d) > 0.9)) continue;
