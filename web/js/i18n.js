@@ -251,7 +251,7 @@ const de = {
 
   // Statuszeile
   status_add: 'Bauen: Kupplung wählen, dann grünen Punkt klicken. Oder Pfeiltasten. Ziehen = drehen.',
-  status_panel: 'Platte: erst ein Tragrohr anklicken, dann eines der hervorgehobenen Gegenrohre. Klick auf eine Platte legt sie um.',
+  status_panel: 'Platte: erst ein Tragrohr anklicken, dann eines der hervorgehobenen Gegenrohre. Klick auf eine Platte legt sie um, Rechts- oder Doppelklick dreht sie um 90° (Schrauben ins andere Rohrpaar).',
   status_reinforce: 'Verstärken: 75er-Rohr anklicken – oder zwei 35er in einer Linie nacheinander. Ein Klick auf ein verstärktes Rohr zieht das Profil wieder heraus (orange = empfohlen).',
   status_c45: 'Winkelkupplung: auf einen grünen Punkt an einer Kupplung klicken. Erneuter Klick auf die gesetzte Kupplung dreht sie um 90°.',
   notice_c45_click_arm: 'Auf einen grünen Punkt an einer Kupplung klicken.',
@@ -686,7 +686,7 @@ const en = {
 
   // Status bar
   status_add: 'Build: select a connector, then click the green dot. Or use arrow keys. Drag = rotate.',
-  status_panel: 'Panel: click one rail tube, then one of the highlighted counterparts. Clicking a panel flips it.',
+  status_panel: 'Panel: click one rail tube, then one of the highlighted counterparts. Clicking a panel flips it, right-click or double-click turns it by 90° (screws into the other pair of tubes).',
   status_reinforce: 'Reinforce: click a 75 cm tube – or two 35 cm tubes in one line, one after the other. Clicking a reinforced tube pulls the profile back out (orange = recommended).',
   status_c45: 'Angle connector: click a green dot at a connector. Clicking the placed one again turns it by 90°.',
   notice_c45_click_arm: 'Click a green dot at a connector.',
