@@ -203,6 +203,10 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   ist die Oberkante der Frontwand (so steht es in der Datei), dazu `w` (Breite), `h` (Wandhöhe)
   und `d` (Tiefe, **mit Vorzeichen** – die Datei führt die Tiefe nicht, sie wird beim Import aus
   dem Kupplungsnetz abgeleitet). Wände, Boden und Wasser zeichnet `scene.js` daraus.
+  Beim Ableiten der Tiefe zählen **nur die Maße, die es als Folie gibt** (`POOL_DEPTHS` in
+  `qdfimport.js`): die Suche nimmt sonst die entfernteste Reihe, an der zufällig vier Ecken
+  stehen, und läuft in die Konstruktion dahinter – in drei Herstellerdateien kamen so 440 und
+  520 cm heraus statt 160.
   Die Folie hängt innen im Rahmen: an den vier Seiten und oben 2,5 cm eingerückt (halbe
   Rohrbreite), unten liegt sie auf. `catalog.poolLinerFor(w, d)` wählt daraus die Poolfolie XS/S/L/XXL (Maße am Katalogteil unter `pool`);
   passt nichts genau, gewinnt die flächenmäßig nächste Größe. Ältere Stände führen den Pool noch

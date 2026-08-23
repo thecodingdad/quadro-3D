@@ -81,6 +81,12 @@ const FITTING_KINDS = {
   "tube-cap2":          { keepRest: true },  // Rohrkappe
 };
 
+// Tiefen, die ein Baellebad ueberhaupt haben kann -- die Langseiten der vier
+// Poolfolien (XS 40x40, S 80x120, L 120x160, XXL 120x240). Die Datei fuehrt die
+// Groesse nicht mit, sie wird aus den umstehenden Kupplungen gelesen; ohne diese
+// Liste greift die Suche in alles, was zufaellig dahinter steht.
+const POOL_DEPTHS = new Set([40, 80, 120, 160, 240]);
+
 // Farbnamen aus material3 auf unsere Farb-IDs abbilden.
 const COLOR_BY_NAME = {
   red: "red", green: "green", blue: "blue", yellow: "yellow",
@@ -781,6 +787,12 @@ export function parseQDF(text, opts = {}) {
       // (z.B. Seitenwand-Mittelknoten) würden sonst als falsche Rückwand gelten.
       let bestDepth = 0, bestBack = null;
       for (const depthCm of depths) {
+        // Ein Baellebad ist ein PRODUKT: seine Folie gibt es in genau vier
+        // Groessen, tiefer als 240 cm wird keine. Ohne diese Schranke lief die
+        // Suche in die Konstruktion DAHINTER weiter -- in drei Herstellerdateien
+        // kamen so 440 und 520 cm heraus, das Becken stand ueber und die
+        // Stueckliste bot die naechstgroessere Folie an.
+        if (!POOL_DEPTHS.has(depthCm)) continue;
         const bA = snapAtDepth(nA, dv, depthCm);
         const bB = snapAtDepth(nB, dv, depthCm);
         const bC = snapAtDepth(nC, dv, depthCm);
