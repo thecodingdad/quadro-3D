@@ -482,7 +482,11 @@ main { flex: 1; display: flex; min-height: 0; }
 }
 .canvas-btn:hover { background: var(--surface); transform: scale(1.06); box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
 .canvas-btn:active { transform: scale(0.94); }
-#btn-help { bottom: 12px; right: 12px; }
+/* Unten rechts stehen zwei Knoepfe nebeneinander: die Rasterweite ganz aussen,
+   die Tastenkuerzel links daneben. Faellt der Tasten-Knopf auf dem Telefon weg,
+   rueckt die Rasterweite nicht nach -- sie hat ihren festen Platz. */
+#btn-help { bottom: 12px; right: 92px; }
+#btn-grid { bottom: 12px; right: 12px; gap: 6px; font-size: 12px; font-weight: 600; }
 
 /* Szene-Toggle-Icon: Kreis links oben im 3D-Viewport */
 /* Der Knopf sitzt oben links im Bild -- und rueckt so weit nach unten, wie die

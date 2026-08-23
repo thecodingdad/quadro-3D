@@ -6,7 +6,7 @@ import { computeBOM, compareInventory, connectorsForNode } from "./bom.js";
 import { computeBuildPlan, BUILD_ORDERS } from "./buildplan.js";
 import { parseQDF } from "./qdfimport.js";
 import { QUALITY_LEVELS } from "./scene.js";
-import { RANDOM_COLOR } from "./builder.js";
+import { RANDOM_COLOR, MOVE_STEPS } from "./builder.js";
 import * as storage from "./storage.js";
 import * as docs from "./docs.js";
 import * as sync from "./sync.js";
@@ -203,6 +203,7 @@ export function initUI({ scene, model, builder }) {
       renderSyncLine();
       renderLibHint();
       renderLibSort();
+      renderGridButton();
       renderTabs();          // der Schliessen-Knopf jedes Tabs traegt einen Tooltip
       renderFittingButton();
       syncProjectionButton();
@@ -441,6 +442,48 @@ export function initUI({ scene, model, builder }) {
   }
   document.addEventListener("visibilitychange", () => { if (document.hidden) sichereSofort(); });
   window.addEventListener("pagehide", sichereSofort);
+
+  // --- Rasterweite beim Verschieben --------------------------------------
+  // Sie gilt fuer Pfeiltasten, Ziehen und Einfuegen -- nicht fuer das Bauen
+  // selbst, das folgt den Rohrlaengen. Gemerkt wird sie global: sie gehoert zur
+  // Arbeitsweise, nicht zum einzelnen Entwurf.
+  const GRID_STEP_KEY = "quadro.moveStep.v1";
+  const gridBtn = $("btn-grid");
+  const gridWert = $("btn-grid-value");
+  const gemerkterSchritt = Number(localStorage.getItem(GRID_STEP_KEY));
+  if (MOVE_STEPS.includes(gemerkterSchritt)) builder.setMoveStep(gemerkterSchritt);
+
+  function renderGridButton() {
+    if (gridWert) gridWert.textContent = t("grid_step", builder.moveStep);
+  }
+  renderGridButton();
+
+  if (gridBtn) {
+    gridBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (togglePopup(gridBtn)) return;
+      closePopup();
+      const pop = el("div", "part-popup");
+      for (const cm of MOVE_STEPS) {
+        const row = el("button", "part-popup-row" + (cm === builder.moveStep ? " active" : ""));
+        row.appendChild(el("span", "pp-name", t("grid_step", cm)));
+        row.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          builder.setMoveStep(cm);
+          localStorage.setItem(GRID_STEP_KEY, String(cm));
+          renderGridButton();
+          closePopup();
+        });
+        pop.appendChild(row);
+      }
+      document.body.appendChild(pop);
+      placePopupUnder(pop, gridBtn);
+      activePopup = pop;
+      popupAnchor = gridBtn;
+      popupOpenedAt = performance.now();
+      setTimeout(() => document.addEventListener("click", onPopupOutsideClick, true), 0);
+    });
+  }
 
   // --- Kamera-Projektion -------------------------------------------------
   // Orthogonal = keine Fluchtpunkte: parallele Rohre bleiben parallel, gut zum

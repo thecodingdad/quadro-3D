@@ -1,7 +1,7 @@
 // Bau-Interaktion: Auswahl, Anbau ueber Richtungs-Handles, Loeschen.
 
 import { DIRECTIONS, DIAGONAL_DIRECTIONS, DIR_ALIGN_TOL, ARM_ALIGN_TOL, CLAMP_LINK_DIST, C45_SLEEVE_LEN, C45_ARM_LEN } from "./config.js";
-import { accessories, geometry, getTube, spacingFor, getPanel, defaultPanel, diagonalTubeId, slideKindLabel, slideKindName, isCurvedTube, gridSpacing, tubeColors, partName, partForFitting, getPartById, getConnector, poolLinerFor } from "./catalog.js";
+import { accessories, geometry, getTube, spacingFor, getPanel, defaultPanel, diagonalTubeId, slideKindLabel, slideKindName, isCurvedTube, gridSpacing, tubeColors, partName, partForFitting, getPartById, getConnector, poolLinerFor, reinforcementPart } from "./catalog.js";
 import { computeBuildPlan, connectorLabelInfo } from "./buildplan.js";
 import { infeasibleConnectors, inferConnectorType } from "./bom.js";
 import { t } from "./i18n.js";
@@ -42,7 +42,15 @@ const PANEL_RANDOM_EXTRA = ["black"];
 // Verschieben im Cursor-Modus (und beim Einfuegen) laeuft im 5-cm-Raster --
 // die Kupplungslaenge. Groebere Schritte wie das halbe 35er-Raster (20 cm)
 // gehen an Aufbauten vorbei, die kurze Rohre mischen.
-const MOVE_STEP = 5;
+// Feines Raster, auf dem die Geometrie selbst einrastet: die Drehachse einer
+// Auswahl und ein Rohr, das in eine Klemme kommt. Es hat nichts mit der
+// Schrittweite zu tun, die der Nutzer unten rechts einstellt -- die gilt fuers
+// VERSCHIEBEN (moveStep).
+const SNAP_STEP = 5;
+// Schrittweite beim Verschieben, Ziehen und Einfuegen. Voreinstellung 20 cm --
+// ein halbes Rasterfeld; einstellbar ueber den Knopf im Bild.
+export const MOVE_STEPS = [5, 10, 20, 40, 80];
+export const DEFAULT_MOVE_STEP = 20;
 
 export class Builder {
   constructor(scene, model, { onChange, onPreview } = {}) {
@@ -72,6 +80,8 @@ export class Builder {
     // sucht (ein Profil deckt immer 80 cm).
     this.reinforceRail = null;
     this.color = "blue";
+    // Schrittweite beim Verschieben (Pfeiltasten, Ziehen, Einfuegen).
+    this.moveStep = DEFAULT_MOVE_STEP;
     this.selectedNodeId = null;
     // Cursor-Modus: id -> kind ("tube"/"panel"/"node"/...). Die ids sind ueber
     // alle Kategorien hinweg eindeutig (gemeinsamer Zaehler in model._id).
@@ -190,6 +200,14 @@ export class Builder {
   }
   setTube(tubeId) { this.tubeId = tubeId; }
   setPanel(panelId) { this.panelId = panelId; if (this.mode === "panel") this.refresh(); }
+  /** Schrittweite beim Verschieben setzen (cm). */
+  setMoveStep(cm) {
+    const wert = Number(cm);
+    if (!MOVE_STEPS.includes(wert)) return false;
+    this.moveStep = wert;
+    return true;
+  }
+
   setClampPart(id) { this.clampPart = id; if (this.mode === "clamp") this.refresh(); }
 
   setFitting(kind) {
@@ -268,7 +286,7 @@ export class Builder {
    * Auswahl um einen Rasterschritt in Richtung dir verschieben (Pfeiltasten).
    * dir ist ein Einheitsvektor auf einer Achse.
    */
-  moveSelectionBy(dir, step = MOVE_STEP) {
+  moveSelectionBy(dir, step = this.moveStep) {
     if (this.mode !== "select" || !this.selection.size) return false;
     const before = JSON.stringify(this.model.toJSON());
     const res = this._move(dir[0] * step, dir[1] * step, dir[2] * step);
@@ -289,7 +307,7 @@ export class Builder {
     if (this.mode !== "select" || !this.selection.size) return false;
     const before = JSON.stringify(this.model.toJSON());
     const res = this.model.rotateSelection(this.selection, steps,
-      { merge: true, validate: infeasibleConnectors, grid: MOVE_STEP });
+      { merge: true, validate: infeasibleConnectors, grid: SNAP_STEP });
     if (!res.ok) { this.onNotice(t("notice_rotate_" + res.reason), "warn"); return false; }
     this._afterMove(before, res);
     return true;
@@ -300,7 +318,7 @@ export class Builder {
     const d = this._paste;
     if (!d || !d.sel) return false;
     // Ohne Zusammenlegen und ohne Trennen: die Kopie steht ja noch frei.
-    const res = this.model.rotateSelection(d.sel, steps, { merge: false, grid: MOVE_STEP });
+    const res = this.model.rotateSelection(d.sel, steps, { merge: false, grid: SNAP_STEP });
     if (!res.ok) return false;
     d.valid = !this._troubleWith(d.sel, d.collidedBefore);
     this.refresh();
@@ -377,7 +395,8 @@ export class Builder {
   _placePaste(point) {
     const d = this._paste;
     const a = d.frag.anchor;
-    const raster = (v, ref) => ref + Math.round((v - ref) / MOVE_STEP) * MOVE_STEP;
+    const schritt = this.moveStep;
+    const raster = (v, ref) => ref + Math.round((v - ref) / schritt) * schritt;
     const offset = point
       ? [raster(point.x, a[0]), a[1], raster(point.z, a[2])]
       : (d.offset || [a[0], a[1], a[2]]);
@@ -577,8 +596,9 @@ export class Builder {
     const { u, v } = d.axes;
     // Zeiger-Versatz auf die beiden Schiebe-Achsen projizieren und je Achse
     // auf das Raster runden.
-    const su = Math.round((off.x * u[0] + off.y * u[1] + off.z * u[2]) / MOVE_STEP) * MOVE_STEP;
-    const sv = Math.round((off.x * v[0] + off.y * v[1] + off.z * v[2]) / MOVE_STEP) * MOVE_STEP;
+    const schritt = this.moveStep;
+    const su = Math.round((off.x * u[0] + off.y * u[1] + off.z * u[2]) / schritt) * schritt;
+    const sv = Math.round((off.x * v[0] + off.y * v[1] + off.z * v[2]) / schritt) * schritt;
     const want = [
       u[0] * su + v[0] * sv,
       u[1] * su + v[1] * sv,
@@ -985,14 +1005,23 @@ export class Builder {
     // Genau EIN gewaehltes Teil: dessen Namen anzeigen. Nur dann -- alle Namen
     // auf einmal machten das Bild unleserlich, deshalb gibt es den frueheren
     // Schalter "Kupplungsnamen" nicht mehr.
-    const soloId = (this.mode === "select" || this.mode === "assembly") && this.selection.size === 1
+    // Ein Verstaerkungsprofil ist mehr als seine Rohre: es steckt in einem oder
+    // zwei davon, und beim Klick darauf sind sie alle gewaehlt. Dann gilt sein
+    // Name -- sonst stuende dort "Rohr 35" oder (bei zwei Rohren) gar nichts.
+    const profil = this._profilAuswahl && this._profilAuswahl.size === this.selection.size
+      && [...this.selection.keys()].every((x) => this._profilAuswahl.has(x))
       ? [...this.selection.keys()][0] : null;
+    const soloId = (this.mode === "select" || this.mode === "assembly")
+      ? (profil != null ? profil : (this.selection.size === 1 ? [...this.selection.keys()][0] : null))
+      : null;
     const withLabels = soloId != null;
     const labelFor = withLabels ? (node) => connectorLabelInfo(this.model, node) : null;
     const slideNameFor = withLabels ? (sl) => slideKindLabel(sl.kind) : null;
     const labelIds = soloId != null ? new Set([soloId]) : null;
     const soloLabel = soloId != null
-      ? { id: soloId, text: this._partLabel(soloId, this.selection.get(soloId)) } : null;
+      ? { id: soloId, text: profil != null
+        ? (reinforcementPart() ? partName(reinforcementPart()) : null)
+        : this._partLabel(soloId, this.selection.get(soloId)) } : null;
     // Vorschlaege, welche Rohre ein Verstaerkungsprofil gebrauchen koennten --
     // sichtbar genau dann, wenn man verstaerkt.
     const suggest = this.mode === "reinforce" ? this.model.reinforcementSuggestions() : null;
@@ -1636,7 +1665,7 @@ export class Builder {
     // bleibt es, wo die Klemme es haelt.
     const achse = [Math.abs(u[0]), Math.abs(u[1]), Math.abs(u[2])];
     const gr = achse.indexOf(Math.max(...achse));
-    if (achse[gr] > 0.99) p1[gr] = Math.round(p1[gr] / MOVE_STEP) * MOVE_STEP;
+    if (achse[gr] > 0.99) p1[gr] = Math.round(p1[gr] / SNAP_STEP) * SNAP_STEP;
     const p2 = [p1[0] + u[0] * span, p1[1] + u[1] * span, p1[2] + u[2] * span];
     this.recordHistory(() => {
       const n1 = this.model.addNode(round2(p1[0]), round2(p1[1]), round2(p1[2]));
@@ -2727,6 +2756,10 @@ export class Builder {
     // 35ern, da waere ein einzelnes Rohr nur die halbe Wahrheit.
     const ids = Array.isArray(pick.data.tubes) && pick.data.tubes.length
       ? pick.data.tubes : [id];
+    // Kam der Klick vom Profil, merken wir uns genau diese Rohre. Stimmt die
+    // Auswahl spaeter nicht mehr damit ueberein, gilt der Vermerk nicht mehr --
+    // so muss ihn niemand aufraeumen.
+    this._profilAuswahl = Array.isArray(pick.data.tubes) ? new Set(ids) : null;
     const schonDrin = ids.every((x) => this.selection.has(x));
     if (add) {
       if (schonDrin) for (const x of ids) this.selection.delete(x);

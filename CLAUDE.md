@@ -261,6 +261,11 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   Feldern und der Angabe, wie sicher wir uns sind (sicher / vermutet / unbekannt). Die
   Fundstellen-Kommentare im Code bleiben, aber die Beschreibung des Formats hat genau einen Ort;
   wer ein Feld entschlüsselt, trägt es dort ein und streicht es aus „Was wir nicht wissen".
+- **Zwei Raster, nicht eins:** `SNAP_STEP` (5 cm, `builder.js`) ist das feine Raster der Geometrie
+  – Drehachse einer Auswahl, Rohr in einer Klemme. `builder.moveStep` ist die vom Nutzer
+  eingestellte Schrittweite fürs **Verschieben** (Pfeiltasten, Ziehen, Einfügen; 5/10/20/40/80 cm,
+  Voreinstellung 20). Die beiden nicht vermischen: mit 80 cm als Drehachsen-Raster springt eine
+  Auswahl beim Drehen quer durchs Bild.
 - **Neue UI-Texte:** immer in **beide** Dictionaries (`de` und `en`) in `i18n.js`, dann `t('key')`
   bzw. `data-i18n`/`data-i18n-title`/`data-i18n-placeholder`/`data-i18n-aria` im HTML. Nie Strings
   in `ui.js` hardcoden.
