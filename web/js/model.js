@@ -176,16 +176,28 @@ export function clampOffset(part, cs = 5) {
  * Querrichtung.
  */
 function bearingQuat(ausrichtung, rohr) {
-  const ex = norm3(ausrichtung);
-  let ey = rohr ? norm3(rohr) : [0, 1, 0];
-  // Querkomponente zu +X; faellt sie weg (Rohr parallel zur Ausrichtung), eine
-  // beliebige andere nehmen.
-  let rest = [ey[0] - ex[0] * dot3(ey, ex), ey[1] - ex[1] * dot3(ey, ex), ey[2] - ex[2] * dot3(ey, ex)];
-  if (Math.hypot(rest[0], rest[1], rest[2]) < 1e-3) {
-    const alt = Math.abs(ex[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
-    rest = [alt[0] - ex[0] * dot3(alt, ex), alt[1] - ex[1] * dot3(alt, ex), alt[2] - ex[2] * dot3(alt, ex)];
+  if (rohr) {
+    // Das Rohr gibt die Achse vor -- die Klemme MUSS genau darum greifen. Die
+    // Ausrichtung zur getragenen Kupplung darf dafuer nachgeben; steht sie
+    // nicht exakt quer (schraeges Rohr), wird ihr Laengsanteil abgezogen.
+    const ey = norm3(rohr);
+    let rest = [ausrichtung[0] - ey[0] * dot3(ausrichtung, ey),
+      ausrichtung[1] - ey[1] * dot3(ausrichtung, ey),
+      ausrichtung[2] - ey[2] * dot3(ausrichtung, ey)];
+    if (Math.hypot(rest[0], rest[1], rest[2]) < 1e-3) {
+      const ersatz = Math.abs(ey[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+      rest = [ersatz[0] - ey[0] * dot3(ersatz, ey), ersatz[1] - ey[1] * dot3(ersatz, ey),
+        ersatz[2] - ey[2] * dot3(ersatz, ey)];
+    }
+    const ex = norm3(rest);
+    return quatFromBasis(ex, ey, cross3(ex, ey));
   }
-  ey = norm3(rest);
+  // Noch kein Rohr: die Ausrichtung steht fest, das Maul zeigt irgendwohin quer.
+  const ex = norm3(ausrichtung);
+  const ersatz = Math.abs(ex[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const rest = [ersatz[0] - ex[0] * dot3(ersatz, ex), ersatz[1] - ex[1] * dot3(ersatz, ex),
+    ersatz[2] - ex[2] * dot3(ersatz, ex)];
+  const ey = norm3(rest);
   return quatFromBasis(ex, ey, cross3(ex, ey));
 }
 
@@ -201,6 +213,7 @@ const ROTATABLE_FITTINGS = new Set([
 ]);
 
 const norm3 = (v) => { const L = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / L, v[1] / L, v[2] / L]; };
+const round4 = (v) => Math.round(v * 1e4) / 1e4;
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 
@@ -1413,7 +1426,15 @@ export class BuildModel {
     return { axis, dir: u, t: s, stub };
   }
 
-  // Kardinale Richtung senkrecht zum Rohr, die am ehesten zur Klickseite zeigt.
+  /**
+   * Richtung senkrecht zum Rohr, die am ehesten zur Klickseite zeigt.
+   *
+   * Gewaehlt wird unter den Weltachsen, gemessen wird aber EXAKT senkrecht: am
+   * schraegen Rohr steht keine Weltachse wirklich quer (erlaubt sind bis zu
+   * 17 Grad Abweichung), und mit der schiefen Richtung sass die Klemme quer
+   * statt um das Rohr. Erst ein Weiterdrehen richtete sie -- das dreht naemlich
+   * um die Rohrachse und trifft die Senkrechte dadurch immer.
+   */
   _cardinalPerpTo(off, u) {
     let best = null, bd = -Infinity;
     for (const c of CARDINALS) {
@@ -1421,7 +1442,13 @@ export class BuildModel {
       const d = dot3(c, off);
       if (d > bd) { bd = d; best = c; }
     }
-    return best || [0, 1, 0];
+    if (!best) return [0, 1, 0];
+    // Laengsanteil abziehen -- uebrig bleibt die echte Querrichtung.
+    const laengs = dot3(best, u);
+    const quer = [best[0] - u[0] * laengs, best[1] - u[1] * laengs, best[2] - u[2] * laengs];
+    const L = Math.hypot(quer[0], quer[1], quer[2]);
+    if (L < 1e-6) return best;
+    return [round4(quer[0] / L), round4(quer[1] / L), round4(quer[2] / L)];
   }
 
   /**
