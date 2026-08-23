@@ -385,6 +385,7 @@ export class SceneManager {
     this.pickTextiles = [];
     this.pickSlides = [];
     this.pickFittings = [];
+    this.pickReinforce = [];
     this.handleMeshes = [];
     this.labelMeshes = [];
 
@@ -2586,12 +2587,14 @@ export class SceneManager {
   // Handvoll Rohrlaengen und Farben gibt, bleiben es trotzdem wenige Buendel.
   //
   // kind/id duerfen null sein (nicht anklickbare Teile wie die Verstaerkungsprofile).
-  _batchAdd(geo, mat, matrix, kind, id, pickList) {
+  _batchAdd(geo, mat, matrix, kind, id, pickList, zusatz = null) {
     const key = geo.uuid + "|" + mat.uuid;
     let b = this._batches.get(key);
     if (!b) { b = { geo, mat, mats: [], items: [], pick: pickList || null }; this._batches.set(key, b); }
     b.mats.push(matrix);
-    b.items.push(kind ? { kind, id } : null);
+    // `zusatz` haengt weitere Felder an den Treffer -- das Verstaerkungsprofil
+    // gibt darueber alle Rohre seines Laufs mit.
+    b.items.push(kind ? { kind, id, ...(zusatz || {}) } : null);
   }
 
   // Gesammelte Buendel als InstancedMesh in die Bau-Gruppe haengen. Die
@@ -2625,6 +2628,10 @@ export class SceneManager {
     this.pickTextiles = [];
     this.pickSlides = [];
     this.pickFittings = [];
+    // Verstaerkungsprofile liegen NEBEN ihrem Rohr -- sie brauchen eine eigene
+    // Trefferliste, sonst faengt das Profil im Bau- oder Plattenmodus Klicks ab,
+    // die dem Rohr gelten.
+    this.pickReinforce = [];
     this._nodePoints = [];
     this._batches.clear();
 
@@ -2790,6 +2797,10 @@ export class SceneManager {
     const wantMeshes = qual.meshes;
     const wantsFitMeshes = (model.fittings && model.fittings.size)
       || (model.clamps && model.clamps.size)
+      // Auch die Verstaerkungsprofile liegen in dieser Datei -- ohne diese
+      // Zeile blieb es in einem Modell ohne Anbauteile beim gezeichneten
+      // Innenstab, das abgegriffene Profil kam nie.
+      || [...model.tubes.values()].some((t) => t.reinforced)
       || [...model.nodes.values()].some((n) => n.c45 || isHolePart(n.part));
     const braucht = [];
     if (model.nodes.size) braucht.push("connectors");
@@ -2850,13 +2861,19 @@ export class SceneManager {
         if (Math.abs(ex.y) > 0.9) ey.set(0, 0, 1);
         ey.addScaledVector(ex, -ey.dot(ex)).normalize();
         const ez = new THREE.Vector3().crossVectors(ex, ey);
-        const mat = zustand.some((z) => z === "current") ? this._tubeHighlight("black")
+        // Hervorhebung: sobald eines der Rohre des Laufs gewaehlt oder in der
+        // Liste markiert ist, leuchtet das ganze Profil mit -- sonst sieht man
+        // nicht, dass der Klick darauf gesessen hat.
+        const grund = zustand.some((z) => z === "current") ? this._tubeHighlight("black")
           : (asm && zustand.every((z) => z === "done")) ? this._fadedMaterial()
           : this._rodMaterial();
+        const mat = matFor(lauf.tubes.find((id) => marked && marked.has(id)) ?? null, grund);
         this._batchAdd(this._meshGeometry("fit:" + (Math.abs(lauf.len - 80) < 1 ? "alu2_800" : "alu2_600"), rec),
           mat, new THREE.Matrix4().makeBasis(ex, ey, ez)
             .setPosition(new THREE.Vector3(lauf.from[0], lauf.from[1], lauf.from[2])),
-          null, null, null);
+          // Ein Klick auf das Profil meint das Rohr darunter; `tubes` haelt den
+          // ganzen Lauf fest, damit die Auswahl beide Rohre erwischt.
+          "tube", lauf.tubes[0], this.pickReinforce, { tubes: lauf.tubes.slice() });
       }
     }
 
@@ -4166,7 +4183,7 @@ export class SceneManager {
     const hit = this.raycastObjects(
       clientX, clientY,
       [...this.pickNodes, ...this.pickTubes, ...this.pickPanels, ...this.pickClamps,
-       ...this.pickTextiles, ...this.pickSlides, ...this.pickFittings]
+       ...this.pickTextiles, ...this.pickSlides, ...this.pickFittings, ...this.pickReinforce]
     );
     const data = this._hitData(hit);
     return data ? { object: hit.object, data, point: hit.point, distance: hit.distance } : null;

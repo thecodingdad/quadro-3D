@@ -2722,14 +2722,20 @@ export class Builder {
       return;
     }
     const { kind, id } = pick.data;
+    // Klick auf ein Verstaerkungsprofil: es gehoert zum ganzen Lauf, also
+    // kommen alle seine Rohre in die Auswahl -- ein 80er Profil steckt in zwei
+    // 35ern, da waere ein einzelnes Rohr nur die halbe Wahrheit.
+    const ids = Array.isArray(pick.data.tubes) && pick.data.tubes.length
+      ? pick.data.tubes : [id];
+    const schonDrin = ids.every((x) => this.selection.has(x));
     if (add) {
-      if (this.selection.has(id)) this.selection.delete(id);
-      else this.selection.set(id, kind);
-    } else if (this.selection.size === 1 && this.selection.has(id)) {
+      if (schonDrin) for (const x of ids) this.selection.delete(x);
+      else for (const x of ids) this.selection.set(x, kind);
+    } else if (this.selection.size === ids.length && schonDrin) {
       this.selection.clear();
     } else {
       this.selection.clear();
-      this.selection.set(id, kind);
+      for (const x of ids) this.selection.set(x, kind);
     }
     this.refresh();
   }
