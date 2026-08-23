@@ -202,6 +202,7 @@ export function initUI({ scene, model, builder }) {
       renderQualityOptions();
       renderSyncLine();
       renderLibHint();
+      renderLibSort();
       syncProjectionButton();
       // Dynamische UI-Texte aktualisieren
       setMode(builder.mode);
@@ -1949,6 +1950,38 @@ export function initUI({ scene, model, builder }) {
     flash(t("lib_added", fresh.length, skipped));
   }
 
+  // --- Bibliothek sortieren ----------------------------------------------
+  // Je Kriterium eine Zahl (oder ein Name); die Richtung dreht nur das
+  // Vorzeichen. Gewaehlte Sortierung und Richtung ueberleben den Reload -- sie
+  // gehoeren zum Arbeitsstand, nicht zu den Dateien.
+  const LIB_SORT_KEY = "quadro.libSort.v1";
+  const LIB_SORTS = {
+    name: "lib_sort_name",
+    missing: "lib_sort_missing",
+    tubes: "lib_sort_tubes",
+    panels: "lib_sort_panels",
+    volume: "lib_sort_volume",
+  };
+  let libSort = "name";
+  let libSortDesc = false;
+  try {
+    const gespeichert = JSON.parse(localStorage.getItem(LIB_SORT_KEY)) || {};
+    if (LIB_SORTS[gespeichert.by]) libSort = gespeichert.by;
+    libSortDesc = !!gespeichert.desc;
+  } catch { /* nichts gemerkt */ }
+
+  /** Der Wert, nach dem sortiert wird -- bei "name" ein Text, sonst eine Zahl. */
+  function libSortWert(zeile, art) {
+    const m = zeile.entry.meta;
+    if (art === "missing") return missingCount(zeile.check);
+    if (art === "tubes") return m.tubes || 0;
+    if (art === "panels") return m.panels || 0;
+    // Volumen der Aussenmasse in Kubikmetern -- die Zahl ist nur zum Vergleichen
+    // da, deshalb ungerundet.
+    if (art === "volume") return ((m.size[0] || 0) * (m.size[1] || 0) * (m.size[2] || 0)) / 1e6;
+    return zeile.entry.name;
+  }
+
   function libVisible() {
     const q = $("lib-search").value.trim().toLowerCase();
     const onlyFeasible = $("lib-only-feasible").checked;
@@ -1959,8 +1992,53 @@ export function initUI({ scene, model, builder }) {
       if (onlyFeasible && !check.ok) continue;
       rows.push({ entry: e, check });
     }
+    const richtung = libSortDesc ? -1 : 1;
+    rows.sort((a, b) => {
+      const va = libSortWert(a, libSort), vb = libSortWert(b, libSort);
+      if (typeof va === "string") return richtung * va.localeCompare(vb, locale());
+      // Gleichstand (viele Modelle brauchen dieselbe Zahl Rohre): nach Namen,
+      // damit die Liste nicht bei jedem Neuzeichnen anders steht.
+      if (va !== vb) return richtung * (va - vb);
+      return a.entry.name.localeCompare(b.entry.name, locale());
+    });
     return rows;
   }
+
+  function renderLibSort() {
+    const sel = $("lib-sort");
+    const knopf = $("lib-sort-dir");
+    if (!sel || !knopf) return;
+    sel.innerHTML = "";
+    for (const [wert, key] of Object.entries(LIB_SORTS)) {
+      const o = document.createElement("option");
+      o.value = wert;
+      o.textContent = t(key);
+      if (wert === libSort) o.selected = true;
+      sel.appendChild(o);
+    }
+    knopf.textContent = libSortDesc ? "↓" : "↑";
+    knopf.title = t(libSortDesc ? "lib_sort_desc" : "lib_sort_asc");
+  }
+
+  function merkeLibSort() {
+    try {
+      localStorage.setItem(LIB_SORT_KEY, JSON.stringify({ by: libSort, desc: libSortDesc }));
+    } catch { /* voll */ }
+  }
+
+  $("lib-sort").addEventListener("change", (e) => {
+    libSort = LIB_SORTS[e.target.value] ? e.target.value : "name";
+    merkeLibSort();
+    renderLibSort();
+    renderLibrary();
+  });
+  $("lib-sort-dir").addEventListener("click", () => {
+    libSortDesc = !libSortDesc;
+    merkeLibSort();
+    renderLibSort();
+    renderLibrary();
+  });
+  renderLibSort();
 
   function renderLibrary() {
     const list = $("lib-list");
