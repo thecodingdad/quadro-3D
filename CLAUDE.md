@@ -298,6 +298,11 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   eigenen Stand. Gesichert wird entprellt **und** sofort bei `visibilitychange`/`pagehide` –
   sonst verschluckten die 400/600 ms den letzten Stand.
 - `catalog.js` lädt `../data/parts.json` relativ – die App muss unter `/web/` ausgeliefert werden.
+- **Die Zoomgrenze gehört nicht ans Zeichnen.** `_applyZoomLimits(model)` läuft auch dann, wenn
+  `renderModel` wegen der noch ladenden Modelldateien früh aussteigt: sonst gilt weiter die Grenze
+  für ein leeres Modell (600 cm), und der nächste `_applyZoomLimits()` – Fenstergröße, Projektion –
+  zieht eine weiter draußen stehende Kamera heran. Genau daran starb die gerade wiederhergestellte
+  Ansicht beim Neuladen.
 - **Beim Start wird gewartet, nicht ersetzt:** solange eine gebrauchte Modelldatei unterwegs ist
   (`MESH_FIELDS`-Feld auf `null`), zeichnet `renderModel` das Modell **gar nicht** und lässt einen
   kleinen Kreisel laufen (`_setLoading`, `.scene-spinner`). Sonst stünden nach jedem Neuladen erst

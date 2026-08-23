@@ -2790,7 +2790,16 @@ export class SceneManager {
     // `false`), geht es mit den Ersatzformen weiter.
     const wartet = wantMeshes && braucht.some((satz) => this[MESH_FIELDS[satz]] === null);
     this._setLoading(wartet);
-    if (wartet) { this._needsRender = true; return; }
+    if (wartet) {
+      // Die Zoomgrenze haengt an der MODELLGROESSE, nicht am Gezeichneten --
+      // sie muss auch beim Warten stehen. Sonst gilt weiter die Grenze fuer ein
+      // leeres Modell, und der naechste `_applyZoomLimits()` (Fenstergroesse,
+      // Projektion) holt eine weit draussen stehende Kamera heran: die gerade
+      // wiederhergestellte Ansicht sprang damit beim Laden zurueck.
+      this._applyZoomLimits(model);
+      this._needsRender = true;
+      return;
+    }
     // Verstaerkungsprofile: die abgegriffenen Modelle liegen bei den Anbauteilen.
     // Sie decken die genormten Laeufe (80 und 60 cm) ab; was uebrig bleibt --
     // etwa die krummen Abstaende eines gedrehten Aufbaus -- behaelt den
