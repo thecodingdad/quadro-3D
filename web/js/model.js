@@ -635,6 +635,19 @@ export class BuildModel {
     return [c0, c1, add(c1), add(c0)];
   }
 
+  /**
+   * Platte um 90 Grad drehen. Sie hat zwei LIPPEN mit je zwei Schrauben; die
+   * Drehung entscheidet, an welchem Rohrpaar sie verschraubt wird -- laengs der
+   * Tragrohre (Vorgabe) oder quer dazu. Geometrisch deckt sie dasselbe Feld,
+   * nur die Schrauben wandern (siehe computeScrews in bom.js).
+   */
+  turnPanel(id) {
+    const p = this.panels.get(id);
+    if (!p) return false;
+    p.turned = !p.turned;
+    return true;
+  }
+
   /** Abstand der beiden Tragrohre (Breite der Platte). */
   panelGap(p) {
     const c = this.panelCorners(p);
@@ -919,7 +932,10 @@ export class BuildModel {
     // Maul dreht mit, es zeigt weiter von der getragenen Kupplung weg.
     if (node.bearingOn) {
       const f = this.fittings.get(node.bearingOn);
-      if (f) f.quat = bearingQuat([-node.stub[0], -node.stub[1], -node.stub[2]], u);
+      if (f) {
+        f.quat = bearingQuat([-node.stub[0], -node.stub[1], -node.stub[2]], u);
+        node.quat = f.quat.slice();
+      }
     }
     return true;
   }
@@ -1229,6 +1245,10 @@ export class BuildModel {
       const f = this.addFitting("bearing-connector4", m.achse[0], m.achse[1], m.achse[2],
         { quat: bearingQuat([-m.stub[0], -m.stub[1], -m.stub[2]], this._tubeDir(this.tubes.get(tubeId))) });
       node.bearingOn = f.id;
+      // Die getragene Kupplung steht wie die Klemme -- am schraegen Rohr also
+      // schraeg. Ohne das boete sie die Weltachsen an und ein angestecktes Rohr
+      // liefe im falschen Winkel weg.
+      node.quat = f.quat.slice();
     } else {
       node.part = part;
     }
@@ -1295,6 +1315,7 @@ export class BuildModel {
     // +Y wandert auf +Z, die Ausrichtung (+X) bleibt.
     f.quat = quatFromBasis(xAxisOf(f.quat), zAxisOf(f.quat),
       cross3(xAxisOf(f.quat), zAxisOf(f.quat)));
+    n.quat = f.quat.slice();
     return true;
   }
 
@@ -1322,6 +1343,7 @@ export class BuildModel {
     const f = this.addFitting("bearing-connector4", achse[0], achse[1], achse[2],
       { quat: bearingQuat(u, null) });
     node.bearingOn = f.id;
+    node.quat = f.quat.slice();   // die Kupplung steht wie die Klemme
     node.stub = [round(-u[0]), round(-u[1]), round(-u[2])];
     return f;
   }
@@ -3076,6 +3098,7 @@ export class BuildModel {
       panels: [...this.panels.values()].map((p) => {
         const o = { id: p.id, a: p.a, b: p.b, t0: round(p.t0), len: round(p.len), panelId: p.panelId, color: p.color };
         if ((p.side || 1) < 0) o.side = -1;   // Standard ist oben/aussen
+        if (p.turned) o.turned = true;        // Lippen quer statt laengs (Schrauben)
         if (p.geom) o.geom = p.geom;          // eigene Lage aus der Datei
         if (p.pool) o.pool = p.pool;          // Original-Zeile des Baellebads
         if (p.poolPart) o.poolPart = true;    // Wand/Boden eines Baellebads
@@ -3158,6 +3181,7 @@ export class BuildModel {
       const rec = this._panelRecord(p);
       if (!rec) continue;
       rec.panelId = p.panelId;
+      if (p.turned) rec.turned = true;
       if (p.geom) rec.geom = p.geom;
       if (p.pool) rec.pool = p.pool;
       if (p.poolPart) rec.poolPart = true;

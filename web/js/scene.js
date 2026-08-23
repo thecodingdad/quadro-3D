@@ -3034,9 +3034,15 @@ export class SceneManager {
       // Versatz auf den Rohrscheitel selbst mit, also OHNE `lift` und mit der
       // rohen Eckenmitte. Die Lochplatte laeuft ueber ihre Katalog-Kennung: sie
       // ist ein Nachbau, kein Mitschnitt, und hat kein eigenes Masspaar.
+      // Gedrehte Platte: ihre Lippen liegen quer. Achsen tauschen, damit man es
+      // sieht -- das abgegriffene Modell bringt die Lippe mit.
+      const flaechenX = p.turned ? zAxis : xAxis;
+      const flaechenZ = p.turned ? xAxis : zAxis;
+      const spanX = p.turned ? w.length() : u.length();
+      const spanZ = p.turned ? u.length() : w.length();
       const echteFlaeche = wantMeshes
         ? this._surfaceMeshFor((getPanel(p.panelId) || {}).holes ? p.panelId : "panel2",
-          xAxis, zAxis, u.length(), w.length(), center.clone(), nrm, p.side)
+          flaechenX, flaechenZ, spanX, spanZ, center.clone(), nrm, p.side)
         : null;
       if (echteFlaeche) {
         this._batchAdd(echteFlaeche.geo, matFor(p.id, mat), echteFlaeche.matrix,

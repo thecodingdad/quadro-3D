@@ -1,7 +1,7 @@
 // Bau-Interaktion: Auswahl, Anbau ueber Richtungs-Handles, Loeschen.
 
 import { DIRECTIONS, DIAGONAL_DIRECTIONS, DIR_ALIGN_TOL, ARM_ALIGN_TOL, CLAMP_LINK_DIST, C45_SLEEVE_LEN, C45_ARM_LEN } from "./config.js";
-import { geometry, getTube, spacingFor, getPanel, defaultPanel, diagonalTubeId, slideKindLabel, slideKindName, isCurvedTube, gridSpacing, tubeColors, partName, partForFitting, getPartById, getConnector, poolLinerFor } from "./catalog.js";
+import { accessories, geometry, getTube, spacingFor, getPanel, defaultPanel, diagonalTubeId, slideKindLabel, slideKindName, isCurvedTube, gridSpacing, tubeColors, partName, partForFitting, getPartById, getConnector, poolLinerFor } from "./catalog.js";
 import { computeBuildPlan, connectorLabelInfo } from "./buildplan.js";
 import { infeasibleConnectors, inferConnectorType } from "./bom.js";
 import { t } from "./i18n.js";
@@ -914,10 +914,20 @@ export class Builder {
       const def = t && getTube(t.tubeId);
       return def ? partName(def) : null;
     }
-    if (kind === "panel" || kind === "textile") {
-      const p = (m.panels.get(id) || m.textiles.get(id));
+    if (kind === "panel") {
+      const p = m.panels.get(id);
       const def = p && getPanel(p.panelId);
       return def ? partName(def) : null;
+    }
+    if (kind === "textile") {
+      // Ein Tuch hat kein Katalogteil je Groesse -- es gibt EINES, seine Masse
+      // stehen am Teil. Ohne diesen Zweig suchte der Name ein `panelId`, das es
+      // hier nicht gibt, und die Auswahl zeigte "null".
+      const x = m.textiles.get(id);
+      if (!x) return null;
+      const def = accessories().find((a) => a.qdf === "textil2");
+      const name = def ? partName(def) : t("bom_textile");
+      return x.w && x.h ? `${name} ${x.w}×${x.h} cm` : name;
     }
     if (kind === "clamp") {
       const c = m.clamps.get(id);
@@ -1602,6 +1612,31 @@ export class Builder {
     // kaemen waehrend des Zoomens abwechselnd Bewegungen BEIDER Finger an: der
     // Drehpunkt sprang dann zwischen ihnen hin und her.
     this._pointerId = null;
+
+    // Rechtsklick im Platten-Modus dreht die Platte unter dem Zeiger um 90 Grad.
+    // Sie hat zwei Lippen mit je zwei Schrauben -- die Drehung entscheidet, an
+    // welchem Rohrpaar sie verschraubt wird. Das Kontextmenue bleibt sonst aus,
+    // wie ueberall auf der Zeichenflaeche.
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (this.mode !== "panel") return;
+      const pick = this.scene.pickForDelete(e.clientX, e.clientY);
+      if (!pick || pick.data.kind !== "panel") return;
+      let ok = false;
+      this.recordHistory(() => { ok = this.model.turnPanel(pick.data.id); });
+      if (ok) this.onNotice(t("notice_panel_turned"), "info");
+      this.refresh();
+    });
+    // Doppelklick tut dasselbe -- auf dem Touchpad ist er der bequemere Weg.
+    el.addEventListener("dblclick", (e) => {
+      if (this.mode !== "panel") return;
+      const pick = this.scene.pickForDelete(e.clientX, e.clientY);
+      if (!pick || pick.data.kind !== "panel") return;
+      let ok = false;
+      this.recordHistory(() => { ok = this.model.turnPanel(pick.data.id); });
+      if (ok) this.onNotice(t("notice_panel_turned"), "info");
+      this.refresh();
+    });
 
     el.addEventListener("pointerdown", (e) => {
       if (this._pointerId !== null) { this._abortGesture(); return; }

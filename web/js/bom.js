@@ -423,21 +423,39 @@ export function computeScrews(model) {
 
   const count = { panel: 0, conical: 0, counter: 0, slide: 0 };
 
-  // 2. Platten: vier Schrauben, je Ecke eine. Sie laufen durch das Tragrohr in
-  //    die Kupplung -- liegt dort eine, ist der Platz weg.
+  // 2. Platten: vier Schrauben. Eine Platte hat ZWEI Lippen mit je zwei
+  //    Schrauben, sie wird also an einem Rohr-PAAR verschraubt -- nicht an allen
+  //    vier Kanten. Welches Paar, sagt ihre Drehung: ungedreht sind es die
+  //    beiden Tragrohre (p.a und p.b), gedreht die beiden quer dazu. Die
+  //    Schrauben laufen durch das Rohr in die Kupplung; liegt dort schon eine,
+  //    ist der Platz weg.
   for (const p of model.panels.values()) {
     if (p.poolPart) continue;                  // Baellebad ist eine Folie
     count.panel += 4;
     const corners = model.panelCorners(p);
     if (!corners) continue;
     // corners: [Anfang a, Ende a, Ende b, Anfang b]
-    for (const [tubeId, punkt] of [[p.a, corners[0]], [p.a, corners[1]],
-                                   [p.b, corners[3]], [p.b, corners[2]]]) {
-      const t = model.tubes.get(tubeId);
+    if (!p.turned) {
+      for (const [tubeId, punkt] of [[p.a, corners[0]], [p.a, corners[1]],
+                                     [p.b, corners[3]], [p.b, corners[2]]]) {
+        const t = model.tubes.get(tubeId);
+        if (!t) continue;
+        const node = nodeNear(punkt, SCREW_SLOT_EPS);
+        if (!node) continue;                   // Platte sitzt mitten auf dem Rohr
+        takeSlot(t.id + "@" + node.id);
+      }
+      continue;
+    }
+    // Gedreht: die Lippen liegen auf den Querrohren. Gesucht ist an jeder Ecke
+    // das Rohr, das zur GEGENUEBERLIEGENDEN Ecke derselben Kante laeuft.
+    const quer = [[corners[0], corners[3]], [corners[1], corners[2]]];
+    for (const [von, nach] of quer) {
+      const nv = nodeNear(von, SCREW_SLOT_EPS), nn = nodeNear(nach, SCREW_SLOT_EPS);
+      if (!nv || !nn) continue;
+      const t = model.tubeBetween ? model.tubeBetween(nv.id, nn.id) : null;
       if (!t) continue;
-      const node = nodeNear(punkt, SCREW_SLOT_EPS);
-      if (!node) continue;                     // Platte sitzt mitten auf dem Rohr
-      takeSlot(t.id + "@" + node.id);
+      takeSlot(t.id + "@" + nv.id);
+      takeSlot(t.id + "@" + nn.id);
     }
   }
 

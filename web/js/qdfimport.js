@@ -807,6 +807,9 @@ export function parseQDF(text, opts = {}) {
     const r4 = (v) => Math.round(v * 1e4) / 1e4;
     nd.stub = [r4(-ex[0]), r4(-ex[1]), r4(-ex[2])];
     nd.bearingOn = f.id;
+    // Die getragene Kupplung steht wie die Klemme -- sonst bietet sie die
+    // Weltachsen an und ein angestecktes Rohr laeuft im falschen Winkel weg.
+    if (!nd.quat) nd.quat = f.quat.slice();
   }
 
   // 3. Durchlauf: Alu-Verstaerkungsprofile -> markiere getroffene Rohre.
