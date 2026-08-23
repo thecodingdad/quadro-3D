@@ -26,6 +26,15 @@ Three sources, in descending order of reliability:
 3. **The binary itself.** `Quadro.exe` contains a table of all element
    keywords (§4). It tells us which elements *exist*, not what their fields
    mean.
+4. **What the software draws**, captured from its OpenGL stream under Wine
+   (`tmp/extracted/`). This settles questions the corpus cannot: whether a
+   field changes the geometry, which mask belongs to which product, whether an
+   element is drawn at all.
+
+One rule for such experiments, learned the hard way: put a **control element**
+(a plain `tube2`) into every probe file. A single malformed line makes the
+software reject the **whole file** without a word — without the control you
+cannot tell "element not drawn" from "file not read".
 
 ### Confidence levels
 
@@ -66,9 +75,14 @@ tube2{2, {4., 0., 0., 0., 0., 0., 0.}, 1, 350., 0., 0}
   writes connectors before tubes, but nothing depends on the order: our
   importer reads the file in several passes and the original software accepts
   our output, which uses a different order again.
-- Anything the reader does not recognise is skipped. Unknown element names,
-  extra fields at the end of a line and `camera2` lines all pass through
+- Anything **this app's** reader does not recognise is skipped: unknown element
+  names, extra fields at the end of a line and `camera2` lines all pass through
   harmlessly.
+- **The original software is not that forgiving.** A line with the wrong number
+  of fields makes it throw the whole file away — silently, with an empty
+  document and no message. Tested on `clip2`: four or seven fields kill the
+  file, five and six are accepted. Anyone writing QDF should keep a known-good
+  element in the file while experimenting (§1). **✔**
 
 ---
 
@@ -227,6 +241,13 @@ The nine with zero lines exist in the binary only. `alu-connector2` and
 panel respectively); the wood parts and the chair back are from product lines
 we have never seen a file for.
 
+Written by hand and fed to the software, four of them do draw:
+`alu-connector2` (400 mm profile), `display2` (a flat 350 × 350 rectangle of
+two triangles), `wood-bed2` (350 × 350 × 30 mm) and `chairseatback2`
+(400 × 385 × 49 mm) — all with the field layout of the element they resemble.
+`wood2`, `wood-knob2` and `round-wood2` refuse every layout tried (three each):
+the software throws the **whole file** away, so their fields stay unknown. **?**
+
 ---
 
 ## 5. Elements in detail
@@ -251,12 +272,32 @@ connector3{1, {4., 0., 0., 0., 0., 0., 0.}, 1, 0, 0, 63, 4095, 0}
 | 3 | almost always 0; a handful of lines carry 63, 60, 15 or 51 | ? |
 | 4 | **arm mask**: which of the six sockets exist, in the cube's *local* axes — `0x01` +X, `0x02` −X, `0x04` +Y, `0x08` −Y, `0x10` +Z, `0x20` −Z | ✔ |
 | 5 | complement of field 4: `63 − mask`, without exception in the corpus | ✔ |
-| 6 | face visibility mask, `4095` = `0xFFF` in more than half the lines, 226 different values overall | ~ |
+| 6 | face mask, `4095` = `0xFFF` in more than half the lines, 226 different values overall — **no effect on the geometry**: nine values from 0 to 4095 all draw the same 192 triangles | ✔ |
 | 7, 8 | editing-step range, only on some lines (§3.5) | ~ |
 
 The arm mask is what makes a connector look like the real part: it includes
 sockets with no tube in them. Because the mask is local, a rotated connector
 has to have its world directions rotated back before the bits are read.
+
+The mask is the **only** thing that shapes the part — the catalogue types are
+nothing but masks, and the software draws each one differently:
+
+| Catalogue id | Mask | Arms | Triangles |
+|---|---:|---|---:|
+| `straight` | 3 | +X −X | 64 |
+| `elbow` | 5 | +X +Y | 96 |
+| `t` | 7 | +X −X +Y | 96 |
+| `cross` | 15 | +X −X +Y −Y | 128 |
+| `3way` | 21 | +X +Y +Z | 112 |
+| `4way` | 23 | +X −X +Y +Z | 128 |
+| `5way` | 31 | all but −Z | 160 |
+| `6way` | 63 | all six | 192 |
+
+Two traps in there. Mask **13** (`+X +Y −Y`) is coplanar and gives another T,
+not the spatial three-way — that one is mask **21**. And masks **0 and 1 draw
+nothing at all**: below two arms the software leaves the part out. That is not
+academic — mask 0 appears **80 times** in the corpus, so those lines describe
+connectors that stay invisible. **✔**
 
 #### `connector45_2` — 45° angle connector
 
@@ -358,9 +399,17 @@ Which edge belongs to which axis matters: swap them and a 40 × 20 panel comes
 out across the frame. The corpus is unanimous — first size on Y — in all 98
 non-square panels. **✔**
 
+The size fields really are free: the software draws every catalogue size, and
+the panel is **pure scaling** — always 22 triangles, the box measures size +
+50 mm in both directions, 47,1 mm thick. **✔**
+
 The local **Z** axis says which side of the tubes the panel is fastened to.
-Panels with holes are not distinguishable in the file; they carry the same
-sizes as the solid ones.
+
+**The perforated panel does not exist for this software.** No field
+distinguishes it (field 7 of all 2 762 `panel2` lines is `0` or a step number),
+and it is not a matter of presentation either: all nine panel materials draw
+the same 22 triangles, and the only `.bmp` strings in the binary belong to a
+file dialog, not to a built-in texture. **✔**
 
 `display2` has the same shape and is read as a panel.
 
@@ -384,6 +433,11 @@ part size: `1550 × 775` measures exactly from −775 to +775 around the anchor.
 **✔** Unlike `panel2`, both orders occur (`1550, 775` twice as often as
 `775, 1550`), so a reader has to try both.  **✔**
 
+The software **reads the line and draws nothing**. With the layout above the
+file loads (the control element of the probe appears), the lattice does not —
+not on its own, and not in the manufacturer's own model that contains two of
+them. Whatever switches it on, it is not in the line. **✔**
+
 ### 5.3 Clamps, adapters, special connectors
 
 #### `hole-connector4` — hole-pin connector
@@ -398,7 +452,7 @@ hole-connector4{1, {2., -2., 0., 0., 1249.999999999932, 1500.000021502626, -899.
 | 1 | placement, anchor = **mouth of the open socket**; the tube in it runs along local **−Y** | ✔ |
 | 2 | active flag, `0` in most lines here | ~ |
 | 3 | 0 (one line has 60) | ? |
-| 4 | arm mask, `11` in 50 of 51 lines; a value of 11 means the three-armed variant, a single bit the one-armed | ~ |
+| 4 | **arm mask**, `11` in 50 of 51 lines — it picks the variant, see below | ✔ |
 | 5 | field 4 minus 3, without exception | ✔ |
 | 6 | `3840` = `0xF00` in every line | ? |
 | 7, 8 | 0 on most lines | ? |
@@ -406,6 +460,23 @@ hole-connector4{1, {2., -2., 0., 0., 1249.999999999932, 1500.000021502626, -899.
 The part grips **over a socket of a connector** — it does not clamp a tube
 directly, and it does not replace the connector next to it. The −Y reading of
 the tube direction holds in all 26 cases where a tube is attached. **✔**
+
+Field 4 picks the variant, and **the arm count of the product is not the number
+of set bits** — that is the trap here. Captured from the software:
+
+| Mask | Product | Catalogue | Triangles |
+|---:|---|---|---:|
+| 11 | pin connector **1-way** | `hole_1` (CH1) | 352 |
+| 15 | pin connector **2-way** | *no entry yet* | 544 |
+| 31, 59 | pin connector **3-way** | `hole_t` (CH3) | 736 |
+
+Masks 31 and 59 are the same shape in a different orientation (checked against
+the rotation-invariant distances of every point to the centroid). Masks with
+single bits (1, 2, 4, 8, 16, 32) and mask 3 do draw something, but only
+**fragments** — sleeves without their pin. They match no product. **✔**
+
+Deciding the variant by counting bits therefore gets every case wrong: mask 11
+has three bits and is the one-way part.
 
 #### `clamp2`, `clip2` — double-tube connector and tube clip
 
@@ -519,7 +590,10 @@ this trips people up:
 - `slide-end2` closes a chain; its anchor is its own upper connection. **✔**
 - `slide-new2` is the one-piece integral slide, and its anchor is the **foot**
   of the run-out. The entry is 850 mm up and 1200 mm back along its run
-  direction. **✔**
+  direction. **✔** Its shape is the one thing in this program that is **not**
+  built at run time: it is `VRML/rutsche10.wrl` next to the executable, a CATIA
+  export of 1004 triangles. A `slide-new2` line on its own draws nothing in our
+  tests. **✔**
 - In the manufacturer's files a 350 mm tube sits under an integral slide, its
   centre exactly on the slide's anchor. It is part of the slide, not a tube of
   the frame. **✔**
@@ -586,19 +660,24 @@ Nothing else is known, and this app neither reads nor writes the line. **?**
 
 Collected list of open points, if anyone wants to dig:
 
-- `connector3` field 3 (a handful of non-zero values) and the 226 different
-  values of the face mask in field 6.
+- `connector3` field 3 (a handful of non-zero values). Field 6 is settled for
+  the geometry — it changes nothing — but why the corpus carries 226 different
+  values is still open.
 - The trailing `0` before the step range on `tube2`, `panel2`, `textil2`.
 - `connector45_2` fields 3–5.
 - `hole-connector4` field 6 (`3840` everywhere), `bearing-connector4`
   fields 3–5, `flexi-connector3` fields 3, 4, 6 and 8, `textil-round2`
   field 3.
+- What makes the software draw a `lattice2`. The line is read without
+  complaint, the part never appears.
+- The field layout of `wood2`, `wood-knob2` and `round-wood2` — every guess so
+  far makes the software reject the file.
 - The two numbers in the header line — the step-count reading fits the four
   files that have one, and that is thin evidence.
 - Whether the step range means "created in step a, deleted in step b" or
   something else, and why so many of those lines are duplicates.
 - All 25 fields of `camera2`.
-- Everything about the nine element types that exist only in the binary.
+- Everything else about the element types that exist only in the binary.
 
 ---
 
