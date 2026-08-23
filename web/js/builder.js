@@ -13,6 +13,11 @@ import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, holeClampDirsAt, HO
 // NICHT dazu -- sie umschließt kein Rohr (siehe PLACEABLE_FITTINGS).
 const TUBE_CLAMP_PARTS = { "bearing-clamp": "bearing" };
 
+// Anbauteile, die auf einem Stutzen der Kupplung SITZEN -- dort ist dann kein
+// Platz mehr fuer ein Rohr. Dieselbe Liste fuehren scene.js (sie zeichnet den
+// Stutzen) und bom.js (sie zaehlt ihn als Arm).
+const ARM_FITTINGS = new Set(["adapter2", "bearing2", "steering-lock2", "open-connector2"]);
+
 // So lange wartet der Seitenwechsel einer Platte auf einen zweiten Klick. Der
 // Doppelklick dreht sie stattdessen; 250 ms ist der uebliche Abstand, den
 // Betriebssysteme dafuer ansetzen.
@@ -50,6 +55,9 @@ export class Builder {
     this._tubeHandles = new Map();   // Rohr -> mitwandernder Ankerpunkt
     this.slideKind = "slide-new2";   // gewaehltes Rutschenteil
     this.onHistoryChange = () => {}; // Undo-Verfuegbarkeit hat sich geaendert
+    // Die Hervorhebung aus Stueckliste/Bestand/Aufbau wurde im Bild aufgehoben
+    // (Klick ins Leere) -- die Liste muss ihre markierte Zeile zuruecknehmen.
+    this.onHighlightCleared = () => {};
 
     // "select" (Cursor: vorhandenes auswaehlen) | "add" | "panel" | "slide" |
     // "clamp" | "fitting" | "reinforce" | "assembly"
@@ -1055,11 +1063,14 @@ export class Builder {
     // Ohne gewaehlte Kupplung zeigen ALLE ihre Ankerpunkte -- so sieht man auf
     // einen Blick, wo sich weiterbauen laesst. Ein Klick auf eine Kupplung
     // waehlt sie, danach sind nur noch ihre Punkte zu sehen.
-    const nodes = this.selectedNodeId
+    const nodes = (this.selectedNodeId
       ? [this.model.nodes.get(this.selectedNodeId)].filter(Boolean)
+      : [...this.model.nodes.values()])
       // Kupplungen ohne Rohr aus einer QDF-Datei werden nicht gezeichnet --
-      // dann bieten sie auch keine Ankerpunkte an.
-      : [...this.model.nodes.values()].filter((n) => !n.unused);
+      // dann bieten sie auch keine Ankerpunkte an. Ebenso ein Rohrende unter
+      // einer Rad- oder Rohrkappe: dort steckt die Kappe ANSTELLE der Kupplung,
+      // ihre Punkte wuerden ins Leere zeigen.
+      .filter((n) => !n.unused && !(this.model.hasWheelCap && this.model.hasWheelCap(n)));
     for (const node of nodes) this._addBuildHandles(node, gap);
   }
 
@@ -1246,10 +1257,17 @@ export class Builder {
 
   _occupiedDirs(node) {
     const occ = new Set();
-    // Ein Stutzen, auf dem eine Lochzapfenkupplung steckt, ist belegt -- dort
-    // gehoert kein Rohr mehr hin (nur die Multirad-Arretierung haelt sie fest,
-    // die laeuft ueber die Anbauteil-Ankerpunkte).
+    // Ein Stutzen ist belegt, wenn eine Lochzapfenkupplung darauf steckt oder
+    // ein Teil daraufsitzt, das den Zapfen fuellt (Radlager, Adapter,
+    // Multirad-Arretierung, offenes Verbinderende) -- ein Rohr passt dann nicht
+    // mehr dazu. Andere Teile auf demselben Zapfen bleiben moeglich, die laufen
+    // ueber die Anbauteil-Ankerpunkte.
     const durchKlemme = holeClampDirsAt(this.model, node, geometry().connectorSize);
+    for (const f of this.model.fittings.values()) {
+      if (!ARM_FITTINGS.has(f.kind) || !f.quat) continue;
+      if (Math.hypot(f.x - node.x, f.y - node.y, f.z - node.z) > 2) continue;
+      durchKlemme.push(xAxisOf(f.quat));
+    }
     // Rotierte Kupplung (armDirs aus QDF-Import): Belegung gegen gespeicherte
     // Arm-Richtungen pruefen (nicht gegen DIRECTIONS/DIAGONAL_DIRECTIONS).
     const eigene = node.c45body ? null : this._armDirsOf(node);
@@ -1984,6 +2002,15 @@ export class Builder {
     // Zeichenflaeche (im Platten-Modus: drehen) -- ohne diese Pruefung lief
     // beides zugleich und die Platte klappte nebenbei auf die andere Seite.
     if (e.button !== 0) { finish(); return; }
+    // Klick ins Leere hebt eine Hervorhebung aus Stueckliste, Bestand oder
+    // Aufbau wieder auf. Sie gehoert keinem Modus -- ohne das bliebe sie beim
+    // Weiterbauen stehen. Die Hervorhebungen der Platten- und Verstaerkungs-
+    // Ablaeufe haengen dagegen an ihrem Rohr und bleiben.
+    if (this.highlight && !this.panelRail && !this.reinforceRail
+        && !this.scene.pickForDelete(e.clientX, e.clientY)) {
+      this.highlight = null;
+      this.onHighlightCleared();
+    }
     if (this.mode === "select") this._clickSelect(e);
     else if (this.mode === "add") this._clickAdd(e);
     else if (this.mode === "panel") this._clickPanel(e);
@@ -2008,7 +2035,7 @@ export class Builder {
     this.selection.clear();
     if (id != null && !same) this.selection.set(id, pick.data.kind);
     // Hervorhebung aus der Schrittliste und Einzelauswahl schliessen sich aus.
-    this.highlight = null;
+    if (this.highlight) { this.highlight = null; this.onHighlightCleared(); }
     this.refresh();
   }
 

@@ -287,6 +287,12 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
 ## Fallstricke
 
 - `catalog.js` lädt `../data/parts.json` relativ – die App muss unter `/web/` ausgeliefert werden.
+- **Beim Start wird gewartet, nicht ersetzt:** solange eine gebrauchte Modelldatei unterwegs ist
+  (`MESH_FIELDS`-Feld auf `null`), zeichnet `renderModel` das Modell **gar nicht** und lässt einen
+  kleinen Kreisel laufen (`_setLoading`, `.scene-spinner`). Sonst stünden nach jedem Neuladen erst
+  die selbst gezeichneten Ersatzformen da und wechselten kurz darauf. Scheitert eine Datei
+  endgültig, steht im Feld `false` – dann geht es mit den Ersatzformen weiter, sonst liefe der
+  Kreisel ewig.
 - **Abgegriffene Originalmodelle** (`data/models/*.json`, erzeugt aus `tmp/extracted/models/` mit
   `tools/obj2mesh.py`): Kupplungen, das Bogenrohr, Rutschen, Dächer und die Anbauteile zeichnet
   die Szene damit statt aus Primitiven – auf **allen** Qualitätsstufen, damit ein Teil überall

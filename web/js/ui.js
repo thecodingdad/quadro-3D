@@ -223,6 +223,15 @@ export function initUI({ scene, model, builder }) {
   // --- Hinweise + Undo-Verfuegbarkeit ------------------------------------
   builder.onNotice = (msg, art) => flash(msg, art);
   builder.onHistoryChange = () => updateUndoButton();
+  // Ein Klick ins Leere hebt die Hervorhebung im Bild auf -- dann darf auch in
+  // Stückliste, Bestand und Aufbau keine Zeile mehr markiert stehen.
+  builder.onHighlightCleared = () => {
+    bomHighlightKey = null;
+    invHighlightKey = null;
+    asmHighlightKey = null;
+    update();
+    renderAssembly();
+  };
   function updateUndoButton() {
     $("btn-undo").disabled = !builder.canUndo();
     $("btn-redo").disabled = !builder.canRedo();

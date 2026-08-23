@@ -903,11 +903,30 @@ export class SceneManager {
       // Hat die Stufe waehrend des Ladens gewechselt, gehoert die Antwort zur
       // falschen Aufloesung. Sie faellt weg; das Feld steht dank _dropMeshes()
       // schon wieder auf `undefined` und wird gleich neu angefordert.
-      if (!rec || !!this._q().fine !== fein) return;
-      this[feld] = rec;
+      if (!!this._q().fine !== fein) return;
+      // `false` heisst: endgueltig nichts geworden (Datei fehlt, kein Netz).
+      // Damit wartet das Bild nicht weiter, sondern zeichnet seine eigenen
+      // Formen -- `null` bedeutet dagegen "laeuft noch".
+      this[feld] = rec || false;
       this.onMeshesReady();
     });
     return null;
+  }
+
+  /**
+   * Kleiner Ladekreisel ueber der Zeichenflaeche. Er laeuft nur, solange die
+   * Modelldateien unterwegs sind: gezeichnet wird in dieser Zeit gar nichts,
+   * damit nicht erst die Ersatzformen aufblitzen (siehe renderModel).
+   */
+  _setLoading(an) {
+    if (!this._spinner) {
+      if (!an) return;
+      this._spinner = document.createElement("div");
+      this._spinner.className = "scene-spinner";
+      this._spinner.setAttribute("aria-hidden", "true");
+      this.container.appendChild(this._spinner);
+    }
+    this._spinner.classList.toggle("visible", !!an);
   }
 
   /**
@@ -2748,24 +2767,30 @@ export class SceneManager {
       }
     }
 
-    // Abgegriffene Originalmodelle: auf dieser Stufe erwuenscht? Dann laden --
-    // beim ersten Mal kommt noch nichts zurueck und es bleibt bei den selbst
-    // gezeichneten Formen, danach zeichnet onMeshesReady() neu.
-    const wantMeshes = qual.meshes;
-    if (wantMeshes && model.nodes.size) this._ensureMeshes("connectors");
-    if (wantMeshes && [...model.tubes.values()].some((t) => t.bow)) this._ensureMeshes("tubes");
-    if (wantMeshes && model.slides.size) this._ensureMeshes("slides");
+    // Abgegriffene Originalmodelle: auf dieser Stufe erwuenscht? Dann laden.
     // Anbauteile-Datei traegt auch Klemmen und die Winkelkupplung.
     // Die Lochzapfenkupplung ist ein KNOTEN, kein Anbauteil -- ihr Modell liegt
     // aber bei den Anbauteilen. Ohne diese Zeile blieb es beim gezeichneten
     // Ersatz, solange das Modell sonst keine Anbauteile hatte.
+    const wantMeshes = qual.meshes;
     const wantsFitMeshes = (model.fittings && model.fittings.size)
       || (model.clamps && model.clamps.size)
       || [...model.nodes.values()].some((n) => n.c45 || isHolePart(n.part));
-    if (wantMeshes && wantsFitMeshes) this._ensureMeshes("fittings");
-    if (wantMeshes && (model.panels.size || (model.textiles && model.textiles.size))) {
-      this._ensureMeshes("surfaces");
-    }
+    const braucht = [];
+    if (model.nodes.size) braucht.push("connectors");
+    if ([...model.tubes.values()].some((t) => t.bow)) braucht.push("tubes");
+    if (model.slides.size) braucht.push("slides");
+    if (wantsFitMeshes) braucht.push("fittings");
+    if (model.panels.size || (model.textiles && model.textiles.size)) braucht.push("surfaces");
+    if (wantMeshes) for (const satz of braucht) this._ensureMeshes(satz);
+    // Solange eine der gebrauchten Dateien noch unterwegs ist, wird das Modell
+    // GAR NICHT gezeichnet -- sonst stuenden beim Laden erst die selbst
+    // gezeichneten Ersatzformen da und wechselten eine Zehntelsekunde spaeter.
+    // Stattdessen laeuft ein Spinner; scheitert eine Datei endgueltig (Feld
+    // `false`), geht es mit den Ersatzformen weiter.
+    const wartet = wantMeshes && braucht.some((satz) => this[MESH_FIELDS[satz]] === null);
+    this._setLoading(wartet);
+    if (wartet) { this._needsRender = true; return; }
     // Verstaerkungsprofile: die abgegriffenen Modelle liegen bei den Anbauteilen.
     // Sie decken die genormten Laeufe (80 und 60 cm) ab; was uebrig bleibt --
     // etwa die krummen Abstaende eines gedrehten Aufbaus -- behaelt den
