@@ -12,6 +12,11 @@ import { TUBE_FITTINGS, POOL_KINDS } from "./model.js";
 // Teile, die sich um ein Rohr klemmen lassen. Die Lochzapfenkupplung gehört
 // NICHT dazu -- sie umschließt kein Rohr (siehe PLACEABLE_FITTINGS).
 const TUBE_CLAMP_PARTS = { "bearing-clamp": "bearing" };
+
+// So lange wartet der Seitenwechsel einer Platte auf einen zweiten Klick. Der
+// Doppelklick dreht sie stattdessen; 250 ms ist der uebliche Abstand, den
+// Betriebssysteme dafuer ansetzen.
+const PANEL_DBLCLICK_MS = 250;
 // Teile, die wie eine Platte an ZWEI parallelen Rohren haengen.
 const RAIL_FITTINGS = new Set(["lattice2", "bag2", "textil2"]);
 
@@ -1619,6 +1624,8 @@ export class Builder {
     // wie ueberall auf der Zeichenflaeche.
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+      clearTimeout(this._panelFlipTimer);
+      this._panelFlipTimer = null;
       if (this.mode !== "panel") return;
       const pick = this.scene.pickForDelete(e.clientX, e.clientY);
       if (!pick || pick.data.kind !== "panel") return;
@@ -1629,6 +1636,9 @@ export class Builder {
     });
     // Doppelklick tut dasselbe -- auf dem Touchpad ist er der bequemere Weg.
     el.addEventListener("dblclick", (e) => {
+      // Der erste Klick hat einen Seitenwechsel vorgemerkt; der gilt nicht mehr.
+      clearTimeout(this._panelFlipTimer);
+      this._panelFlipTimer = null;
       if (this.mode !== "panel") return;
       const pick = this.scene.pickForDelete(e.clientX, e.clientY);
       if (!pick || pick.data.kind !== "panel") return;
@@ -1936,6 +1946,10 @@ export class Builder {
       return;
     }
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > CLICK_TOLERANCE) { finish(); return; } // Drehen
+    // Nur die LINKE Taste setzt/loescht. Rechts gehoert dem Kontextmenue der
+    // Zeichenflaeche (im Platten-Modus: drehen) -- ohne diese Pruefung lief
+    // beides zugleich und die Platte klappte nebenbei auf die andere Seite.
+    if (e.button !== 0) { finish(); return; }
     if (this.mode === "select") this._clickSelect(e);
     else if (this.mode === "add") this._clickAdd(e);
     else if (this.mode === "panel") this._clickPanel(e);
@@ -2447,10 +2461,18 @@ export class Builder {
     if (!pick) { this._clearPanelRail(); return; }
 
     if (pick.data.kind === "panel" && !this.panelRail) {
-      let side = null;
-      this.recordHistory(() => { side = this.model.flipPanelSide(pick.data.id); });
-      if (side != null) this.onNotice(t(side < 0 ? "notice_panel_below" : "notice_panel_above"), "info");
-      this.refresh();
+      // Der Seitenwechsel wartet kurz: ein Doppelklick DREHT die Platte, und
+      // der besteht aus zwei Klicks -- ohne diese Pause klappte sie dabei
+      // zweimal um. `dblclick` raeumt den Auftrag weg (siehe _attach).
+      const id = pick.data.id;
+      clearTimeout(this._panelFlipTimer);
+      this._panelFlipTimer = setTimeout(() => {
+        this._panelFlipTimer = null;
+        let side = null;
+        this.recordHistory(() => { side = this.model.flipPanelSide(id); });
+        if (side != null) this.onNotice(t(side < 0 ? "notice_panel_below" : "notice_panel_above"), "info");
+        this.refresh();
+      }, PANEL_DBLCLICK_MS);
       return;
     }
     if (pick.data.kind !== "tube") { this._clearPanelRail(); return; }
