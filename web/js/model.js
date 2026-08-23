@@ -210,6 +210,14 @@ function bearingQuat(ausrichtung, rohr) {
 }
 
 /**
+ * Teile, die es nur in Schwarz gibt: weder die Baufarbe noch die aus der Datei
+ * faerbt sie um. In den Herstellerdateien tragen Radlager und Schwimmrad
+ * durchgehend das schwarze Material (125 bzw. 76 Vorkommen); die Rohrkappe gibt
+ * es ebenfalls nur schwarz.
+ */
+export const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2", "tube-cap2"]);
+
+/**
  * Lochzapfenkupplungen: Katalog-Kennung -> Arm-Maske im LOKALEN System des
  * Teils, genau wie sie in der QDF-Zeile steht. Die Bits 0x01 und 0x02 (+X/-X)
  * sind das LOCH, mit dem das Teil ueber den Stutzen einer Kupplung greift; die
@@ -2067,13 +2075,18 @@ export class BuildModel {
     const map = kind === "tube" ? this.tubes
       : kind === "panel" ? this.panels
       : kind === "textile" ? this.textiles
-      : kind === "slide" ? this.slides : null;
+      : kind === "slide" ? this.slides
+      // Anbauteile nehmen beim Setzen die Baufarbe an -- dann muessen sie sich
+      // auch nachtraeglich umfaerben lassen.
+      : kind === "fitting" ? this.fittings : null;
     if (!map) return false;
     const el = map.get(id);
     if (!el || el.color === color) return false;
     // Arm-/Link-Kanten (C45-Adapter, Doppelrohr-Verbindung) sind keine echten
     // Rohre und werden nicht eingefaerbt.
     if (kind === "tube" && (el.arm || el.link)) return false;
+    // Schwarze Teile bleiben schwarz.
+    if (kind === "fitting" && BLACK_FITTINGS.has(el.kind)) return false;
     el.color = color;
     return true;
   }

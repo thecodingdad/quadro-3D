@@ -23,7 +23,7 @@
 
 import { geometry, getPanel, getTube } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
-import { isHolePart, HOLE_MASKS } from "./model.js";
+import { isHolePart, HOLE_MASKS, BLACK_FITTINGS } from "./model.js";
 
 // Farbtabelle wie in den Dateien der Herstellersoftware: erst der Satz fuer
 // Rohre und Kupplungen (kind 1), dann derselbe Satz fuer Platten (kind 2). Die
@@ -68,8 +68,6 @@ const MATERIALS = [
 // ersten Satzes zurueck.
 const TUBE_MAT = { black: 1, red: 2, green: 3, blue: 4, yellow: 5 };
 
-// Teile, die es nur in Schwarz gibt -- ihre Farbe steht nicht zur Wahl.
-const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2", "tube-cap2"]);
 const PANEL_MAT = { red: 6, green: 7, blue: 8, yellow: 9, black: 1, white: 14 };
 // Lochplatten: dieselbe Farbe, eigene Materialnummer -- daran erkennen wir sie
 // beim Einlesen wieder (siehe MATERIALS). Weiss hat keine Lochplatte.

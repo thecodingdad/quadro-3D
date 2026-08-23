@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
-import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs } from "./model.js";
+import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs, BLACK_FITTINGS } from "./model.js";
 import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
@@ -143,13 +143,18 @@ const POOL_INSET = 2.5;
 // das seine Aufgabe: es ERZWINGT den Stutzen (so auch in der Herstellersoftware).
 const ARM_FITTINGS = new Set(["adapter2", "bearing2", "steering-lock2", "open-connector2"]);
 
-// Teile, die es nur in Schwarz gibt -- sie nehmen keine Farbe an.
-const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2", "tube-cap2"]);
 
 // Farbschema der normalen Ansicht (die Szene bringt ihren eigenen Himmel mit).
 // Die Werte sind die Gegenstuecke zu --bg/--line in style.css.
 const BG_LIGHT = 0xeef1f5;
 const BG_DARK = 0x171b21;
+// Bodenraster: Kantenlaenge und Zellweite. 1280 cm sind 32 Rasterfelder --
+// das urspruengliche 800er Raster plus sechs Felder auf jeder Seite, damit auch
+// breitere Aufbauten noch darauf stehen. Es bleibt innerhalb der Grasflaeche
+// (1600 cm), sonst schwebte das Raster ueber deren Rand hinaus.
+const GRID_SIZE = 1280;
+const GRID_CELL = 20;    // cm je Linie -- zwei Linien je Rasterfeld
+
 const GRID_LIGHT = [0xb8c0cc, 0xd6dce4];   // Hauptlinien, Nebenlinien
 const GRID_DARK = [0x3a4351, 0x2a313b];
 
@@ -173,7 +178,7 @@ const CONNECTOR_ROUNDNESS = 3;
 // Bildmitte und man findet ohne Zuruecksetzen nicht mehr hin. Grenze ist ein
 // Vielfaches der Modelldiagonale -- bei diesem Abstand fuellt das Modell noch
 // rund ein Drittel der Bildhoehe. Der Mindestwert gilt fuer kleine und leere
-// Modelle, damit man das Raster (800 cm) noch ganz sieht.
+// Modelle, damit man ein gutes Stueck des Rasters (GRID_SIZE) noch sieht.
 const ZOOM_OUT_FACTOR = 3;
 // Luft am Bildrand, wenn die Ansicht auf ein Modell eingepasst wird.
 const FIT_MARGIN = 1.15;
@@ -4693,7 +4698,7 @@ export class SceneManager {
       this._grid.geometry.dispose();
       this._grid.material.dispose();
     }
-    const grid = new THREE.GridHelper(800, 40, major, minor);
+    const grid = new THREE.GridHelper(GRID_SIZE, GRID_SIZE / GRID_CELL, major, minor);
     grid.position.y = -GROUND_DROP;
     this.scene.add(grid);
     this._grid = grid;
