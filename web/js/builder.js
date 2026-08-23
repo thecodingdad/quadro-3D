@@ -6,7 +6,7 @@ import { computeBuildPlan, connectorLabelInfo } from "./buildplan.js";
 import { infeasibleConnectors, inferConnectorType } from "./bom.js";
 import { t } from "./i18n.js";
 import { round2, panelNormal, modelMiddle, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
-import { TUBE_FITTINGS, POOL_KINDS } from "./model.js";
+import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, HOLE_MASKS } from "./model.js";
 
 // Kupplungen, die auf einem Rohr sitzen statt im Raster: QDF-Art -> Katalogteil.
 // Teile, die sich um ein Rohr klemmen lassen. Die Lochzapfenkupplung gehört
@@ -1132,9 +1132,13 @@ export class Builder {
     // Lochzapfenkupplung: genau EIN offenes Ende, dorthin geht das Rohr. Die
     // Lagerkupplung traegt dagegen eine ganze Kupplung -- von der geht es in
     // jede freie Richtung weiter.
+    // Lochzapfenkupplung: ihre EIGENEN Arme (ein, zwei oder drei) sind die
+    // Richtungen -- dorthin gehoert das Rohr. Sie gelten auch nach
+    // 45-Grad-Drehungen, weil sie aus ihrer Lage kommen.
+    const holeDirs = isHolePart(node.part)
+      ? holeArmDirs(node).map((v, i) => ({ name: "stub" + i, vec: v })) : null;
     const dirs = c45Dir ? [{ name: "c45", vec: c45Dir }]
-      : (node.stub && node.part === "hole_1")
-      ? [{ name: "stub", vec: node.stub }]   // auch nach 45-Grad-Drehungen gueltig
+      : (holeDirs && holeDirs.length) ? holeDirs
       : hasArmDirs ? armDirs
       : isSlope ? (this._slopeArmDirs(node) || DIAGONAL_DIRECTIONS)
       : DIRECTIONS;
@@ -1396,6 +1400,17 @@ export class Builder {
     // Zeiger zeigt dort eine Hand, auch wenn er den Ankerpunkt knapp verfehlt.
     this._fittingMountNodes = new Set();
     if (RAIL_FITTINGS.has(this.fittingKind)) return;  // Netz/Sack laufen ueber zwei Rohre
+    // Lochzapfenkupplung: je freiem Stutzen einer Kupplung ein Punkt -- dort
+    // steckt ihr Loch darauf.
+    if (HOLE_MASKS[this.fittingKind]) {
+      const sel0 = this.selectedNodeId;
+      for (const m of this.model.holeArmMounts(geometry().connectorSize)) {
+        this._fittingMountNodes.add(m.nodeId);
+        if (sel0 && m.nodeId !== sel0) continue;
+        this.scene.addHandle(m.pos, { holeArm: m }, "dir");
+      }
+      return;
+    }
     // Ist eine Kupplung gewaehlt, gelten nur ihre Stellen -- bei Teilen auf einem
     // Rohr nur die Rohre, die an ihr haengen. Ohne Auswahl sind alle zu sehen.
     const sel = this.selectedNodeId;
@@ -2113,6 +2128,7 @@ export class Builder {
    */
   _clickFitting(e) {
     if (RAIL_FITTINGS.has(this.fittingKind)) { this._clickLattice(e); return; }
+    if (HOLE_MASKS[this.fittingKind]) { this._clickHoleClamp(e); return; }
     if (TUBE_CLAMP_PARTS[this.fittingKind]) { this._clickTubeClamp(e); return; }
     if (TUBE_FITTINGS[this.fittingKind]) { this._clickTubeFitting(e); return; }
     const h = this.scene.pickHandle(e.clientX, e.clientY);
@@ -2265,6 +2281,40 @@ export class Builder {
     return this.fittingKind === "bag2"
       ? this.model.bagPartners(railId)
       : this.model.latticePartners(railId);   // Netz und Textil: gleiche Regel
+  }
+
+  /**
+   * Lochzapfenkupplung: sie steckt mit ihrem Loch auf einem freien Stutzen
+   * einer Kupplung -- also einen der gruenen Ankerpunkte anklicken. Ein Klick
+   * auf eine schon gesetzte dreht sie um 90 Grad um ihre Lochachse weiter,
+   * solange noch kein Rohr an ihren Armen haengt.
+   */
+  _clickHoleClamp(e) {
+    const cs = geometry().connectorSize;
+    const h = this.scene.pickHandle(e.clientX, e.clientY);
+    if (h && h.data && h.data.holeArm) {
+      const m = h.data.holeArm;
+      let gesetzt = null;
+      this.recordHistory(() => {
+        gesetzt = this.model.addHoleClamp(m.nodeId, m.dir, this.fittingKind, cs);
+      });
+      if (gesetzt) this._notePlaced(gesetzt.id, "node");
+      else this.onNotice(t("notice_fitting_exists"), "warn");
+      this.refresh();
+      return;
+    }
+    const pick = this.scene.pickForDelete(e.clientX, e.clientY);
+    if (pick && pick.data.kind === "node") {
+      const n = this.model.nodes.get(pick.data.id);
+      if (n && isHolePart(n.part)) {
+        let gedreht = false;
+        this.recordHistory(() => { gedreht = this.model.turnHoleClamp(n.id); });
+        if (!gedreht) this.onNotice(t("notice_fitting_fixed"), "warn");
+        this.refresh();
+        return;
+      }
+    }
+    this._pickFittingNode(pick);
   }
 
   /**

@@ -23,6 +23,7 @@
 
 import { geometry, getPanel, getTube } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
+import { isHolePart, HOLE_MASKS } from "./model.js";
 
 // Farbtabelle wie in den Dateien der Herstellersoftware: erst der Satz fuer
 // Rohre und Kupplungen (kind 1), dann derselbe Satz fuer Platten (kind 2). Die
@@ -316,13 +317,16 @@ export function buildQDF(model) {
         : (Math.abs(n.stub[1]) > 0.5 ? [1, 0, 0] : [0, 1, 0]);
       const ey = [-n.stub[0], -n.stub[1], -n.stub[2]];
       const ez = [ex[1] * ey[2] - ex[2] * ey[1], ex[2] * ey[0] - ex[0] * ey[2], ex[0] * ey[1] - ex[1] * ey[0]];
-      if (n.part === "hole_1") {
+      if (isHolePart(n.part)) {
         // Eingelesene Klemme: ihre Ausrichtung kommt aus der Datei. Nur selbst
         // gesetzte werden aus Stutzen und Rohr gerechnet.
         const qh = n.partQuat && n.partQuat.length === 4
           ? encodeQuat([n.partQuat[3], n.partQuat[0], n.partQuat[1], n.partQuat[2]])
           : encodeQuat(quatFromAxes(ex, ey, ez));
-        lines.push(`hole-connector4{${CONNECTOR_MAT}, ${tuple(qh, n.x, n.y, n.z)}, 0, 0, 11, 8, 3840, 0, 0}`);
+        // Arm-Maske wie bei der Kupplung; das Feld dahinter fuehrt sie ohne die
+        // beiden Loch-Bits (11/8, 15/12, 59/56 -- so steht es im Bestand).
+        const hm = n.partMask || HOLE_MASKS[n.part] || 11;
+        lines.push(`hole-connector4{${CONNECTOR_MAT}, ${tuple(qh, n.x, n.y, n.z)}, 0, 0, ${hm}, ${hm - 3}, 3840, 0, 0}`);
         stats.fittings++;
         continue;   // die Lochzapfenkupplung IST die Kupplung
       }
@@ -362,6 +366,17 @@ export function buildQDF(model) {
       // Fuer den Viertelkreis gilt: Tangente am Anfang = Richtung vom
       // Mittelpunkt zum ANDEREN Ende, und umgekehrt.
       const l = toLocal(t.bow && t.bowCenter ? bowStubDir(n, other, t.bowCenter) : dirOf(n, other));
+      for (const [bit, v] of ARM_BITS) if (dot(l, v) > 0.9) mask |= bit;
+    }
+    // Eine Lochzapfenkupplung steckt mit ihrem Loch auf einem Stutzen -- der
+    // gehoert damit in die Maske (52 von 55 Vorkommen des Bestands fuehren ihn
+    // dort). Ihr Knoten liegt eine Kupplungslaenge daneben.
+    for (const h of model.nodes.values()) {
+      if (!isHolePart(h.part) || h.id === n.id) continue;
+      const dx = h.x - n.x, dy = h.y - n.y, dz = h.z - n.z;
+      const len = Math.hypot(dx, dy, dz);
+      if (len < 0.5 || len > cs50 * 1.2) continue;
+      const l = toLocal([dx / len, dy / len, dz / len]);
       for (const [bit, v] of ARM_BITS) if (dot(l, v) > 0.9) mask |= bit;
     }
     // Ein offenes Verbinderende erzwingt seinen Stutzen: in allen 67 Vorkommen

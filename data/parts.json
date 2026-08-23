@@ -215,6 +215,18 @@
       "url": "https://quadroshop.com/products/hole-t-connector"
     },
     {
+      "id": "hole_2",
+      "code": "CH2",
+      "name": "Lochzapfenkupplung 2-armig",
+      "name_en": "Pin connector 2-way",
+      "arms": 2,
+      "kind": "special",
+      "price": 6.49,
+      "buildable": false,
+      "note": "zwei gegenüberliegende Arme quer zum Loch · Preis wie die ein- und die dreiarmige, eigener Shop-Eintrag noch offen",
+      "url": "https://quadroshop.com/products/hole-connector"
+    },
+    {
       "id": "hole_1",
       "code": "CH1",
       "name": "Lochzapfenkupplung 1-armig",

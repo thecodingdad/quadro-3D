@@ -1,7 +1,7 @@
 // Verkabelt die Bedienoberflaeche (Toolbar, Tastatur, Stueckliste, Bestand).
 
 import { buildableTubes, buildableCurvedTubes, buildablePanels, tubeColors, geometry, allTubes, allConnectors, panels, reinforcements, screws, slideKindName, partName, partForFitting, accessories, getPartById, poolLinerFor, getTube, getPanel } from "./catalog.js";
-import { PLACEABLE_FITTINGS, POOL_KINDS } from "./model.js";
+import { PLACEABLE_FITTINGS, POOL_KINDS, HOLE_MASKS } from "./model.js";
 import { computeBOM, compareInventory, connectorsForNode } from "./bom.js";
 import { computeBuildPlan, BUILD_ORDERS } from "./buildplan.js";
 import { parseQDF } from "./qdfimport.js";
@@ -1131,8 +1131,8 @@ export function initUI({ scene, model, builder }) {
     ["grp_wheels", ["multi-wheel2", "floating-wheel2", "casters2", "bearing2", "hub-cap2", "steering-lock2"],
       `<circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.6"/>` +
       `<circle cx="8" cy="8" r="1.6" fill="currentColor"/>`],
-    ["grp_joints", [C45_ENTRY, "bearing-clamp", CLAMP_ENTRY, CLIP_ENTRY, "tube-cap2",
-      "open-connector2"],
+    ["grp_joints", [C45_ENTRY, "bearing-clamp", "hole_1", "hole_2", "hole_t",
+      CLAMP_ENTRY, CLIP_ENTRY, "tube-cap2", "open-connector2"],
       `<line x1="2.5" y1="6" x2="13.5" y2="6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<rect x="6" y="3" width="4" height="11" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/>`],
@@ -1268,7 +1268,8 @@ export function initUI({ scene, model, builder }) {
 
   // Manche Teile führen ihr Sinnbild unter der QDF-Art, andere unter der
   // Teile-Kennung; die Klemm-Kupplungen teilen sich eins mit den Anbauteilen.
-  const ICON_ALIAS = { hole_1: "hole-connector4", hole_t: "hole-connector4",
+  const ICON_ALIAS = { hole_1: "hole-connector4", hole_2: "hole-connector4",
+    hole_t: "hole-connector4",
     bearing: "bearing-clamp", tube_cap: "tube-cap2", open_end: "open-connector2" };
   function teileIcon(id, kind) {
     return FITTING_ICONS[kind] || SLIDE_ICONS[kind] || CONNECTOR_ICONS[id]
@@ -1278,7 +1279,9 @@ export function initUI({ scene, model, builder }) {
   const fittingGroupBtns = [];
   for (const [key, kinds, path] of FITTING_GROUPS) {
     const items = kinds.map((k) => {
-      const def = (k === CLAMP_ENTRY || k === CLIP_ENTRY)
+      // Klemmen und Lochzapfenkupplungen stehen unter ihrer Katalog-Kennung im
+      // Menue, die uebrigen unter ihrer QDF-Art.
+      const def = (k === CLAMP_ENTRY || k === CLIP_ENTRY || HOLE_MASKS[k])
         ? allConnectors().find((c) => c.id === k)
         : k === C45_ENTRY ? allConnectors().find((c) => c.id === "diagonal")
         : partForFitting(k);

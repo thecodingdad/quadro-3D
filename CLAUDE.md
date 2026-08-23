@@ -390,6 +390,18 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     `connector3` – Spieltisch: beide auf −800/−50/−800; wir zeichnen und zählen dort nur die
     Kappe.) Ihre Ankerpunkte kommen aus `_wheelCapMounts` und brauchen wie alle Punkte an einer
     Kupplung ein `handle` weiter außen, sonst steckt der grüne Punkt im Würfel.
+  - **Die Lochzapfenkupplung gibt es dreifach** (`hole_1`, `hole_2`, `hole_t`) und sie ist ein
+    **Knoten**, kein Anbauteil: sie steckt mit ihrem Loch auf einem freien Stutzen einer
+    Kupplung, ihre eigenen ein bis drei Arme tragen dann Rohre wie die einer Kupplung. Welche
+    Arme das sind, sagt die Maske aus der Datei (`partMask`, Bits 0x01/0x02 = das Loch): 11 = −Y,
+    15 = ±Y, 59 = −Y ±Z; 31 ist dieselbe dreiarmige um 90° gedreht. **Nicht die Bits zählen** –
+    Maske 11 hat drei Bits und ist die EINARMIGE. Ihre Lage steht in `partQuat` (lokal −X zeigt
+    zur tragenden Kupplung, die 5 cm entfernt sitzt), die Arme rechnet `holeArmDirs()` daraus –
+    dort **normieren**, die Lage aus der Datei hat nicht Länge 1. Gesetzt wird über
+    `holeArmMounts()`/`addHoleClamp()`, ein weiterer Klick dreht sie um 90° um die Lochachse
+    (`turnHoleClamp`, gesperrt sobald ein Rohr an einem Arm hängt). Ihr Modell liegt bei den
+    **Anbauteilen** (`hole-connector4_<maske>`), obwohl sie ein Knoten ist – deshalb steht sie
+    mit in der Bedingung, die `fittings.json` nachlädt.
   - **`flexi-connector3` ist das Scharnier**, nicht die ganze Flexikupplung: je Gelenk stehen
     zwei davon plus ein `bolt2` in der Datei. Am Katalogteil `flexi_hinge` hängt deshalb das
     `qdf`, nicht am Teil `flexi` – sonst zählte die Stückliste jedes Gelenk als zwei ganze

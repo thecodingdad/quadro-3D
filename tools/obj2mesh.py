@@ -101,7 +101,18 @@ FITTINGS = {
     "adapter2": "adapter2.obj",
     "open-connector2": "open-connector2.obj",
     "tube-cap2": "tube-cap2.obj",
-    "hole-connector4": "hole-connector4.obj",
+    # Lochzapfenkupplungen. Der Schlüssel ist die Maske aus der QDF-Zeile: die
+    # Bits 0x01 und 0x02 (lokal +X/-X) sind das LOCH, das über den Stutzen einer
+    # Kupplung greift, die übrigen Bits sind ihre eigenen Arme.
+    #   11 = -Y                 einarmig
+    #   15 = +Y -Y              zweiarmig
+    #   59 = -Y +Z -Z           dreiarmig
+    #   31 = +Y -Y +Z           dieselbe dreiarmige, um 90 Grad um X gedreht --
+    #                           sie steht so in einer Datei des Bestands
+    "hole-connector4_11": "hole-connector4_mask11.obj",
+    "hole-connector4_15": "hole-connector4_mask15.obj",
+    "hole-connector4_31": "hole-connector4_mask31.obj",
+    "hole-connector4_59": "hole-connector4_mask59.obj",
     "bolt2": "bolt2.obj",
     "textil-round2": "textil-round2.obj",
     "roof-large2": "roof-large2.obj",

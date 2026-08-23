@@ -2,7 +2,7 @@
 
 import { getTube, getConnector, getPanel, colorName, partName, reinforcementPart, partForFitting, getPartById, getScrew, poolLinerFor, geometry } from "./catalog.js";
 import { round2, xAxisOf } from "./util.js";
-import { POOL_KINDS } from "./model.js";
+import { POOL_KINDS, isHolePart } from "./model.js";
 
 // Einheitsvektoren der Nachbarn eines Knotens. Doppelrohr-Verbindungen (link)
 // sind KEIN Arm der Kupplung und zaehlen nicht in die Kupplungstyp-Heuristik
@@ -59,7 +59,7 @@ function neighborDirs(model, node) {
   // T-Kupplung des Ball Cage nur zwei Arme.
   const cs = geometry().connectorSize;
   for (const h of model.nodes.values()) {
-    if (h.part !== "hole_1" || h.id === node.id) continue;
+    if (!isHolePart(h.part) || h.id === node.id) continue;
     const dx = h.x - node.x, dy = h.y - node.y, dz = h.z - node.z;
     const len = Math.hypot(dx, dy, dz);
     if (len < 0.5 || len > cs * 1.2) continue;
@@ -221,7 +221,7 @@ export function connectorsForNode(model, node) {
   // Klemm-Kupplungen sind ein festes Katalogteil. Die Lochzapfenkupplung nimmt
   // das Rohr selbst auf -- sie zaehlt allein. Die Lagerkupplung traegt eine
   // ganze Kupplung, die zusaetzlich in die Liste gehoert.
-  if (node.part === "hole_1") return [node.part];
+  if (isHolePart(node.part)) return [node.part];
   // Flexikupplung: an diesem Punkt sitzt keine Kupplung, sondern zwei ihrer
   // Arme, die ein Bolzen haelt. Gezaehlt werden die Arme als Anbauteile (je
   // eine Zeile der Datei) -- hier also nichts, sonst stuende beides in der

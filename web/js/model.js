@@ -206,6 +206,58 @@ function bearingQuat(ausrichtung, rohr) {
   return quatFromBasis(ex, ey, cross3(ex, ey));
 }
 
+/**
+ * Lochzapfenkupplungen: Katalog-Kennung -> Arm-Maske im LOKALEN System des
+ * Teils, genau wie sie in der QDF-Zeile steht. Die Bits 0x01 und 0x02 (+X/-X)
+ * sind das LOCH, mit dem das Teil ueber den Stutzen einer Kupplung greift; die
+ * uebrigen Bits sind seine eigenen Arme.
+ *   11 = -Y            einarmig
+ *   15 = +Y -Y         zweiarmig
+ *   59 = -Y +Z -Z      dreiarmig
+ * Maske 31 (+Y -Y +Z) ist dieselbe dreiarmige, um 90 Grad um die Lochachse
+ * gedreht -- sie kommt aus einer Datei des Bestands und wird nur gelesen.
+ */
+export const HOLE_MASKS = { hole_1: 11, hole_2: 15, hole_t: 59 };
+const HOLE_ARM_BITS = [[0x04, 1, 1], [0x08, 1, -1], [0x10, 2, 1], [0x20, 2, -1]];
+
+/** Ist dieser Knoten eine Lochzapfenkupplung? */
+export function isHolePart(part) {
+  return part === "hole_1" || part === "hole_2" || part === "hole_t";
+}
+
+/** Katalogteil zu einer Arm-Maske: die Zahl der Arme entscheidet. */
+export function holePartForMask(mask) {
+  let arme = 0;
+  for (const [bit] of HOLE_ARM_BITS) if (mask & bit) arme++;
+  return arme >= 3 ? "hole_t" : arme === 2 ? "hole_2" : "hole_1";
+}
+
+/**
+ * Die eigenen Arme einer Lochzapfenkupplung in Weltrichtungen -- dorthin
+ * gehoeren Rohre. Die Lage steckt in `partQuat`, welche Arme es gibt in
+ * `partMask` (aus der Datei) bzw. in der Maske ihres Katalogteils.
+ */
+export function holeArmDirs(node) {
+  if (!node || !isHolePart(node.part)) return [];
+  const mask = node.partMask || HOLE_MASKS[node.part] || 0;
+  const q = node.partQuat;
+  const achsen = q && q.length === 4
+    ? [xAxisOf(q), yAxisOf(q), zAxisOf(q)]
+    : [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  const out = [];
+  for (const [bit, achse, vz] of HOLE_ARM_BITS) {
+    if (!(mask & bit)) continue;
+    // Normieren: die Lage aus der Datei ist NICHT auf Laenge 1 gebracht (die
+    // Werte stehen dort quadriert und mit 4 skaliert), ihre Achsen kaemen sonst
+    // um diesen Faktor zu lang heraus.
+    const a = norm3(achsen[achse]);
+    out.push([round(a[0] * vz), round(a[1] * vz), round(a[2] * vz)]);
+  }
+  // Ohne Lage (aeltere Staende) bleibt nur der gemerkte Stutzen.
+  if (!out.length && node.stub) out.push(node.stub.slice());
+  return out;
+}
+
 export function nodeClampOffset(node, cs = 5) {
   if (node && node.bearingOn) return cs * 2;
   return clampOffset(node && node.part, cs);
@@ -1360,6 +1412,84 @@ export class BuildModel {
   }
 
   /**
+   * Ankerpunkte einer Lochzapfenkupplung: jeder freie Stutzen einer Kupplung.
+   * Sie steckt mit ihrem Loch darauf, ihr Koerper sitzt deshalb genau eine
+   * Kupplungslaenge davor -- so steht es auch in den Herstellerdateien (in 54
+   * von 55 Vorkommen liegt die tragende Kupplung 5 cm entlang der lokalen
+   * -X-Achse).
+   */
+  holeArmMounts(cs = 5) {
+    const out = [];
+    for (const n of this.nodes.values()) {
+      if (n.part || n.bearingOn || n.unused || n.c45body) continue;
+      const belegt = [];
+      for (const t of this.tubes.values()) {
+        const other = t.a === n.id ? this.nodes.get(t.b) : t.b === n.id ? this.nodes.get(t.a) : null;
+        if (other) belegt.push(norm3([other.x - n.x, other.y - n.y, other.z - n.z]));
+      }
+      if (!belegt.length) continue;   // freie Kupplung ohne Rohr: nichts zu tragen
+      for (const richtung of DIRECTIONS) {
+        const d = richtung.vec;
+        if (belegt.some((b) => dot3(b, d) > 0.9)) continue;
+        const pos = [round(n.x + d[0] * cs), round(n.y + d[1] * cs), round(n.z + d[2] * cs)];
+        if (this.isBelowGround(pos[1])) continue;
+        if (this.findNodeNear(pos[0], pos[1], pos[2])) continue;   // dort steht schon etwas
+        out.push({ nodeId: n.id, dir: d, pos });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Lochzapfenkupplung auf einen freien Stutzen setzen. Sie wird ein KNOTEN mit
+   * festem Katalogteil -- wie die eingelesene: ihre eigenen Arme tragen dann
+   * Rohre wie die Arme einer Kupplung.
+   *
+   * Die lokale +X-Achse zeigt vom Traeger weg (in seinem Stutzen steckt das
+   * Loch), die Arme stehen quer dazu. Ihre Rollage ist frei -- genommen wird
+   * die, bei der der erste Arm (lokal -Y) nach unten zeigt; weiterdrehen laesst
+   * sie sich mit `turnHoleClamp`.
+   */
+  addHoleClamp(nodeId, dir, part = "hole_1", cs = 5) {
+    const traeger = this.nodes.get(nodeId);
+    if (!traeger || traeger.part || !HOLE_MASKS[part]) return null;
+    const ex = norm3(dir);
+    const pos = [round(traeger.x + ex[0] * cs), round(traeger.y + ex[1] * cs),
+      round(traeger.z + ex[2] * cs)];
+    if (this.isBelowGround(pos[1]) || this.findNodeNear(pos[0], pos[1], pos[2])) return null;
+    // Rollage: lokal +Y moeglichst nach oben, damit der Arm (lokal -Y) nach
+    // unten zeigt. Steht die Achse selbst senkrecht, tut es jede Querrichtung.
+    const hoch = Math.abs(ex[1]) > 0.9 ? [0, 0, 1] : [0, 1, 0];
+    const ey = norm3([hoch[0] - ex[0] * dot3(hoch, ex), hoch[1] - ex[1] * dot3(hoch, ex),
+      hoch[2] - ex[2] * dot3(hoch, ex)]);
+    const node = this.addNode(pos[0], pos[1], pos[2]);
+    node.part = part;
+    node.partMask = HOLE_MASKS[part];
+    node.partQuat = quatFromBasis(ex, ey, cross3(ex, ey)).map(round4);
+    // `stub` ist der ERSTE eigene Arm (lokal -Y) -- so fuehrt ihn auch der
+    // Import, und daran haengen die aelteren Pfade (Bauhilfen, Export).
+    node.stub = holeArmDirs(node)[0] || [round(-ex[0]), round(-ex[1]), round(-ex[2])];
+    return node;
+  }
+
+  /**
+   * Lochzapfenkupplung um 90 Grad um ihre Lochachse weiterdrehen -- damit ihre
+   * Arme woandershin zeigen. Steckt schon ein Rohr darin, bleibt sie stehen:
+   * sonst risse die Drehung das Rohr von seinem Arm.
+   */
+  turnHoleClamp(nodeId) {
+    const n = this.nodes.get(nodeId);
+    if (!n || !isHolePart(n.part) || !n.partQuat) return false;
+    if (this.degree(n.id) > 0) return false;
+    const ex = xAxisOf(n.partQuat), ez = zAxisOf(n.partQuat);
+    // +Y wandert auf +Z, die Lochachse (+X) bleibt.
+    n.partQuat = quatFromBasis(ex, ez, cross3(ex, ez)).map(round4);
+    const arme = holeArmDirs(n);
+    if (arme.length) n.stub = arme[0];
+    return true;
+  }
+
+  /**
    * Wohin eine Klemm-Kupplung an dieser Stelle des Rohrs kaeme -- ohne sie zu
    * setzen. Liefert null, wo sie nicht hin darf (Bogenrohr, unter dem Boden,
    * schon eine gleiche Klemme dort). Gebraucht fuer die Vorschau unter dem
@@ -2160,6 +2290,7 @@ export class BuildModel {
         stub: n.stub || null, bearingOn: n.bearingOn || null,
         ownConnector: !!n.ownConnector, c45file: !!n.c45file,
         unused: !!n.unused, partQuat: n.partQuat || null,
+        partMask: n.partMask || null,
       });
     }
     for (const t of frag.tubes || []) {
@@ -3079,6 +3210,7 @@ export class BuildModel {
         if (n.c45file) o.c45file = true; // Winkelkupplung stand so in der QDF-Datei
         if (n.unused) o.unused = true;   // aus der Datei, aber ohne Rohr/Platte
         if (n.partQuat) o.partQuat = n.partQuat; // Ausrichtung der Klemm-Kupplung aus der Datei
+        if (n.partMask) o.partMask = n.partMask; // Arm-Maske der Lochzapfenkupplung
         if (n.c45body) o.c45body = true; // Adapter-Koerper am Arm-Ende der C45
         if (n.c45axis) o.c45axis = n.c45axis; // kardinale Huelsenachse des Adapters
         if (n.c45quat) o.c45quat = n.c45quat; // eigene Lage der Winkelkupplung (Three x,y,z,w)
@@ -3172,7 +3304,7 @@ export class BuildModel {
         part: n.part || null, clampOn: n.clampOn || null, stub: n.stub || null,
         bearingOn: n.bearingOn || null,
         ownConnector: !!n.ownConnector, c45file: !!n.c45file, unused: !!n.unused,
-        partQuat: n.partQuat || null });
+        partQuat: n.partQuat || null, partMask: n.partMask || null });
       maxSeq = Math.max(maxSeq, parseSeq(n.id));
     }
     for (const t of data.tubes || []) {

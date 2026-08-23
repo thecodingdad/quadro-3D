@@ -95,9 +95,11 @@ export function partForFitting(kind, mask) {
   // Huelse auf einem Kupplungs-Stutzen. Beide haengen an ihrem eigenen
   // Katalogteil, die Suche unten findet sie ueber `qdf`.
   if (kind === "hole-connector4") {
+    // Die beiden untersten Bits sind das LOCH (lokal +X/-X), nicht Arme --
+    // gezaehlt wird nur der Rest: ein, zwei oder drei Arme.
     let arms = 0;
-    for (let b = 0; b < 6; b++) if ((mask || 0) & (1 << b)) arms++;
-    return getConnector(arms > 1 ? "hole_t" : "hole_1");
+    for (let b = 2; b < 6; b++) if ((mask || 0) & (1 << b)) arms++;
+    return getConnector(arms >= 3 ? "hole_t" : arms === 2 ? "hole_2" : "hole_1");
   }
   const all = [...allConnectors(), ...accessories(), ...allTubes(), ...panels()];
   return all.find((x) => x.qdf === kind) || null;

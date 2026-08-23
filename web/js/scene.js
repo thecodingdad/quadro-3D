@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
-import { nodeClampOffset } from "./model.js";
+import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs } from "./model.js";
 import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
@@ -2348,6 +2348,20 @@ export class SceneManager {
     const g = geometry();
     const cs = g.connectorSize;
     const stub = new THREE.Vector3(...(n.stub || [0, 1, 0])).normalize();
+    // Abgegriffenes Originalteil: eines je Arm-Maske. Es sitzt auf dem Punkt
+    // des Knotens, seine Lage ist die des Teils (lokales -X zeigt zur tragenden
+    // Kupplung, die Arme stehen quer dazu).
+    const maske = n.partMask || HOLE_MASKS[n.part] || 11;
+    const echt = this._q().meshes && this._fitMeshes
+      ? this._fitMeshes["hole-connector4_" + maske] : null;
+    if (echt && n.partQuat && n.partQuat.length === 4) {
+      const qh = new THREE.Quaternion(n.partQuat[0], n.partQuat[1], n.partQuat[2],
+        n.partQuat[3]).normalize();
+      this._batchAdd(this._meshGeometry("hole:" + maske, echt), mat,
+        new THREE.Matrix4().compose(new THREE.Vector3(n.x, n.y, n.z), qh, ONE),
+        "node", n.id, st !== "future" ? this.pickNodes : null);
+      return;
+    }
     // Achse des Rings, also die Richtung zur tragenden Kupplung: die lokale
     // -X-Achse der Teile-Quaternion (so steht es in allen Dateien des
     // Bestands). Fehlt sie, zeigt sie zur naechsten Kupplung; ohne die bleibt
@@ -2397,13 +2411,17 @@ export class SceneManager {
     // INNENwand des Rings heraus: am Aussenmantel angesetzt klaffte zwischen
     // Ring und Stutzen eine Luecke.
     const stubLen = cs * 0.85;
-    const arm = new THREE.Mesh(
-      this._cachedGeo(`pinStub${seg}`, () => this._tubeGeometry(armR, stubLen, Math.max(6, seg - 4))), mat);
-    arm.quaternion.setFromUnitVectors(UP, stub);
-    arm.position.copy(at).addScaledVector(stub, ringR - PIN_RING_WALL + stubLen / 2);
-    arm.userData = { kind: "node", id: n.id };
-    this.buildGroup.add(arm);
-    if (st !== "future") this.pickNodes.push(arm);
+    // Ein Stutzen je Arm -- die zwei- und die dreiarmige Fassung haben mehrere.
+    const arme = holeArmDirs(n).map((d) => new THREE.Vector3(d[0], d[1], d[2]).normalize());
+    for (const richtung of (arme.length ? arme : [stub])) {
+      const arm = new THREE.Mesh(
+        this._cachedGeo(`pinStub${seg}`, () => this._tubeGeometry(armR, stubLen, Math.max(6, seg - 4))), mat);
+      arm.quaternion.setFromUnitVectors(UP, richtung);
+      arm.position.copy(at).addScaledVector(richtung, ringR - PIN_RING_WALL + stubLen / 2);
+      arm.userData = { kind: "node", id: n.id };
+      this.buildGroup.add(arm);
+      if (st !== "future") this.pickNodes.push(arm);
+    }
   }
 
   /**
@@ -2664,7 +2682,7 @@ export class SceneManager {
     // Kupplung -- der gehoert also gezeichnet, obwohl dort kein Rohr steckt.
     // Ihr Knoten liegt eine Kupplungslaenge daneben, das gibt die Richtung.
     for (const p of model.nodes.values()) {
-      if (p.part !== "hole_1") continue;
+      if (!isHolePart(p.part)) continue;
       let near = null, nd = geometry().connectorSize * 1.4;
       for (const n of model.nodes.values()) {
         if (n === p || n.part) continue;
@@ -2738,9 +2756,12 @@ export class SceneManager {
     if (wantMeshes && [...model.tubes.values()].some((t) => t.bow)) this._ensureMeshes("tubes");
     if (wantMeshes && model.slides.size) this._ensureMeshes("slides");
     // Anbauteile-Datei traegt auch Klemmen und die Winkelkupplung.
+    // Die Lochzapfenkupplung ist ein KNOTEN, kein Anbauteil -- ihr Modell liegt
+    // aber bei den Anbauteilen. Ohne diese Zeile blieb es beim gezeichneten
+    // Ersatz, solange das Modell sonst keine Anbauteile hatte.
     const wantsFitMeshes = (model.fittings && model.fittings.size)
       || (model.clamps && model.clamps.size)
-      || [...model.nodes.values()].some((n) => n.c45);
+      || [...model.nodes.values()].some((n) => n.c45 || isHolePart(n.part));
     if (wantMeshes && wantsFitMeshes) this._ensureMeshes("fittings");
     if (wantMeshes && (model.panels.size || (model.textiles && model.textiles.size))) {
       this._ensureMeshes("surfaces");
@@ -2815,11 +2836,11 @@ export class SceneManager {
       // Anschluss. Die Lochzapfenkupplung nimmt dort direkt ein Rohr auf und
       // braucht keinen Wuerfel; die Lagerkupplung traegt eine ganze Kupplung --
       // die wird unten zusaetzlich gezeichnet.
-      if (n.stub && n.part === "hole_1") this._addPinConnector(model, n, matFor(n.id, mat), st);
+      if (n.stub && isHolePart(n.part)) this._addPinConnector(model, n, matFor(n.id, mat), st);
       else if (n.stub && n.part) this._addTubeClamp(model, n, matFor(n.id, mat), st);
       // Wo eine Radkappe sitzt, gibt es keine Kupplung mehr -- die Kappe
       // schliesst das Rohrende selbst ab.
-      if (!n.c45body && n.part !== "hole_1" && !(model.hasWheelCap && model.hasWheelCap(n))) {
+      if (!n.c45body && !isHolePart(n.part) && !(model.hasWheelCap && model.hasWheelCap(n))) {
         const pos = new THREE.Vector3(n.x, n.y, n.z);
         const quat = this._nodeCubeQuat(model, n);
         // Das abgegriffene Originalteil, wenn es zum Anschlussbild passt: EIN

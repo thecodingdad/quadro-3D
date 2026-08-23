@@ -27,6 +27,7 @@
 
 import { round2 as round, panelNormal, modelMiddle } from "./util.js";
 import { FORMAT_VERSION } from "./config.js";
+import { holePartForMask, holeArmDirs } from "./model.js";
 
 // Alle benannten Richtungen (kardinal + 45°-diagonal) fuer Arm-Erkennung.
 const S45 = Math.SQRT1_2;
@@ -549,6 +550,10 @@ export function parseQDF(text, opts = {}) {
       holeClamps.push({
         x: round(p.tuple[4] / 10), y: round(p.tuple[5] / 10), z: round(p.tuple[6] / 10),
         stub: nearestCardinal([-ey[0], -ey[1], -ey[2]]),
+        // Arm-Maske wie bei der Kupplung (rest[4]). Die Bits 0x01/0x02 sind das
+        // Loch, der Rest sind ihre eigenen Arme -- daran haengt, ob sie ein-,
+        // zwei- oder dreiarmig ist. Ohne Angabe die einarmige (51 von 55).
+        mask: typeof p.rest[4] === "number" ? p.rest[4] : 11,
         // Eigene Ausrichtung aus der Datei (Three-Reihenfolge x,y,z,w). In
         // gedrehten Aufbauten steht die Klemme schraeg -- aus Stutzen und Rohr
         // laesst sie sich dann nicht zurueckrechnen.
@@ -1001,7 +1006,8 @@ export function parseQDF(text, opts = {}) {
     const nd = { id: "n" + seq++, x: h.x, y: h.y, z: h.z };
     nodes.push(nd);
     clampNodes.set(nd.id, nd);
-    nd.part = "hole_1";
+    nd.part = holePartForMask(h.mask);
+    nd.partMask = h.mask;
     nd.stub = h.stub;
     if (h.quat) nd.partQuat = h.quat;
     if (onTube) nd.clampOn = onTube;
@@ -1020,9 +1026,17 @@ export function parseQDF(text, opts = {}) {
         if (!e || !o || e === nd) continue;
         if (Math.hypot(e.x - nd.x, e.y - nd.y, e.z - nd.z) > HOLE_SNAP) continue;
         const dx = o.x - nd.x, dy = o.y - nd.y, dz = o.z - nd.z;
-        const L = Math.hypot(dx, dy, dz) || 1;
-        const dot = (dx / L) * h.stub[0] + (dy / L) * h.stub[1] + (dz / L) * h.stub[2];
-        if (dot < 0.9) continue;               // laeuft woanders hin
+        // Gegen ALLE ihre Arme pruefen -- die zwei- und die dreiarmige Fassung
+        // nehmen mehr als ein Rohr auf. Verglichen wird der ABSTAND des fernen
+        // Endes von der Armachse, nicht nur der Winkel: das Rohr der tragenden
+        // Kupplung laeuft aus Sicht der Klemme fast in dieselbe Richtung (nur
+        // 7 Grad daneben), liegt aber eine Kupplungslaenge neben der Achse.
+        const trifft = holeArmDirs(nd).some((a) => {
+          const s = dx * a[0] + dy * a[1] + dz * a[2];
+          if (s <= 0) return false;            // laeuft nach hinten
+          return Math.hypot(dx - a[0] * s, dy - a[1] * s, dz - a[2] * s) < 2;
+        });
+        if (!trifft) continue;                 // laeuft woanders hin
         t[end] = nd.id;
       }
     }
@@ -1078,6 +1092,7 @@ export function parseQDF(text, opts = {}) {
       if (n.arms) o.arms = n.arms; // variant2: echte Arm-Stutzen (inkl. offener Arme)
       if (n.quat) o.quat = n.quat; // Wuerfel-Orientierung der Kupplung (Three x,y,z,w)
       if (n.part) o.part = n.part; // festes Katalogteil (Klemm-Kupplung)
+      if (n.partMask) o.partMask = n.partMask; // Arm-Maske der Lochzapfenkupplung
       if (n.clampOn) o.clampOn = n.clampOn; // umschlossenes Rohr + Stelle darauf
       if (n.stub) o.stub = n.stub; // Richtung des offenen Anschlusses
       if (n.bearingOn) o.bearingOn = n.bearingOn; // getragen von dieser Lagerkupplung

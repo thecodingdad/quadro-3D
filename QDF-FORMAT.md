@@ -467,7 +467,7 @@ of set bits** — that is the trap here. Captured from the software:
 | Mask | Product | Catalogue | Triangles |
 |---:|---|---|---:|
 | 11 | pin connector **1-way** | `hole_1` (CH1) | 352 |
-| 15 | pin connector **2-way** | *no entry yet* | 544 |
+| 15 | pin connector **2-way** | `hole_2` (CH2) | 544 |
 | 31, 59 | pin connector **3-way** | `hole_t` (CH3) | 736 |
 
 Masks 31 and 59 are the same shape in a different orientation (checked against
