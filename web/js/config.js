@@ -54,5 +54,8 @@ export const CLAMP_LINK_DIST = 7;
 // Schluessel fuer den automatischen Zwischenspeicher.
 export const AUTOSAVE_KEY = "quadro.autosave.v1";
 
-// Aktuelles Speicherformat (fuer spaetere Migrationen).
-export const FORMAT_VERSION = 1;
+// Aktuelles Speicherformat. Aeltere Staende werden beim Laden angehoben
+// (model.js, loadJSON), neuere abgelehnt.
+//   1 -> 2: Der Punkt einer Klemme lag zwischen ihren beiden Loechern; jetzt
+//           liegt er im Loch des gehaltenen Rohrs, wie in den QDF-Dateien.
+export const FORMAT_VERSION = 2;

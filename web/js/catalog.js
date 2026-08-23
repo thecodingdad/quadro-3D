@@ -89,12 +89,11 @@ export function partForFitting(kind, mask) {
   // Die Lagerkupplung hat kein eigenes QDF-Element -- sie ist eine Klemm-
   // Kupplung, die wir selbst setzen, und wird als bearing2 geschrieben.
   if (kind === "bearing-clamp") return getConnector("bearing");
-  // Fuer die Rohrkappe fuehren die Herstellerdateien zwei Elementarten; das
-  // Teil dahinter ist dasselbe. Am Katalogteil haengt `tube-cap2`, denn das
-  // ist die Kappe: aus Quadro.exe abgegriffen 24 mm lang und an einem Ende
-  // geschlossen, waehrend `open-connector2` eine 50 mm lange, beidseitig
-  // offene Huelse ist (sie sitzt auf einem Kupplungs-Stutzen).
-  if (kind === "open-connector2") return accessories().find((a) => a.qdf === "tube-cap2") || null;
+  // Rohrkappe und offenes Verbinderende sind ZWEI Teile, nicht eins: die Kappe
+  // (`tube-cap2`) ist 24 mm lang und an einem Ende geschlossen, das offene
+  // Verbinderende (`open-connector2`) eine 50 mm lange, beidseitig offene
+  // Huelse auf einem Kupplungs-Stutzen. Beide haengen an ihrem eigenen
+  // Katalogteil, die Suche unten findet sie ueber `qdf`.
   if (kind === "hole-connector4") {
     let arms = 0;
     for (let b = 0; b < 6; b++) if ((mask || 0) & (1 << b)) arms++;

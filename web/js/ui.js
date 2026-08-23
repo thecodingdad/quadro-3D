@@ -1131,7 +1131,8 @@ export function initUI({ scene, model, builder }) {
     ["grp_wheels", ["multi-wheel2", "floating-wheel2", "casters2", "bearing2", "hub-cap2", "steering-lock2"],
       `<circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.6"/>` +
       `<circle cx="8" cy="8" r="1.6" fill="currentColor"/>`],
-    ["grp_joints", [C45_ENTRY, "bearing-clamp", CLAMP_ENTRY, CLIP_ENTRY, "open-connector2"],
+    ["grp_joints", [C45_ENTRY, "bearing-clamp", CLAMP_ENTRY, CLIP_ENTRY, "tube-cap2",
+      "open-connector2"],
       `<line x1="2.5" y1="6" x2="13.5" y2="6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<rect x="6" y="3" width="4" height="11" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/>`],
@@ -1177,8 +1178,13 @@ export function initUI({ scene, model, builder }) {
       `<line x1="1" y1="10.8" x2="15" y2="10.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<path d="M5.4 3.5 A3.1 3.1 0 1 0 10.6 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
       `<path d="M5.4 12.5 A3.1 3.1 0 1 1 10.6 12.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>`,
-    "open-connector2": `<line x1="1.5" y1="8" x2="9.5" y2="8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>` +
+    // Rohrkappe: Rohr mit geschlossener Haube am Ende.
+    "tube-cap2": `<line x1="1.5" y1="8" x2="9.5" y2="8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>` +
       `<ellipse cx="11.4" cy="8" rx="2.2" ry="3.4" fill="currentColor"/>`,
+    // Offenes Verbinderende: Huelse auf dem Stutzen, beide Enden offen.
+    "open-connector2": `<line x1="1.5" y1="8" x2="7" y2="8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>` +
+      `<path d="M7 4.6 L13.4 4.6 M7 11.4 L13.4 11.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
+      `<ellipse cx="13.4" cy="8" rx="1.5" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.4"/>`,
     "adapter2": `<path d="M2.4 6.4 L8.6 6.4 L8.6 9.6 L2.4 9.6" fill="none" stroke="currentColor" stroke-width="1.4"/>` +
       `<rect x="8.6" y="4.8" width="5" height="6.4" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"/>`,
     // Sonstiges
@@ -1263,7 +1269,7 @@ export function initUI({ scene, model, builder }) {
   // Manche Teile führen ihr Sinnbild unter der QDF-Art, andere unter der
   // Teile-Kennung; die Klemm-Kupplungen teilen sich eins mit den Anbauteilen.
   const ICON_ALIAS = { hole_1: "hole-connector4", hole_t: "hole-connector4",
-    bearing: "bearing-clamp", tube_cap: "open-connector2" };
+    bearing: "bearing-clamp", tube_cap: "tube-cap2", open_end: "open-connector2" };
   function teileIcon(id, kind) {
     return FITTING_ICONS[kind] || SLIDE_ICONS[kind] || CONNECTOR_ICONS[id]
       || FITTING_ICONS[id] || FITTING_ICONS[ICON_ALIAS[id]] || null;

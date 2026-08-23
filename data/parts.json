@@ -165,7 +165,6 @@
     },
     {
       "id": "flexi",
-      "qdf": "flexi-connector3",
       "code": "CX4",
       "name": "Flexikupplung",
       "name_en": "Flexi connector",
@@ -173,11 +172,12 @@
       "kind": "special",
       "price": 8.99,
       "buildable": false,
-      "note": "frei einstellbar",
+      "note": "frei einstellbar · das ganze Gelenk: zwei Scharniere und ein Bolzen. In der QDF-Datei steht KEINE eigene Zeile dafür, sondern zwei flexi-connector3 (die Scharniere) plus ein bolt2",
       "url": "https://quadroshop.com/products/flexi-connector"
     },
     {
       "id": "flexi_hinge",
+      "qdf": "flexi-connector3",
       "code": "CXB",
       "name": "Flexikupplung Scharnier",
       "name_en": "Flexi connector hinge",
@@ -185,7 +185,7 @@
       "kind": "special",
       "price": 2.49,
       "buildable": false,
-      "note": "",
+      "note": "eine Hälfte des Gelenks · je Flexikupplung stehen zwei davon in der Datei",
       "url": "https://quadroshop.com/products/flexi-connector-hinge"
     },
     {
@@ -613,6 +613,16 @@
       "name_en": "Tube cap",
       "qdf": "tube-cap2",
       "url": "https://quadroshop.com/products/tube-cap"
+    },
+    {
+      "id": "open_end",
+      "code": "",
+      "name": "Offenes Verbinderende",
+      "name_en": "Open connector end",
+      "price": 0,
+      "qdf": "open-connector2",
+      "note": "50 mm lange, beidseitig offene Hülse auf einem Stutzen der Kupplung · erzwingt diesen Stutzen: ohne Rohr wird dort sonst keiner gezeichnet und keiner gerechnet · im Shop nicht als Einzelteil gelistet, deshalb ohne Preis",
+      "url": "https://quadroshop.com/collections/connectors"
     },
     {
       "id": "safety_clamp",

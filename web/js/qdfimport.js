@@ -26,6 +26,7 @@
 // Bewusst ohne Three.js/DOM, damit per Node testbar und Backend-tauglich.
 
 import { round2 as round, panelNormal, modelMiddle } from "./util.js";
+import { FORMAT_VERSION } from "./config.js";
 
 // Alle benannten Richtungen (kardinal + 45°-diagonal) fuer Arm-Erkennung.
 const S45 = Math.SQRT1_2;
@@ -67,7 +68,9 @@ const FITTING_KINDS = {
   "roof-large2":     { renderBase: 4 },   // grosses Dach
   "lattice2":        { renderBase: 8, sized: true },  // Netz
   "bag2":            { renderBase: 4 },   // Spielsack
-  "open-connector2": { renderBase: 4 },   // offener Anschluss
+  // Offenes Verbinderende: Huelse auf einem Stutzen der Kupplung. Sie erzwingt
+  // diesen Stutzen -- ohne Rohr zeichnet und rechnet ihn sonst niemand.
+  "open-connector2": { renderBase: 4 },
   // Kupplungen, die wir (noch) nicht setzen koennen und auch nicht zeichnen --
   // gelesen, benannt und beim Speichern unveraendert zurueckgeschrieben werden
   // sie trotzdem. `keepRest` haelt dafuer die Felder hinter der Lage fest.
@@ -441,15 +444,24 @@ export function parseQDF(text, opts = {}) {
       }
     } else if (p.name === "clamp2" || p.name === "clip2") {
       // Doppelrohrverbinder (clamp2) und Rohrklammer (clip2) sitzen als freier
-      // Punkt auf einem Rohr. Die lokale +X-Achse ist die Rohrrichtung.
+      // Punkt auf einem Rohr; der Punkt liegt in dem Loch, durch das dieses Rohr
+      // laeuft (Test.qdf: Rohr auf der Y-Achse, clamp2 auf 0/340/0). Die lokale
+      // +X-Achse ist die Rohrrichtung.
       if (!p.tuple || p.tuple.length < 7) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
       const x = p.tuple[4] / 10, y = p.tuple[5] / 10, z = p.tuple[6] / 10;
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const dir = nearestCardinal(rotateByQuat(q, [1, 0, 0]));
+      // Wohin das zweite Loch zeigt, steckt in der Drehung: bei der Rohrklammer
+      // auf der lokalen +Y-, beim Doppelrohrverbinder auf der lokalen -Z-Achse
+      // (an den abgegriffenen Modellen gemessen). Ohne diese Richtung stuende
+      // das Teil beliebig um sein Rohr gedreht.
+      const zweit = nearestCardinal(p.name === "clip2"
+        ? rotateByQuat(q, [0, 1, 0])
+        : rotateByQuat(q, [0, 0, -1]));
       clamps.push({
         id: "k" + seq++, x: round(x), y: round(y), z: round(z),
         connectorId: p.name === "clip2" ? "tube_clamp" : "double_tube",
-        dir,
+        dir, off: zweit.map((v) => round(v * conn)),
       });
     }
   }
@@ -886,8 +898,10 @@ export function parseQDF(text, opts = {}) {
       }
       c.dir = T1.cp.dir.map(round);
       if (T2) {
-        // Klemme exakt zwischen beide Tubes setzen, Versatz merken (fuer die "8").
-        c.x = round((T1.cp.x + T2.cp.x) / 2); c.y = round((T1.cp.y + T2.cp.y) / 2); c.z = round((T1.cp.z + T2.cp.z) / 2);
+        // Die Klemme sitzt auf der NAECHSTEN Tube (dort steht auch ihr Punkt in
+        // der Datei) und greift mit dem zweiten Loch nach der anderen -- also
+        // auf die erste Achse setzen und den Versatz dorthin merken.
+        c.x = round(T1.cp.x); c.y = round(T1.cp.y); c.z = round(T1.cp.z);
         c.off = [round(T2.cp.x - T1.cp.x), round(T2.cp.y - T1.cp.y), round(T2.cp.z - T1.cp.z)];
         // Beide Tubes verbinden: naechstes Endknoten-Paar (kurze Link-Kante).
         const e1 = [nodeById.get(T1.t.a), nodeById.get(T1.t.b)], e2 = [nodeById.get(T2.t.a), nodeById.get(T2.t.b)];
@@ -1047,7 +1061,10 @@ export function parseQDF(text, opts = {}) {
   }
 
   return {
-    format: 1,
+    // Der Einleser liefert IMMER den aktuellen Stand -- er baut die Felder ja
+    // gerade neu auf. Stuende hier 1, schoebe die Migration in model.js die
+    // Klemmen noch einmal um eine halbe Lochweite.
+    format: FORMAT_VERSION,
     nodes: nodes.map((n) => {
       const o = { id: n.id, x: n.x, y: n.y, z: n.z };
       if (n.c45) o.c45 = true;

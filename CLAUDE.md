@@ -167,6 +167,11 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   rotierten Kupplungen greift `extendDiagonalSnap` mit größerer Toleranz.
 - `loadJSON` gibt `{ok, reason}` zurück (`"data"` / `"format"`), statt still ein kaputtes Modell
   zu übernehmen. Aufrufer muss das Ergebnis auswerten und via `t()` melden.
+- **Format-Versionen** (`FORMAT_VERSION` in `config.js`): `loadJSON` nimmt alles **bis** zur
+  aktuellen Nummer an und hebt es beim Laden an; abgelehnt wird nur, was **neuer** ist. Wer eine
+  Nummer hochzählt, trägt die Anhebung gleich daneben ein – und denkt an `qdfimport.js`: der
+  Einleser baut die Felder neu auf und muss deshalb **die aktuelle** Nummer liefern, sonst läuft
+  die Migration ein zweites Mal über frische Daten.
 
 ## Stückliste (bom.js)
 
@@ -357,6 +362,32 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     hält die schon versorgten Rohre fest. Die **Rollachse** ist frei wählbar – im Bestand kommen
     neun verschiedene vor, eine Regel gibt es dort nicht; genommen wird die, die am ehesten nach
     oben zeigt.
+  - **Der Punkt einer Klemme liegt im Loch des gehaltenen Rohrs**, nicht zwischen ihren beiden
+    Löchern. So steht er in der Datei (Test.qdf: Rohr auf der Y-Achse, `clamp2` auf 0/340/0),
+    und genau dort hat das abgegriffene Modell seinen Nullpunkt – die alte Mitte zeichnete es
+    2,5 cm daneben. Wohin das **zweite** Loch zeigt, steckt allein in der Drehung: beim
+    Doppelrohrverbinder liegt es 5,0 cm in lokal **−Z**, bei der Rohrklammer 5,5 cm in lokal
+    **+Y** (an den Modellen gemessen). Import und Export rechnen das ineinander um
+    (`clampQuat` in `qdfexport.js`), Speicherstände von vorher schiebt die Migration auf
+    **Format 2** zurecht.
+  - **Radlager (`bearing2`) und Schwimmrad (`floating-wheel2`) gibt es nur in Schwarz** – weder
+    die Baufarbe noch die aus der Datei färbt sie um (`BLACK_FITTINGS`, in `scene.js` und
+    `qdfexport.js`). In den Herstellerdateien tragen sie durchgehend Material 1 (125 bzw. 76
+    Vorkommen). Das **Multirad** dagegen kommt in Farben (Material 6–9).
+  - **Rohrkappe und offenes Verbinderende sind zwei Teile**, nicht eins: `tube-cap2` ist 24 mm
+    lang und an einem Ende geschlossen (Katalog `tube_cap`), `open-connector2` eine 50 mm lange,
+    beidseitig offene Hülse auf einem Stutzen (Katalog `open_end`). Das offene Verbinderende
+    **erzwingt** diesen Stutzen: ohne Rohr wird dort sonst keiner gezeichnet und keiner
+    gerechnet. Dafür steht es in `ARM_FITTINGS` (`scene.js` **und** `bom.js`), und der Export
+    setzt sein Bit in der Arm-Maske der Kupplung – in allen 67 Vorkommen des Bestands steht es
+    dort auch. Die Rohrkappe sitzt **auf** der Kupplung (Spieltisch: `connector3` und
+    `tube-cap2` beide auf −800/−50/−800), ersetzt sie also nicht; nur die **Radkappe** tut das
+    (`hasWheelCap`). Ihr Modell liegt als einziges auf der **Minus**-X-Seite seines Nullpunkts,
+    deshalb dreht `_fittingMeshes` es um 180 Grad, sonst steckte die Kappe im Würfel.
+  - **`flexi-connector3` ist das Scharnier**, nicht die ganze Flexikupplung: je Gelenk stehen
+    zwei davon plus ein `bolt2` in der Datei. Am Katalogteil `flexi_hinge` hängt deshalb das
+    `qdf`, nicht am Teil `flexi` – sonst zählte die Stückliste jedes Gelenk als zwei ganze
+    Flexikupplungen.
   - **Die Lagerkupplung** (`bearing-connector4`, Katalog `bearing`) klemmt um ein Rohr und
     **trägt eine Kupplung**. Die steht in der Datei als eigene `connector3`, 10 cm entgegen der
     +X-Achse der Klemme (gemessen: alle 47 eindeutigen Fälle). Ein eigener Durchlauf im Import

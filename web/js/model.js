@@ -15,6 +15,9 @@ import { round2 as round, quatFromXAxis, quatFromBasis, xAxisOf, yAxisOf, zAxisO
 const FITTING_MOUNTS = {
   "bearing2":        { at: "node", offset: 0 },   // Radlager: 5-cm-Stueck an der Kupplung
   "casters2":        { at: "node", offset: 0 },   // Laufrolle; der Adapter kommt mit
+  // Offenes Verbinderende: eine 5 cm lange, beidseitig offene Huelse auf einem
+  // freien Stutzen der Kupplung. Sie ERZWINGT diesen Stutzen -- ohne Rohr
+  // rechnet und zeichnet ihn sonst niemand (genau wie in der Herstellersoftware).
   "open-connector2": { at: "node", offset: 0 },
   "steering-lock2":  { at: "node", offset: 0 },   // Multirad-Arretierung, sitzt am Ende des Stutzens
 };
@@ -42,6 +45,7 @@ export const PLACEABLE_FITTINGS = [...new Set([
   ...Object.keys(FITTING_MOUNTS),
   ...Object.keys(TUBE_FITTINGS),
   "hub-cap2",                     // am offenen Rohrende, siehe _wheelCapMounts
+  "tube-cap2",                    // Rohrkappe, ebenfalls am offenen Rohrende
   "bag2",                         // zwischen zwei Rohren, siehe addBag
   // Die Lochzapfenkupplung (hole-connector4) klemmt NICHT um ein Rohr: ihr Ring
   // greift über den Stutzen einer Kupplung, quer dazu steht ihr eigener Stutzen
@@ -73,7 +77,8 @@ const LATTICE_MAX = 160;
 // gezeichnet. Gebraucht wird sie, um zu pruefen, ob ein Rad auf sein Rohr passt
 // und ob es an ein anderes Teil stoesst.
 const FITTING_WIDTH = {
-  "multi-wheel2": 2.4, "floating-wheel2": 14, "hub-cap2": 5, "open-connector2": 1,
+  "multi-wheel2": 2.4, "floating-wheel2": 14, "hub-cap2": 5, "tube-cap2": 2.4,
+  "open-connector2": 5,
   "bearing2": 5, "casters2": 5, "adapter2": 5, "steering-lock2": 2.4,
 };
 
@@ -948,7 +953,7 @@ export class BuildModel {
    */
   fittingMounts(kind) {
     if (kind === "multi-wheel2") return this._wheelMounts();
-    if (kind === "hub-cap2" || kind === "open-connector2") return this._wheelCapMounts();
+    if (kind === "hub-cap2" || kind === "tube-cap2") return this._wheelCapMounts();
     if (kind === "textil-round2") return this._roundCoverMounts();
     const spec = FITTING_MOUNTS[kind];
     if (!spec) return [];
@@ -1090,27 +1095,27 @@ export class BuildModel {
   }
 
   /**
-   * Sitzt an diesem Knoten eine Radkappe? Dann ersetzt sie dort die Kupplung --
-   * das Rohrende steckt in der Kappe, eine Kupplung gibt es nicht mehr.
-   */
-  /**
-   * Steckt auf diesem Knoten eine Kappe, die die Kupplung ersetzt? Radkappe und
-   * offener Anschluss verschliessen ein Rohrende -- an einem Ende mit nur einem
-   * Rohr sitzt dann keine Kupplung mehr. Hat der Knoten mehrere Arme, bleibt die
-   * Kupplung: dort schliesst das Teil nur einen freien Stutzen ab.
+   * Steckt auf diesem Knoten eine Radkappe? Dann ersetzt sie dort die Kupplung:
+   * das Rohrende steckt in der Kappe, die das Schwimmrad haelt. Hat der Knoten
+   * mehrere Arme, bleibt die Kupplung stehen -- dort schliesst die Kappe nur
+   * einen freien Stutzen ab.
+   *
+   * Die ROHRKAPPE zaehlt hier NICHT mit: sie sitzt auf der Kupplung, nicht an
+   * ihrer Stelle. In den Herstellerdateien stehen an derselben Stelle beide
+   * Zeilen -- die Kupplung und die Kappe darauf (Spieltisch: connector3 und
+   * tube-cap2, beide auf -800/-50/-800).
    */
   hasWheelCap(node) {
-    if (!this._fittingAt(node, "hub-cap2") && !this._fittingAt(node, "open-connector2")) return false;
+    if (!this._fittingAt(node, "hub-cap2")) return false;
     return this.degree(node.id) <= 1;
   }
 
   /**
-   * Steckt an diesem Knoten ein Abschluss? Radkappe und offener Anschluss
-   * schliessen ein Rohrende ab -- es zaehlt dann nicht mehr als offenes Ende.
-   * Die Kappe ERSETZT die Kupplung, der offene Anschluss sitzt auf ihr.
+   * Steckt an diesem Knoten ein Abschluss? Radkappe und Rohrkappe schliessen
+   * ein Rohrende ab -- es zaehlt dann nicht mehr als offenes Ende.
    */
   hasEndPiece(node) {
-    return this._fittingAt(node, "hub-cap2") || this._fittingAt(node, "open-connector2");
+    return this._fittingAt(node, "hub-cap2") || this._fittingAt(node, "tube-cap2");
   }
 
   _fittingAt(node, kind) {
@@ -1630,7 +1635,7 @@ export class BuildModel {
     if (!PLACEABLE_FITTINGS.includes(kind)) return null;
     // Rohrkappe und Radkappe schliessen beide ein Rohrende ab -- an derselben
     // Stelle ergibt nur eine von beiden Sinn.
-    const CAPS = ["hub-cap2", "open-connector2"];
+    const CAPS = ["hub-cap2", "tube-cap2"];
     const blocken = CAPS.includes(kind) ? CAPS : [kind];
     for (const f of this.fittings.values()) {
       if (!blocken.includes(f.kind)) continue;
@@ -1945,12 +1950,10 @@ export class BuildModel {
     const cr = cross3(u, o), d = dot3(u, o) * (1 - co);
     const no = [o[0] * co + cr[0] * si + u[0] * d, o[1] * co + cr[1] * si + u[1] * d,
       o[2] * co + cr[2] * si + u[2] * d];
-    // Die Mitte liegt zwischen beiden Loechern: das Rohr bleibt, wo es ist.
-    const axis = [c.x - o[0] / 2, c.y - o[1] / 2, c.z - o[2] / 2];
-    const pos = [axis[0] + no[0] / 2, axis[1] + no[1] / 2, axis[2] + no[2] / 2];
-    if (this.isBelowGround(pos[1])) return false;
+    // Der Punkt IST die Achse des umschlossenen Rohrs -- er bleibt stehen,
+    // gedreht wird nur das zweite Loch um ihn herum.
+    if (this.isBelowGround(c.y + no[1])) return false;
     c.off = no.map(round);
-    c.x = round(pos[0]); c.y = round(pos[1]); c.z = round(pos[2]);
     return true;
   }
 
@@ -3147,9 +3150,11 @@ export class BuildModel {
       return { ok: false, reason: "data" };
     }
     // Aeltere Speicherstaende ohne "format"-Feld gelten als Version 1
-    // (Legacy) und werden weiter akzeptiert; nur eine abweichende, bekannte
-    // Versionsnummer wird abgelehnt.
-    if (data.format != null && data.format !== FORMAT_VERSION) {
+    // (Legacy) und werden weiter akzeptiert -- sie werden beim Laden angehoben.
+    // Abgelehnt wird nur, was NEUER ist als dieser Stand: dessen Felder kennen
+    // wir nicht.
+    const version = data.format != null ? data.format : 1;
+    if (!(version >= 1 && version <= FORMAT_VERSION)) {
       return { ok: false, reason: "format" };
     }
     this.clear();
@@ -3189,8 +3194,18 @@ export class BuildModel {
       maxSeq = Math.max(maxSeq, parseSeq(p.id));
     }
     for (const c of data.clamps || []) {
+      // Version 1 fuehrte den Punkt in der MITTE zwischen beiden Loechern; seit
+      // Version 2 liegt er im Loch des gehaltenen Rohrs. Beim Laden also eine
+      // halbe Lochweite weiterschieben, sonst haengt die Klemme neben dem Rohr.
+      // Der Versatz zeigt vom gehaltenen Rohr zum freien Loch, die alte Mitte lag
+      // also eine halbe Lochweite DAHINTER -- zurueckschieben.
+      const alt = version < 2 && c.off ? c.off : null;
       this.clamps.set(c.id, {
-        id: c.id, x: c.x, y: c.y, z: c.z, connectorId: c.connectorId || "double_tube",
+        id: c.id,
+        x: round(c.x - (alt ? alt[0] / 2 : 0)),
+        y: round(c.y - (alt ? alt[1] / 2 : 0)),
+        z: round(c.z - (alt ? alt[2] / 2 : 0)),
+        connectorId: c.connectorId || "double_tube",
         dir: c.dir || null, off: c.off || null,
       });
       maxSeq = Math.max(maxSeq, parseSeq(c.id));
@@ -3203,8 +3218,12 @@ export class BuildModel {
       maxSeq = Math.max(maxSeq, parseSeq(t.id));
     }
     for (const f of data.fittings || []) {
+      // Bis Version 1 stand die Rohrkappe als `open-connector2` im Stand -- das
+      // ist in Wahrheit das offene Verbinderende (eine Huelse auf einem
+      // Kupplungs-Stutzen). Die Kappe heisst jetzt nach ihrem eigenen Element.
+      const kind = version < 2 && f.kind === "open-connector2" ? "tube-cap2" : f.kind;
       this.fittings.set(f.id, {
-        id: f.id, kind: f.kind, x: f.x, y: f.y, z: f.z,
+        id: f.id, kind, x: f.x, y: f.y, z: f.z,
         quat: f.quat || null, color: f.color || null,
         w: f.w, h: f.h, d: f.d, mask: f.mask,
         // Felder aus der Datei, die wir nur durchreichen (Flexikupplung & Co.)

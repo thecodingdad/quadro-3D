@@ -1038,7 +1038,9 @@ export class Builder {
     if (!isCurvedTube(this.tubeId)) {
       for (const c of this.model.clamps.values()) {
         if (!c.dir || !c.off) continue;
-        const center = [c.x + c.off[0] / 2, c.y + c.off[1] / 2, c.z + c.off[2] / 2];
+        // Der Punkt der Klemme liegt auf dem gehaltenen Rohr, das freie Loch
+        // eine volle Lochweite daneben.
+        const center = [c.x + c.off[0], c.y + c.off[1], c.z + c.off[2]];
         if (this._openingOccupied(center, c.dir)) continue;
         this.scene.addHandle(center, { clampOpening: true, center, dir: c.dir }, "dir");
       }
@@ -1559,10 +1561,14 @@ export class Builder {
     const pl = Math.hypot(...p) || 1; p = [p[0] / pl, p[1] / pl, p[2] / pl];
     const card = this._cardinalPerp(p, u);
     const off = [card[0] * cs, card[1] * cs, card[2] * cs];
-    const pos = [ax[0] + off[0] / 2, ax[1] + off[1] / 2, ax[2] + off[2] / 2];
+    // Der Punkt liegt auf der Achse des UMSCHLOSSENEN Rohrs, nicht zwischen
+    // beiden Loechern -- genau wie in den Herstellerdateien (Test.qdf: das Rohr
+    // laeuft auf der Y-Achse, die clamp2-Zeile steht auf 0/340/0). Das
+    // abgegriffene Modell hat dort seinen Nullpunkt; die alte Mitte zeichnete es
+    // um eine halbe Lochweite versetzt.
     let gesetzt = null;
     this.recordHistory(() => {
-      const clamp = this.model.addClamp(round2(pos[0]), round2(pos[1]), round2(pos[2]), this.clampPart);
+      const clamp = this.model.addClamp(round2(ax[0]), round2(ax[1]), round2(ax[2]), this.clampPart);
       clamp.dir = u.map(round2); clamp.off = off.map(round2);
       gesetzt = clamp;
     });

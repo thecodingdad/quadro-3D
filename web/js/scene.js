@@ -138,7 +138,13 @@ const POOL_SKIN = 2;
 const POOL_INSET = 2.5;
 // Anbauteile, die auf einem Stutzen der Kupplung sitzen: die Kupplung bekommt
 // dort denselben Stutzen wie fuer ein Rohr.
-const ARM_FITTINGS = new Set(["adapter2", "bearing2", "steering-lock2"]);
+// Teile, die auf einem Stutzen der Kupplung sitzen -- dort gehoert einer
+// gezeichnet, auch wenn kein Rohr steckt. Beim offenen Verbinderende ist genau
+// das seine Aufgabe: es ERZWINGT den Stutzen (so auch in der Herstellersoftware).
+const ARM_FITTINGS = new Set(["adapter2", "bearing2", "steering-lock2", "open-connector2"]);
+
+// Teile, die es nur in Schwarz gibt -- sie nehmen keine Farbe an.
+const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2"]);
 
 // Farbschema der normalen Ansicht (die Szene bringt ihren eigenen Himmel mit).
 // Die Werte sind die Gegenstuecke zu --bg/--line in style.css.
@@ -1168,6 +1174,9 @@ export class SceneManager {
         depth: CLAMP_LEN, bevelEnabled: false, curveSegments: seg,
       });
       g.translate(0, 0, -CLAMP_LEN / 2);            // um die Mitte, Achse auf +Z
+      // Der Umriss steht um die Mitte zwischen beiden Loechern; der Punkt der
+      // Klemme liegt aber im ERSTEN Loch (dort laeuft das gehaltene Rohr).
+      g.translate(d / 2, 0, 0);
       return g;
     });
   }
@@ -1266,7 +1275,11 @@ export class SceneManager {
     const q = f.quat && f.quat.length === 4
       ? new THREE.Quaternion(f.quat[0], f.quat[1], f.quat[2], f.quat[3]).normalize()
       : new THREE.Quaternion();
-    const hex = f.color ? colorHex(f.color) : 0x2b2b2b;
+    // Radlager und Schwimmrad gibt es nur in Schwarz -- weder die Baufarbe noch
+    // die Farbe aus der Datei faerbt sie um. In den Herstellerdateien tragen
+    // beide durchgehend das schwarze Material (125 bzw. 76 Vorkommen).
+    const hex = BLACK_FITTINGS.has(f.kind) ? connectorColor().hex
+      : f.color ? colorHex(f.color) : 0x2b2b2b;
     let geo = null, mat = null;
     const cs = geometry().connectorSize;
 
@@ -1278,9 +1291,16 @@ export class SceneManager {
     const echt = this._q().meshes && this._fitMeshes ? this._fitMeshes[f.kind] : null;
     if (echt) {
       const geoEcht = this._meshGeometry("fit:" + f.kind, echt);
-      const matEcht = this._fittingMaterial(
-        f.kind === "floating-wheel2" && !f.color ? 0x8f9296 : hex, false);
-      const mesh = this._placeFitting(new THREE.Mesh(geoEcht, matEcht), f, q);
+      const matEcht = this._fittingMaterial(hex, false);
+      // Die Rohrkappe liegt im abgegriffenen Modell auf der MINUS-X-Seite ihres
+      // Nullpunkts (x -4,5 bis -2,1 cm), waehrend ihre Achse in der Datei nach
+      // AUSSEN zeigt -- ungedreht steckte sie im Kupplungswuerfel. Gedreht sitzt
+      // sie 2,1 bis 4,5 cm vor dem Knoten, also genau auf dessen Aussenflaeche
+      // (2,5 cm). Alle anderen Teile liegen auf der Plus-X-Seite.
+      const qT = f.kind === "tube-cap2"
+        ? q.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI))
+        : q;
+      const mesh = this._placeFitting(new THREE.Mesh(geoEcht, matEcht), f, qT);
       // Der Spielsack: der Import ruecht seinen Punkt um BAG_OFFSET auf die
       // Mitte seines Feldes vor (qdfimport.js), das Modell erwartet aber den
       // Punkt, wie er in der Datei steht -- also wieder zurueck. Seine eigene
@@ -1303,10 +1323,8 @@ export class SceneManager {
         break;
       }
       case "floating-wheel2": {         // Schwimmrad, knapp 15 cm dick
-        // Es gibt es in mehreren Farben -- gesetzte Raeder tragen die Baufarbe,
-        // importierte ohne Farbangabe bleiben grau.
         geo = this._wheelGeometry(WHEEL_R, 14, false);
-        mat = this._fittingMaterial(f.color ? hex : 0x8f9296, false);
+        mat = this._fittingMaterial(hex, false);   // immer schwarz, siehe BLACK_FITTINGS
         break;
       }
       case "hub-cap2": {                // Radkappe: haelt das Schwimmrad fest
@@ -1386,7 +1404,7 @@ export class SceneManager {
         mat = this._fittingMaterial(0xd42e2e, false);
         break;
       }
-      case "open-connector2": {         // Offenes Ende: runde Kappe auf dem Rohr
+      case "tube-cap2": {               // Rohrkappe: runde Kappe auf dem Rohr
         // Sie verschliesst das Rohrende, ist also nur so dick wie noetig und hat
         // den Durchmesser des Rohrs. Sie sitzt auf der Schnittflaeche des Rohrs,
         // eine halbe Kupplungslaenge vor dem Knoten.
@@ -1395,6 +1413,20 @@ export class SceneManager {
           const g = new THREE.CylinderGeometry(rc, rc, 1, Math.max(12, this._q().tube));
           g.rotateZ(Math.PI / 2);
           g.translate(-cs / 2 + 0.5, 0, 0);
+          return g;
+        });
+        mat = this._fittingMaterial(0x2b2b2b, false);
+        break;
+      }
+      case "open-connector2": {         // Offenes Verbinderende: Huelse ueber dem Stutzen
+        // Sie ist so lang wie ein Kupplungs-Stutzen und beidseitig offen: von
+        // aussen sieht es aus wie ein abgeschnittenes Rohr. Den Stutzen darunter
+        // zeichnet die Kupplung selbst (ARM_FITTINGS).
+        const ro = geometry().tubeRadius;
+        geo = this._cachedGeo("openend", () => {
+          const g = new THREE.CylinderGeometry(ro, ro, cs, Math.max(12, this._q().tube), 1, true);
+          g.rotateZ(Math.PI / 2);
+          g.translate(cs, 0, 0);
           return g;
         });
         mat = this._fittingMaterial(0x2b2b2b, false);
@@ -3156,17 +3188,21 @@ export class SceneManager {
       const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
       const q = new THREE.Quaternion().setFromRotationMatrix(
         new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
-      // Abgegriffenes Originalteil: dort laeuft das umschlossene Rohr entlang
-      // dem lokalen +X und das zweite Loch liegt in -Z -- die Achsen, die auch
-      // qdfexport.js schreibt (quatFromX(c.dir)), nicht die des gezeichneten
-      // Koerpers. Also ein eigenes Kreuz statt des obigen.
+      // Abgegriffenes Originalteil: das umschlossene Rohr laeuft entlang dem
+      // lokalen +X, und der Nullpunkt liegt in dessen Loch -- deshalb sitzt das
+      // Modell direkt auf dem Punkt der Klemme. Das zweite Loch liegt bei den
+      // beiden Teilen woanders (am Modell gemessen): beim Doppelrohrverbinder
+      // 5,0 cm in lokal -Z, bei der Rohrklammer 5,5 cm in lokal +Y.
       const echt = wantMeshes && this._fitMeshes
         ? this._fitMeshes[klammer ? "clip2" : "clamp2"] : null;
       if (echt) {
-        const zM = off ? off.clone().normalize().negate() : yAxis.clone();
-        const yM = new THREE.Vector3().crossVectors(zM, dir).normalize();
-        const qM = new THREE.Quaternion().setFromRotationMatrix(
-          new THREE.Matrix4().makeBasis(dir, yM, zM));
+        const zweit = off ? off.clone().normalize() : yAxis.clone();
+        const qM = new THREE.Quaternion().setFromRotationMatrix(klammer
+          ? new THREE.Matrix4().makeBasis(dir,
+            zweit, new THREE.Vector3().crossVectors(dir, zweit).normalize())
+          : new THREE.Matrix4().makeBasis(dir,
+            new THREE.Vector3().crossVectors(zweit.clone().negate(), dir).normalize(),
+            zweit.clone().negate()));
         this._batchAdd(this._meshGeometry("fit:" + (klammer ? "clip2" : "clamp2"), echt), mat,
           new THREE.Matrix4().compose(new THREE.Vector3(c.x, c.y, c.z), qM, ONE),
           "clamp", c.id, this.pickClamps);

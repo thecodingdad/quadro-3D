@@ -66,6 +66,9 @@ const MATERIALS = [
 // schwarze Platten gibt es dort nicht, sie fallen auf das schwarze Material des
 // ersten Satzes zurueck.
 const TUBE_MAT = { black: 1, red: 2, green: 3, blue: 4, yellow: 5 };
+
+// Teile, die es nur in Schwarz gibt -- ihre Farbe steht nicht zur Wahl.
+const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2"]);
 const PANEL_MAT = { red: 6, green: 7, blue: 8, yellow: 9, black: 1, white: 14 };
 // Lochplatten: dieselbe Farbe, eigene Materialnummer -- daran erkennen wir sie
 // beim Einlesen wieder (siehe MATERIALS). Weiss hat keine Lochplatte.
@@ -156,6 +159,20 @@ function quatFromX(dir) {
   const axis = cross([1, 0, 0], d);
   const s = Math.sqrt((1 + c) * 2);
   return [s / 2, axis[0] / s, axis[1] / s, axis[2] / s];
+}
+
+/**
+ * Drehung einer Klemme: die lokale +X-Achse laeuft mit dem gehaltenen Rohr, die
+ * Richtung zum zweiten Loch liegt bei der Rohrklammer auf der lokalen +Y-, beim
+ * Doppelrohrverbinder auf der lokalen -Z-Achse.
+ */
+function clampQuat(dir, off, clip) {
+  const ex = norm(dir);
+  let o = norm(off);
+  const p = dot(o, ex);
+  o = norm([o[0] - ex[0] * p, o[1] - ex[1] * p, o[2] - ex[2] * p]);
+  return clip ? quatFromAxes(ex, o, cross(ex, o))
+    : quatFromAxes(ex, cross([-o[0], -o[1], -o[2]], ex), [-o[0], -o[1], -o[2]]);
 }
 
 /**
@@ -347,6 +364,16 @@ export function buildQDF(model) {
       const l = toLocal(t.bow && t.bowCenter ? bowStubDir(n, other, t.bowCenter) : dirOf(n, other));
       for (const [bit, v] of ARM_BITS) if (dot(l, v) > 0.9) mask |= bit;
     }
+    // Ein offenes Verbinderende erzwingt seinen Stutzen: in allen 67 Vorkommen
+    // des Bestands, in denen es auf einer Kupplung sitzt, steht dessen Bit auch
+    // in deren Maske. Ohne diese Zeile faenge die Herstellersoftware den Stutzen
+    // beim naechsten Laden nicht wieder ein.
+    for (const f of (model.fittings ? model.fittings.values() : [])) {
+      if (f.kind !== "open-connector2" || !f.quat) continue;
+      if (Math.hypot(f.x - n.x, f.y - n.y, f.z - n.z) > 2) continue;
+      const l = toLocal(rotateByQuat([f.quat[3], f.quat[0], f.quat[1], f.quat[2]], [1, 0, 0]));
+      for (const [bit, v] of ARM_BITS) if (dot(l, v) > 0.9) mask |= bit;
+    }
     // Ein Adapter-Koerper mit eigener Kupplung ist in der Datei eine gewoehnliche
     // connector3 -- die Winkelkupplung steckt an der Ecke, nicht hier.
     // c45file: die Datei hatte hier eine Winkelkupplung, auch wenn wir daraus
@@ -516,7 +543,14 @@ export function buildQDF(model) {
     // Doppelrohrverbinder und Rohrklammer sind zwei Elemente; die lokale
     // +X-Achse ist die Richtung des umschlossenen Rohrs.
     const kind = c.connectorId === "tube_clamp" ? "clip2" : "clamp2";
-    const q = c.dir ? encodeQuat(quatFromX(c.dir)) : IDENTITY;
+    // Der Punkt liegt im Loch des gehaltenen Rohrs. Wohin das ZWEITE Loch
+    // zeigt, steckt allein in der Drehung: beim Doppelrohrverbinder liegt es in
+    // lokal -Z, bei der Rohrklammer in lokal +Y (an den abgegriffenen Modellen
+    // gemessen). Ohne Versatz -- eine Klemme ohne zweites Rohr -- bleibt es bei
+    // der kuerzesten Drehung auf die Rohrachse.
+    const q = c.dir
+      ? encodeQuat(c.off ? clampQuat(c.dir, c.off, kind === "clip2") : quatFromX(c.dir))
+      : IDENTITY;
     lines.push(`${kind}{${TUBE_MAT.red}, ${tuple(q, c.x, c.y, c.z)}, 1, 0, 0}`);
     stats.clamps++;
   }
@@ -533,7 +567,10 @@ export function buildQDF(model) {
     // Ohne Farbe: Material 0 wie in der Datei (so stehen alle 50 Dach-Zeilen
     // des Bestands dort). CONNECTOR_MAT waere schwarz und faerbte das Teil beim
     // naechsten Laden ein.
-    const mat = f.color ? (stoff ? panelMat(f.color) : tubeMat(f.color)) : 0;
+    // Radlager und Schwimmrad gibt es nur schwarz -- so stehen sie auch in den
+    // Herstellerdateien (Material 1, 125 bzw. 76 Vorkommen).
+    const mat = BLACK_FITTINGS.has(f.kind) ? TUBE_MAT.black
+      : f.color ? (stoff ? panelMat(f.color) : tubeMat(f.color)) : 0;
     // Der Spielsack wird an dem Rohr gespeichert, an dem er haengt -- unsere
     // Mitte liegt 20 cm weiter in der lokalen +Z-Richtung, also zurueckrechnen.
     let fx = f.x, fy = f.y, fz = f.z;

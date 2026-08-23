@@ -11,8 +11,10 @@ import { POOL_KINDS } from "./model.js";
 // des Adapter-Koerpers (c45body).
 // Anbauteile, die einen ARM der Kupplung belegen -- sie stecken auf einem
 // Stutzen, genau wie ein Rohr, und gehoeren deshalb in die Armzahl. Die
-// Laufrolle sitzt auf ihrem Adapter und zaehlt nicht doppelt.
-const ARM_FITTINGS = new Set(["bearing2", "adapter2", "steering-lock2"]);
+// Laufrolle sitzt auf ihrem Adapter und zaehlt nicht doppelt. Das offene
+// Verbinderende ist genau dafuer da: es erzwingt den Stutzen, den ein freier
+// Arm sonst weder bekommt noch kostet.
+const ARM_FITTINGS = new Set(["bearing2", "adapter2", "steering-lock2", "open-connector2"]);
 
 // Naechste Achsenrichtung zu einem Vektor.
 function cardinalOf(dx, dy, dz) {
@@ -556,9 +558,9 @@ export function computeBOM(model) {
     if (n.unused) continue;   // steht in der Datei, haelt aber nichts
     const types = connectorsForNode(model, n);
     if (types.length === 0) {
-      // Radkappe und offener Anschluss schliessen das Rohrende ab -- es ist
-      // dann nicht mehr offen. Die Kupplung selbst zaehlt weiter (nur die
-      // Radkappe ersetzt sie, das steht in connectorsForNode).
+      // Radkappe und Rohrkappe schliessen das Rohrende ab -- es ist dann nicht
+      // mehr offen. Die Kupplung selbst zaehlt weiter (nur die Radkappe ersetzt
+      // sie, das steht in connectorsForNode).
       const zu = model.hasEndPiece && model.hasEndPiece(n);
       if (model.degree(n.id) >= 1 && !zu) openEnds++;
       continue;
