@@ -148,11 +148,11 @@ const ARM_FITTINGS = new Set(["adapter2", "bearing2", "steering-lock2", "open-co
 // Die Werte sind die Gegenstuecke zu --bg/--line in style.css.
 const BG_LIGHT = 0xeef1f5;
 const BG_DARK = 0x171b21;
-// Bodenraster: Kantenlaenge und Zellweite. 1280 cm sind 32 Rasterfelder --
-// das urspruengliche 800er Raster plus sechs Felder auf jeder Seite, damit auch
-// breitere Aufbauten noch darauf stehen. Es bleibt innerhalb der Grasflaeche
-// (1600 cm), sonst schwebte das Raster ueber deren Rand hinaus.
-const GRID_SIZE = 1280;
+// Bodenraster: Kantenlaenge und Zellweite. 1040 cm sind 52 Zellen je Achse --
+// das urspruengliche 800er Raster plus sechs Zellen auf jeder Seite, damit auch
+// breitere Aufbauten noch darauf stehen. Es bleibt deutlich innerhalb der
+// Grasflaeche, sonst schwebte das Raster ueber deren Rand hinaus.
+const GRID_SIZE = 1040;
 const GRID_CELL = 20;    // cm je Linie -- zwei Linien je Rasterfeld
 
 // Die Wiese um das Raster herum. Sie muss deutlich groesser sein als das
@@ -160,7 +160,7 @@ const GRID_CELL = 20;    // cm je Linie -- zwei Linien je Rasterfeld
 // besten so weit draussen, dass er bei einem eingepassten Modell gar nicht ins
 // Bild kommt. Baeume und Buesche stehen im Ring dahinter -- ausserhalb des
 // Rasters, damit sie nicht in ein grosses Modell hineinragen.
-const GROUND_AREA = 3200;                     // Kantenlaenge der Wiese, cm
+const GROUND_AREA = 2600;                     // Kantenlaenge der Wiese, cm
 const GRASS_TILE = 25;                        // cm je Graskachel (Halmgroesse)
 const TREE_RING = [GRID_SIZE / 2 + 120, GROUND_AREA / 2 - 120];
 const BUSH_RING = [GRID_SIZE / 2 + 60, GROUND_AREA / 2 - 100];
@@ -4494,10 +4494,10 @@ export class SceneManager {
     let seed = 137;
     const rng = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0x100000000; };
 
-    // Mehr Baeume als frueher: der Ring ist mit der Wiese gewachsen, bei 60
-    // Stueck stuenden sie vereinzelt in der Landschaft.
+    // Die Zahl richtet sich nach dem Ring: er ist groesser als die frueheren
+    // 620-780 cm, bei 60 Stueck stuenden sie vereinzelt in der Landschaft.
     const rand = GROUND_AREA / 2 - 10;
-    for (let i = 0; i < 160; i++) {
+    for (let i = 0; i < 110; i++) {
       const r = TREE_RING[0] + rng() * (TREE_RING[1] - TREE_RING[0]);
       const θ = rng() * Math.PI * 2;
       const tx = Math.cos(θ) * r, tz = Math.sin(θ) * r;
@@ -4544,7 +4544,7 @@ export class SceneManager {
     let seed = 138;
     const rng = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0x100000000; };
 
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 60; i++) {
       const r = BUSH_RING[0] + rng() * (BUSH_RING[1] - BUSH_RING[0]);
       const θ = rng() * Math.PI * 2;
       const tx = Math.cos(θ) * r, tz = Math.sin(θ) * r;
