@@ -30,11 +30,24 @@ export const QUALITY_LEVELS = ["low", "medium", "high"];
 // steht auf "low" eine andere Kupplung als daneben in der Anleitung. Die Stufe
 // steuert weiter alles, was wir selbst zeichnen -- Rohre, Platten, Schatten,
 // Kantenglättung -- nur eben nicht mehr die Form der abgegriffenen Teile.
+//
+// Kantenglaettung: `antialias` schaltet die des Browsers (MSAA) ein -- die
+// kennt nur an oder aus. Eine STAERKERE gibt es nur ueber mehr Bildpunkte:
+// `ss` rechnet das Bild um diesen Faktor groesser und laesst die Grafikkarte
+// es beim Anzeigen wieder verkleinern (Supersampling). 1,5 bedeutet gut die
+// doppelte Punktzahl -- das glaettet auch die groben Kanten der abgegriffenen
+// Modelle, kostet aber entsprechend. Ein Nachbearbeitungs-Schritt (FXAA/SMAA)
+// waere die dritte Moeglichkeit; der braeuchte zusaetzliche Dateien aus dem
+// three.js-Beispielordner, und die App kommt ohne aus.
 const QUALITY = {
-  low:    { conn: null,      tube: 8,  bow: 8,  notch: 0,  shadow: 0,    antialias: false, meshes: true },
-  medium: { conn: [16, 10],  tube: 16, bow: 14, notch: 6,  shadow: 1024, antialias: true,  meshes: true },
-  high:   { conn: [48, 32],  tube: 44, bow: 32, notch: 16, shadow: 2048, antialias: true,  meshes: true },
+  low:    { conn: null,      tube: 8,  bow: 8,  notch: 0,  shadow: 0,    antialias: false, ss: 1,   meshes: true },
+  medium: { conn: [16, 10],  tube: 16, bow: 14, notch: 6,  shadow: 1024, antialias: true,  ss: 1,   meshes: true },
+  high:   { conn: [48, 32],  tube: 44, bow: 32, notch: 16, shadow: 2048, antialias: true,  ss: 1.5, meshes: true },
 };
+
+// So viele Bildpunkte je CSS-Punkt hoechstens -- auf einem Telefon mit dreifach
+// feinem Bildschirm waere das Bild sonst neunmal so gross wie noetig.
+const MAX_PIXEL_RATIO = 2.5;
 const DEFAULT_QUALITY = "medium";
 
 // Hervorhebung (Cursor-Auswahl und Bestandsliste): immer dasselbe Lila,
@@ -545,6 +558,12 @@ export class SceneManager {
     }
   }
 
+  /** Bildpunkte je CSS-Punkt: Geraet mal Supersampling der Qualitaetsstufe. */
+  _pixelRatio() {
+    const geraet = window.devicePixelRatio || 1;
+    return Math.min(MAX_PIXEL_RATIO, geraet * (this._q().ss || 1));
+  }
+
   onResize() {
     this._needsRender = true;
     const w = this.container.clientWidth, h = this.container.clientHeight;
@@ -680,7 +699,7 @@ export class SceneManager {
   _makeRenderer(antialias) {
     const old = this.renderer;
     this.renderer = new THREE.WebGLRenderer({ antialias: !!antialias });
-    this.renderer.setPixelRatio(window.devicePixelRatio || 1);
+    this.renderer.setPixelRatio(this._pixelRatio());
     // updateStyle = false: die CSS-Groesse des Canvas kommt aus dem Stylesheet
     // (100 % des Containers), nicht als feste px-Werte -> siehe onResize().
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight, false);
@@ -747,6 +766,14 @@ export class SceneManager {
     // Kantenglaettung nur ueber einen neuen Renderer moeglich. Danach haengen
     // OrbitControls und die Zeiger-Listener am alten Canvas -> neu binden.
     if (QUALITY[level].antialias !== QUALITY[prev].antialias) this._replaceRenderer();
+    else if (QUALITY[level].ss !== QUALITY[prev].ss) {
+      // Nur die Punktdichte aendert sich -- dafuer braucht es keinen neuen
+      // Renderer, aber ein setSize danach, sonst behaelt der Puffer seine alte
+      // Groesse und das Bild wird verzerrt.
+      this.renderer.setPixelRatio(this._pixelRatio());
+      this.renderer.setSize(this.container.clientWidth, this.container.clientHeight, false);
+      this._needsRender = true;
+    }
     return true;
   }
 

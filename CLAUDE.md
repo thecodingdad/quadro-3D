@@ -385,6 +385,14 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     `QDF-FORMAT.md` §5.3).
   Geladen wird erst, wenn ein Modell die Teile enthält, und danach zeichnet `onMeshesReady()`
   (in `main.js` auf `builder.refresh()`) einmal neu.
+- **Kantenglättung je Qualitätsstufe:** `antialias` schaltet die MSAA des Browsers – die kennt nur
+  an oder aus. Stärker wird es nur über mehr Bildpunkte, dafür steht `ss` in der `QUALITY`-Tabelle:
+  das Bild wird um diesen Faktor größer gerechnet und beim Anzeigen verkleinert (Supersampling).
+  Heute: niedrig ohne MSAA, mittel mit, hoch mit MSAA **und** `ss: 1.5` – gut die doppelte
+  Punktzahl, was auch die groben Kanten der abgegriffenen Modelle glättet. `MAX_PIXEL_RATIO`
+  deckelt das Ganze, sonst rechnete ein Telefon mit dreifach feinem Bildschirm neunfach.
+  Ein Wechsel, der nur `ss` ändert, braucht **keinen** neuen Renderer – `setPixelRatio` plus
+  `setSize`, sonst behält der Puffer seine alte Größe und das Bild verzerrt.
 - **Bau-Richtungen folgen der Kupplung, nicht der Welt.** `_armDirsOf()` in `builder.js` nimmt
   die sechs Würfelachsen aus `node.quat` – damit baut eine um 22,5° gedrehte Kupplung ihr Rohr
   auch um 22,5° gedreht, und `extend()` gibt die Lage an den neuen Knoten weiter, sonst knickte
