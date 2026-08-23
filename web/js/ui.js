@@ -387,15 +387,57 @@ export function initUI({ scene, model, builder }) {
   // und neu lud, bekam den Stand aus der letzten Modellaenderung zurueck oder,
   // wenn es keine gab, die Standardansicht.
   const CAMERA_KEY = "quadro.camera.v1";
+  // Die Sitzung liegt EINMAL in der Datenbank -- mehrere BROWSER-Fenster teilen
+  // sie sich und überschreiben darin gegenseitig ihre Ansicht. Die Kamera
+  // gehört aber zum Fenster, nicht zum Entwurf: sie liegt deshalb zusätzlich im
+  // `sessionStorage`, den jedes Fenster für sich hat und der einen Reload
+  // übersteht. Beim Start gewinnt dieser Stand -- so kommt jedes Fenster in
+  // seiner eigenen Ansicht zurück.
+  const CAMVIEW_KEY = "quadro.camview.v1";
+  function fensterKameras() {
+    try { return JSON.parse(sessionStorage.getItem(CAMVIEW_KEY)) || {}; } catch { return {}; }
+  }
+  function merkeFensterKamera(tabId, st) {
+    if (!tabId || !st) return;
+    const alle = fensterKameras();
+    alle[tabId] = st;
+    // Geschlossene Tabs mitnehmen wäre Ballast -- nur die offenen bleiben.
+    const offen = new Set(tabs.map((x) => x.tabId));
+    for (const id of Object.keys(alle)) if (id !== tabId && !offen.has(id)) delete alle[id];
+    try { sessionStorage.setItem(CAMVIEW_KEY, JSON.stringify(alle)); } catch { /* voll */ }
+  }
+
   let camSaveTimer = null;
   scene.onCameraChange = () => {
     clearTimeout(camSaveTimer);
     camSaveTimer = setTimeout(() => {
       const st = scene.cameraState();
-      if (st) localStorage.setItem(CAMERA_KEY, JSON.stringify(st));
+      if (st) {
+        localStorage.setItem(CAMERA_KEY, JSON.stringify(st));
+        merkeFensterKamera(activeTabId, st);
+      }
       scheduleSessionSave();
     }, 400);
   };
+
+  // Beim Verstecken oder Verlassen der Seite SOFORT sichern. Die Entprellung
+  // (400 ms Kamera, 600 ms Sitzung) verschluckte den letzten Stand sonst: wer
+  // gleich nach dem Drehen neu lud, bekam die vorige Ansicht zurück.
+  function sichereSofort() {
+    clearTimeout(camSaveTimer);
+    clearTimeout(sessionTimer);
+    const st = scene.cameraState();
+    if (st) {
+      try { localStorage.setItem(CAMERA_KEY, JSON.stringify(st)); } catch { /* voll */ }
+      merkeFensterKamera(activeTabId, st);
+    }
+    if (builder.pasting) return;   // wie scheduleSessionSave: Vorschau nicht sichern
+    captureActiveTab();
+    const lean = tabs.map(({ savedJson, baseJson, ...rest }) => rest);
+    docs.saveSession({ tabs: lean, activeTabId }).catch(() => { /* beim Schliessen egal */ });
+  }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) sichereSofort(); });
+  window.addEventListener("pagehide", sichereSofort);
 
   // --- Kamera-Projektion -------------------------------------------------
   // Orthogonal = keine Fluchtpunkte: parallele Rohre bleiben parallel, gut zum
@@ -3307,6 +3349,8 @@ export function initUI({ scene, model, builder }) {
     // der Sitzung oder in der Datei.
     tab.model = builder.pasteSnapshot() || model.toJSON();
     tab.view = viewState();
+    // Auch beim Tab-Wechsel: die Ansicht gehört zu diesem Fenster.
+    merkeFensterKamera(tab.tabId, tab.view.camera);
     return tab;
   }
 
@@ -3652,6 +3696,10 @@ export function initUI({ scene, model, builder }) {
       // mit; dann gilt der zuletzt gesehene aus localStorage, statt gleich auf
       // die Standardansicht zurueckzufallen.
       const view = { ...(tab.view || {}) };
+      // Die Ansicht DIESES Fensters hat Vorrang: die Sitzung kann inzwischen von
+      // einem anderen Fenster überschrieben worden sein.
+      const fenster = fensterKameras();
+      if (fenster[tab.tabId]) view.camera = fenster[tab.tabId];
       if (!view.camera) {
         try { view.camera = JSON.parse(localStorage.getItem(CAMERA_KEY)) || null; } catch { /* egal */ }
       }

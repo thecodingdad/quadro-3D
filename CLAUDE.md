@@ -290,6 +290,13 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
 
 ## Fallstricke
 
+- **Die Kamera gehört zum FENSTER, nicht zur Sitzung.** Die Sitzung (offene Tabs samt Ansicht)
+  liegt einmal in der Datenbank – mehrere Browser-Fenster überschreiben sie gegenseitig, und beim
+  Neuladen bekam man die Ansicht eines anderen Fensters. Der Kamerastand liegt deshalb zusätzlich
+  im `sessionStorage` (`quadro.camview.v1`, je Tab-Kennung), den jedes Fenster für sich hat; beim
+  Start gewinnt er. `quadro.camera.v1` in `localStorage` bleibt als Rückfall für ein Fenster ohne
+  eigenen Stand. Gesichert wird entprellt **und** sofort bei `visibilitychange`/`pagehide` –
+  sonst verschluckten die 400/600 ms den letzten Stand.
 - `catalog.js` lädt `../data/parts.json` relativ – die App muss unter `/web/` ausgeliefert werden.
 - **Beim Start wird gewartet, nicht ersetzt:** solange eine gebrauchte Modelldatei unterwegs ist
   (`MESH_FIELDS`-Feld auf `null`), zeichnet `renderModel` das Modell **gar nicht** und lässt einen
