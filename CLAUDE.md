@@ -287,6 +287,16 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   die Szene damit statt aus Primitiven – auf **allen** Qualitätsstufen, damit ein Teil überall
   gleich aussieht. Vier Dateien, je eine Gruppe: `connectors`, `tubes`, `slides`, `fittings`.
   Was dabei zählt:
+  - **Zwei Auflösungen je Gruppe.** Neben `foo.json` steht `foo-fine.json` aus den
+    `*_fine.obj`-Abgriffen; die Stufe **„hoch"** (`fine: true` in `QUALITY`) legt sie über die
+    grobe Fassung. Die feine Datei führt **nur**, wovon es einen feinen Abgriff gibt – für Dach,
+    Integralrutsche und die Platten bleibt es beim groben Modell, und fehlt die Datei ganz, fällt
+    `meshes.js` still darauf zurück. Beim Stufenwechsel wirft `_dropMeshes()` die Felder **und**
+    die daraus gebauten Geometrien weg; beide Auflösungen gleichzeitig zu halten wäre bei den
+    Rutschen der größte Posten der Szene. Wer dort ein Feld ergänzt, trägt es in `MESH_FIELDS`
+    ein, sonst bleibt es beim Wechsel auf der alten Auflösung stehen. Die feinen Dateien stehen
+    **nicht** im Vorrat des Service Workers (dreifache Größe für eine Stufe, die die meisten nie
+    wählen) – sie landen über den Fetch-Zweig im Cache.
   - **Die Armmaske kommt aus den Rohren, die wirklich anstecken** (`tubeDirsAt`), nicht aus
     `variant2` der Datei. Am Bestand gemessen führt `variant2` an den allermeisten Knoten mehr
     Arme als Rohre – gezeichnet stünden dort überall Stutzen ins Leere.

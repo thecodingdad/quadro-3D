@@ -39,10 +39,21 @@ export const QUALITY_LEVELS = ["low", "medium", "high"];
 // Modelle, kostet aber entsprechend. Ein Nachbearbeitungs-Schritt (FXAA/SMAA)
 // waere die dritte Moeglichkeit; der braeuchte zusaetzliche Dateien aus dem
 // three.js-Beispielordner, und die App kommt ohne aus.
+//
+// fine = die hochaufloesende Fassung der abgegriffenen Modelle laden
+// (`data/models/*-fine.json`, rund doppelt so viele Dreiecke). Nur auf "hoch":
+// die Dateien sind zusammen etwa dreimal so gross wie die groben und werden
+// erst geholt, wenn die Stufe gewaehlt ist.
 const QUALITY = {
-  low:    { conn: null,      tube: 8,  bow: 8,  notch: 0,  shadow: 0,    antialias: false, ss: 1,   meshes: true },
-  medium: { conn: [16, 10],  tube: 16, bow: 14, notch: 6,  shadow: 1024, antialias: true,  ss: 1,   meshes: true },
-  high:   { conn: [48, 32],  tube: 44, bow: 32, notch: 16, shadow: 2048, antialias: true,  ss: 1.5, meshes: true },
+  low:    { conn: null,      tube: 8,  bow: 8,  notch: 0,  shadow: 0,    antialias: false, ss: 1,   meshes: true,  fine: false },
+  medium: { conn: [16, 10],  tube: 16, bow: 14, notch: 6,  shadow: 1024, antialias: true,  ss: 1,   meshes: true,  fine: false },
+  high:   { conn: [48, 32],  tube: 44, bow: 32, notch: 16, shadow: 2048, antialias: true,  ss: 1.5, meshes: true,  fine: true },
+};
+
+// Wo die geladenen Modelle liegen: Satz -> Feld der Szene.
+const MESH_FIELDS = {
+  connectors: "_connMeshes", slides: "_slideMeshes", tubes: "_tubeMeshes",
+  fittings: "_fitMeshes", surfaces: "_surfMeshes",
 };
 
 // So viele Bildpunkte je CSS-Punkt hoechstens -- auf einem Telefon mit dreifach
@@ -762,6 +773,9 @@ export class SceneManager {
       for (const g of this._capGeos.values()) { this._keepGeos.delete(g); g.dispose(); }
       this._capGeos.clear();
     }
+    // Grobe gegen feine Modelle tauschen -- die Dateien holt meshes.js beim
+    // naechsten Bild nach, bis dahin steht das Teil in der anderen Aufloesung.
+    if (QUALITY[level].fine !== QUALITY[prev].fine) this._dropMeshes();
     this._applyShadowQuality();
     // Kantenglaettung nur ueber einen neuen Renderer moeglich. Danach haengen
     // OrbitControls und die Zeiger-Listener am alten Canvas -> neu binden.
@@ -871,20 +885,42 @@ export class SceneManager {
    * Formen; schlaegt sie fehl, bleibt es dabei.
    */
   _ensureMeshes(which) {
-    const feld = { slides: "_slideMeshes", tubes: "_tubeMeshes", fittings: "_fitMeshes",
-      surfaces: "_surfMeshes" }[which] || "_connMeshes";
+    const feld = MESH_FIELDS[which] || "_connMeshes";
     if (this[feld] !== undefined) return this[feld];
+    const fein = !!this._q().fine;
     this[feld] = null;   // laeuft -> nicht noch einmal anfordern
-    const laden = which === "slides" ? loadSlideMeshes()
-      : which === "tubes" ? loadTubeMeshes()
-      : which === "fittings" ? loadFittingMeshes()
-      : which === "surfaces" ? loadSurfaceMeshes() : loadConnectorMeshes();
+    const laden = which === "slides" ? loadSlideMeshes(fein)
+      : which === "tubes" ? loadTubeMeshes(fein)
+      : which === "fittings" ? loadFittingMeshes(fein)
+      : which === "surfaces" ? loadSurfaceMeshes(fein) : loadConnectorMeshes(fein);
     laden.then((rec) => {
-      if (!rec) return;
+      // Hat die Stufe waehrend des Ladens gewechselt, gehoert die Antwort zur
+      // falschen Aufloesung. Sie faellt weg; das Feld steht dank _dropMeshes()
+      // schon wieder auf `undefined` und wird gleich neu angefordert.
+      if (!rec || !!this._q().fine !== fein) return;
       this[feld] = rec;
       this.onMeshesReady();
     });
     return null;
+  }
+
+  /**
+   * Geladene Modelle wegwerfen -- beim Wechsel zwischen grober und feiner
+   * Fassung. Die Felder gehen auf `undefined` zurueck, damit das naechste Bild
+   * sie neu anfordert (die JSON-Dateien selbst haelt meshes.js fest, es geht
+   * also kein Netzverkehr verloren), und die daraus gebauten Geometrien geben
+   * ihren Grafikspeicher frei: beide Aufloesungen gleichzeitig zu halten waere
+   * bei den Rutschen der groesste Posten der ganzen Szene.
+   */
+  _dropMeshes() {
+    for (const feld of Object.values(MESH_FIELDS)) this[feld] = undefined;
+    if (!this._fitGeos) return;
+    for (const [key, geo] of [...this._fitGeos]) {
+      if (!key.startsWith("mesh:")) continue;
+      this._fitGeos.delete(key);
+      this._keepGeos.delete(geo);
+      geo.dispose();
+    }
   }
 
   /**

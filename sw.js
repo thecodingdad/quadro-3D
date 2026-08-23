@@ -19,6 +19,10 @@ const SCHALE = [
   "icons/icon-192.png",
   "icons/icon-512.png",
   "data/parts.json",
+  // Nur die groben Modelle. Die hochaufloesenden `*-fine.json` (Stufe "hoch")
+  // sind zusammen rund dreimal so gross und wuerden die Installation belasten,
+  // obwohl die meisten sie nie brauchen -- sie landen ueber den Fetch-Zweig
+  // unten im Cache, sobald die Stufe einmal gewaehlt war.
   "data/models/connectors.json",
   "data/models/fittings.json",
   "data/models/slides.json",

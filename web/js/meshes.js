@@ -11,6 +11,7 @@ const POS_TO_CM = 1 / 100;
 const NRM_SCALE = 1 / 1000;
 
 const stores = {};   // Dateiname -> Promise auf { name -> record }
+const overlays = {}; // dasselbe, aber grob + fein zusammengelegt
 
 /**
  * Ein Modell: `pos`/`nrm` als Float32Array (Position in cm), `idx` als
@@ -45,30 +46,52 @@ function load(file) {
   return stores[file];
 }
 
+/**
+ * Die feine Fassung ÜBER die grobe legen. `*-fine.json` führt nur die Modelle,
+ * von denen es einen hochauflösenden Abgriff gibt (Dach, Integralrutsche und
+ * die Platten stehen nur einfach da) -- der Rest kommt weiter aus der groben
+ * Datei. Fehlt die feine Datei ganz oder kommt sie nicht an, bleibt es
+ * ebenfalls bei der groben: eine Stufe gröber ist besser als kein Teil.
+ *
+ * Beide Dateien werden geholt, das ist der Preis dieser Aufteilung. Dafür
+ * liegt kein Modell doppelt im Repo, und der Rückfall kostet keine Zeile.
+ */
+function loadLevel(file, fine) {
+  if (!fine) return load(file);
+  if (!overlays[file]) {
+    overlays[file] = Promise.all([load(file), load(file.replace(".json", "-fine.json"))])
+      .then(([grob, fein]) => (fein ? Object.assign({}, grob || {}, fein) : grob));
+  }
+  return overlays[file];
+}
+
+// Alle Lader nehmen `fine`: auf der Qualitätsstufe "hoch" die hochauflösenden
+// Modelle, sonst die groben.
+
 /** Kupplungen, nach Katalog-Kennung ("straight", "t", "6way" ...). */
-export function loadConnectorMeshes() {
-  return load("connectors.json");
+export function loadConnectorMeshes(fine) {
+  return loadLevel("connectors.json", fine);
 }
 
 /** Rohre, nach QDF-Elementart -- bisher nur das Bogenrohr ("round-tube2"). */
-export function loadTubeMeshes() {
-  return load("tubes.json");
+export function loadTubeMeshes(fine) {
+  return loadLevel("tubes.json", fine);
 }
 
 /** Rutschen und Dächer, nach QDF-Elementart ("slide2", "roof2" ...). */
-export function loadSlideMeshes() {
-  return load("slides.json");
+export function loadSlideMeshes(fine) {
+  return loadLevel("slides.json", fine);
 }
 
 /** Anbauteile: Räder, Klemmen, Tücher, Bällebad ... nach QDF-Elementart. */
-export function loadFittingMeshes() {
-  return load("fittings.json");
+export function loadFittingMeshes(fine) {
+  return loadLevel("fittings.json", fine);
 }
 
 /**
  * Flächen (Platten, Tücher). Der Schlüssel führt das Maßpaar aus der QDF-Zeile
  * mit: `panel2_350x150` = Feld 3 (lokale Y-Achse) x Feld 5 (lokale X-Achse).
  */
-export function loadSurfaceMeshes() {
-  return load("surfaces.json");
+export function loadSurfaceMeshes(fine) {
+  return loadLevel("surfaces.json", fine);
 }

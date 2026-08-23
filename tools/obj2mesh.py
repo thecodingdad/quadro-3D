@@ -11,6 +11,13 @@ Quelle ist der Ordner mit den OBJs (voreingestellt `tmp/extracted/models`, wo
 der Mitschnitt sie ablegt -- der Ordner selbst gehört nicht ins Repo). Erzeugt
 werden `data/models/connectors.json` und `data/models/slides.json`.
 
+Zu jedem Satz entsteht ausserdem eine `*-fine.json` mit den hochauflösenden
+Fassungen: liegt neben `foo.obj` auch ein `foo_fine.obj`, kommt es dort hinein.
+Die Datei führt NUR diese Modelle -- die Stufe "hoch" legt sie über die groben,
+für alles ohne feine Fassung bleibt es beim groben Modell. Ist keins vorhanden,
+wird trotzdem eine leere Datei geschrieben, damit der Editor nicht ins Leere
+greift.
+
 Format je Modell -- ganze Zahlen, damit die Datei kurz bleibt:
 
     { "mask": 3, "pos": [...], "nrm": [...], "idx": [...] }
@@ -144,6 +151,9 @@ SURFACES = {
 POS_SCALE = 10      # mm -> 0,1 mm
 NRM_SCALE = 1000
 
+# Dateizusatz der hochauflösenden Fassung: `slide2.obj` -> `slide2_fine.obj`.
+FINE = "_fine"
+
 
 def read_obj(path):
     """OBJ einlesen: Ecken, Normalen und Dreiecke (Vielecke werden gefächert)."""
@@ -218,28 +228,40 @@ def write(name, data):
     print("%-24s %2d Modelle, %6d Dreiecke, %7.1f KB" % (name, len(data), total, size))
 
 
+def convert_set(source, table):
+    """Einen Satz umwandeln: liefert die grobe und die feine Fassung sowie die
+    Kennungen ohne feine Datei. Ein Tabelleneintrag ist entweder der Dateiname
+    oder ein Paar (Dateiname, Armmaske)."""
+    grob, fein, ohne = {}, {}, []
+    for key, eintrag in table.items():
+        rel, mask = eintrag if isinstance(eintrag, tuple) else (eintrag, None)
+        stamm, ext = os.path.splitext(rel)
+        for ziel, pfad in ((grob, rel), (fein, stamm + FINE + ext)):
+            voll = os.path.join(source, pfad)
+            if not os.path.isfile(voll):
+                if ziel is fein:
+                    ohne.append(key)
+                    continue
+                raise SystemExit("Datei fehlt: %s" % voll)
+            mesh = convert(voll)
+            if mask is not None:
+                mesh["mask"] = mask
+            ziel[key] = mesh
+    return grob, fein, ohne
+
+
 def main():
     source = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_SOURCE
     if not os.path.isdir(source):
         raise SystemExit("Quellordner fehlt: %s" % source)
 
-    connectors = {}
-    for key, (rel, mask) in CONNECTORS.items():
-        mesh = convert(os.path.join(source, rel))
-        mesh["mask"] = mask
-        connectors[key] = mesh
-    write("connectors.json", connectors)
-
-    write("tubes.json", {key: convert(os.path.join(source, rel)) for key, rel in TUBES.items()})
-
-    slides = {key: convert(os.path.join(source, rel)) for key, rel in SLIDES.items()}
-    write("slides.json", slides)
-
-    write("fittings.json",
-          {key: convert(os.path.join(source, rel)) for key, rel in FITTINGS.items()})
-
-    write("surfaces.json",
-          {key: convert(os.path.join(source, rel)) for key, rel in SURFACES.items()})
+    for name, table in (("connectors", CONNECTORS), ("tubes", TUBES), ("slides", SLIDES),
+                        ("fittings", FITTINGS), ("surfaces", SURFACES)):
+        grob, fein, ohne = convert_set(source, table)
+        write(name + ".json", grob)
+        write(name + "-fine.json", fein)
+        if ohne:
+            print("%-24s ohne feine Fassung: %s" % ("", ", ".join(sorted(ohne))))
 
 
 if __name__ == "__main__":
