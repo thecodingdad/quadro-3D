@@ -1087,9 +1087,18 @@ body.asm-sheet-on .status { bottom: calc(var(--asm-sheet-h, 0px) + 12px); }
 /* Waagerecht scrollbare Leisten (Tabs, Bauteil-Gruppe, linke Kopfzeile) zeigen
    am rechten Ende einen schmalen Schatten, solange dort noch etwas kommt --
    sonst schneidet der Bereich hart am Nachbarn (+-Knopf, Farbwahl) ab und man
-   sieht nicht, dass sich scrollen lohnt. Der Schatten liegt INNEN, damit er
-   nicht mitwandert; gesetzt wird die Klasse in ui.js. */
-.scroll-more { box-shadow: inset -12px 0 9px -9px var(--edge-shadow); }
+   sieht nicht, dass sich scrollen lohnt.
+   Ein Innenschatten am Bereich selbst taugt dafuer nicht: seine Kinder (Tabs,
+   Knoepfe) malen darueber, ein aktiver Tab verdeckte ihn ganz. Der Streifen ist
+   deshalb ein eigenes Element UEBER dem Bereich; ui.js legt es an, misst seine
+   Lage und blendet es ein. */
+.scroll-fade {
+  position: absolute;
+  width: 16px;
+  pointer-events: none;
+  z-index: 6;
+  background: linear-gradient(to right, transparent, var(--edge-shadow));
+}
 
 .tab-list {
   display: flex;

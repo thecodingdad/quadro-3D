@@ -232,12 +232,24 @@ export function initUI({ scene, model, builder }) {
   // +-Knopf bzw. die Farbwahl. Ohne Hinweis schneidet der Bereich dort hart ab.
   // Solange noch etwas nach rechts kommt, traegt er `.scroll-more`.
   function beobachteScrollrand(el) {
-    if (!el) return;
+    if (!el || !el.parentElement) return;
+    const eltern = el.parentElement;
+    if (getComputedStyle(eltern).position === "static") eltern.style.position = "relative";
+    const streifen = el.ownerDocument.createElement("div");
+    streifen.className = "scroll-fade";
+    streifen.hidden = true;
+    eltern.appendChild(streifen);
     let warte = false;
     const pruefen = () => {
       warte = false;
       const mehr = el.scrollWidth - el.clientWidth - el.scrollLeft > 1;
-      el.classList.toggle("scroll-more", mehr);
+      streifen.hidden = !mehr;
+      if (!mehr) return;
+      // Lage jedes Mal messen: die Leiste wandert beim Umbauen des Layouts.
+      const breite = streifen.offsetWidth || 16;
+      streifen.style.left = (el.offsetLeft + el.offsetWidth - breite) + "px";
+      streifen.style.top = el.offsetTop + "px";
+      streifen.style.height = el.offsetHeight + "px";
     };
     const anstossen = () => { if (!warte) { warte = true; requestAnimationFrame(pruefen); } };
     el.addEventListener("scroll", anstossen, { passive: true });
