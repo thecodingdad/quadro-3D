@@ -236,6 +236,19 @@ export function initUI({ scene, model, builder }) {
     update();
     renderAssembly();
   };
+  // Dasselbe beim Klick in den LEEREN Bereich einer Liste: nicht jeder greift
+  // dafür zur Zeichenfläche, und eine markierte Zeile ohne Weg zurück ist
+  // ärgerlich. Klicks auf Zeilen und Bedienelemente bleiben unberührt.
+  for (const panelId of ["panel-bom", "panel-assembly"]) {
+    const box = $(panelId);
+    if (!box) continue;
+    box.addEventListener("click", (e) => {
+      if (!builder.highlight) return;
+      if (e.target.closest(".bom-row, .asm-row, button, input, select, label, a")) return;
+      builder.setHighlight(null);
+      builder.onHighlightCleared();
+    });
+  }
   function updateUndoButton() {
     $("btn-undo").disabled = !builder.canUndo();
     $("btn-redo").disabled = !builder.canRedo();
