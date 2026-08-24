@@ -736,7 +736,9 @@ export class SceneManager {
     // updateStyle = false: die CSS-Groesse des Canvas kommt aus dem Stylesheet
     // (100 % des Containers), nicht als feste px-Werte -> siehe onResize().
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight, false);
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCFShadowMap ist seit r182 die weiche Variante -- PCFSoftShadowMap gilt
+    // dort als ueberholt.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // Die Schattenkarte wird NICHT pro Bild neu gerechnet: das waere ein zweiter
     // Durchgang ueber alle ~1850 Werfer, obwohl sich Licht und Modell selten
     // aendern. _shadowsDirty() stoesst sie gezielt an (Modell, Szene, Schnitt).

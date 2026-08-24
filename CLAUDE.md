@@ -266,6 +266,10 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   eingestellte Schrittweite fürs **Verschieben** (Pfeiltasten, Ziehen, Einfügen; 5/10/20/40/80 cm,
   Voreinstellung 20). Die beiden nicht vermischen: mit 80 cm als Drehachsen-Raster springt eine
   Auswahl beim Drehen quer durchs Bild.
+- **Three.js liegt gevendort in `web/vendor/three/` (r185) und besteht seit r185 aus ZWEI Dateien:**
+  `three.module.js` lädt `three.core.js` nach. Beim nächsten Update beide tauschen **und** beide im
+  Vorrat des Service Workers führen – fehlt die Core-Datei, startet die App ohne Netz nicht mehr.
+  `OrbitControls.js` gehört zur selben Version (es erbt seit r169 von `Controls` aus dem Kern).
 - **Neue UI-Texte:** immer in **beide** Dictionaries (`de` und `en`) in `i18n.js`, dann `t('key')`
   bzw. `data-i18n`/`data-i18n-title`/`data-i18n-placeholder`/`data-i18n-aria` im HTML. Nie Strings
   in `ui.js` hardcoden.

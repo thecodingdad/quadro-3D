@@ -31,6 +31,9 @@ const SCHALE = [
   "web/index.html",
   "web/css/style.css",
   "web/vendor/three/three.module.js",
+  // Seit r185 ist das Modul zweiteilig: three.module.js laedt three.core.js
+  // nach. Fehlt die Datei im Vorrat, startet die App ohne Netz nicht mehr.
+  "web/vendor/three/three.core.js",
   "web/vendor/three/OrbitControls.js",
   "web/js/main.js",
   "web/js/bom.js",
