@@ -647,6 +647,11 @@ export function computeBOM(model) {
   const fitMap = new Map();
   for (const f of (model.fittings ? model.fittings.values() : [])) {
     if (POOL_KINDS.has(f.kind)) continue;   // zaehlt oben als Poolfolie
+    // Das offene Verbinderende ist KEIN Bauteil: es sagt nur, dass an dieser
+    // Kupplung ein Stutzen gerechnet werden soll (siehe ARM_FITTINGS). Gekauft
+    // wird dafuer nichts -- es steht deshalb weder in der Stueckliste noch in
+    // der Aufbau-Liste.
+    if (f.kind === "open-connector2") continue;
     const def = partForFitting(f.kind, f.mask);
     const key = def ? def.id : f.kind;
     if (!fitMap.has(key)) fitMap.set(key, { def, kind: f.kind, count: 0 });

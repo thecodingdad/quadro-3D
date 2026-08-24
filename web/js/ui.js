@@ -1,7 +1,7 @@
 // Verkabelt die Bedienoberflaeche (Toolbar, Tastatur, Stueckliste, Bestand).
 
 import { buildableTubes, buildableCurvedTubes, buildablePanels, tubeColors, geometry, allTubes, allConnectors, panels, reinforcements, screws, slideKindName, partName, partForFitting, accessories, getPartById, poolLinerFor, getTube, getPanel } from "./catalog.js";
-import { PLACEABLE_FITTINGS, POOL_KINDS, HOLE_MASKS, ROTATABLE_FITTINGS } from "./model.js";
+import { PLACEABLE_FITTINGS, POOL_KINDS, HOLE_MASKS, ROTATABLE_FITTINGS, SLIDE_PARTS } from "./model.js";
 import { computeBOM, compareInventory, connectorsForNode } from "./bom.js";
 import { computeBuildPlan, BUILD_ORDERS } from "./buildplan.js";
 import { parseQDF } from "./qdfimport.js";
@@ -808,8 +808,11 @@ export function initUI({ scene, model, builder }) {
     };
     const key = m === "fitting" ? fittingHintKey(builder.fittingKind)
       // Der Auslauf haengt NUR an einem gesetzten Rutschenteil -- fuer ihn gibt
-      // es keine Feld-Ankerpunkte, also auch einen eigenen Hinweis.
+      // es keine Feld-Ankerpunkte, also auch einen eigenen Hinweis. Und was
+      // keine Kette fortsetzt (Integralrutsche, Dach), darf auch keine
+      // versprechen.
       : m === "slide" && builder.slideKind === "slide-end2" ? "status_slide_end"
+      : m === "slide" && !kettenTeil(builder.slideKind) ? "status_slide_solo"
       : (statusMap[m] || "status_add");
     setStatusHint(t(key));
     renderCurrentPart();
@@ -833,6 +836,11 @@ export function initUI({ scene, model, builder }) {
     "lattice2": "status_fitting_rail",
     "textil2": "status_fitting_rail",
   };
+  /** Setzt sich hinter dieses Rutschenteil eine Kette fort? */
+  function kettenTeil(kind) {
+    return !!(SLIDE_PARTS[kind] && SLIDE_PARTS[kind].chain);
+  }
+
   function fittingHintKey(kind) {
     if (FITTING_HINTS[kind]) return FITTING_HINTS[kind];
     if (HOLE_MASKS[kind]) return "status_fitting_hole";

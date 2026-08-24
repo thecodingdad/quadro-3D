@@ -1055,6 +1055,11 @@ export class Builder {
     // Ankerpunkte von Teilen, die frei auf einem Rohr sitzen -- sie wandern
     // unter dem Mauszeiger mit (siehe _trackTubeHandles).
     this._tubeHandles = new Map();
+    // Waehrend eine Zeile aus Stueckliste, Bestand oder Aufbau hervorgehoben
+    // ist, bleiben die gruenen Punkte weg: dort schaut man sich das Modell an,
+    // und die Punkte legen sich nur davor. Die Hervorhebungen der Platten- und
+    // Verstaerkungs-Ablaeufe gehoeren dagegen zum Setzen und bleiben.
+    if (this.highlight && !this.panelRail && !this.reinforceRail) return;
     // Im Platten-Modus gibt es keine Handles: dort klickt man zwei Rohre an.
     if (this.mode === "panel") return;
     if (this.mode === "slide") { this._buildSlideHandles(); return; }

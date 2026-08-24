@@ -283,6 +283,9 @@ export function computeBuildPlan(model, order = "y+") {
   // sitzen.
   const fittingsByLevel = levels.map(() => []);
   for (const f of (model.fittings ? model.fittings.values() : [])) {
+    // Das offene Verbinderende ist kein Bauteil, sondern ein Vermerk an der
+    // Kupplung -- im Aufbau gibt es dafuer nichts zu tun.
+    if (f.kind === "open-connector2") continue;
     fittingsByLevel[levelIndex(levels, coord(f))].push(f);
   }
   // Rutschen kommen dorthin, wo ihr EINSTIEG gebaut wird -- und eine Kette
