@@ -229,6 +229,12 @@ export function initUI({ scene, model, builder }) {
   builder.onHistoryChange = () => updateUndoButton();
   // Ein Klick ins Leere hebt die Hervorhebung im Bild auf -- dann darf auch in
   // Stückliste, Bestand und Aufbau keine Zeile mehr markiert stehen.
+  // Wechselt jemand von der Maus zum Finger (oder zurueck), gilt sofort der
+  // andere Hinweis. Beim Start entscheidet die Geraeteart, damit auf dem Telefon
+  // nicht erst der Maus-Hinweis steht.
+  if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) builder.inputType = "touch";
+  builder.onInputTypeChange = () => { if (builder.mode === "select") setMode(builder.mode); };
+
   builder.onHighlightCleared = () => {
     bomHighlightKey = null;
     invHighlightKey = null;
@@ -810,9 +816,10 @@ export function initUI({ scene, model, builder }) {
     syncDeleteButton();
     // Auf dem Touchscreen gibt es kein Strg/Shift -- dort gilt der Hinweis mit
     // dem Halten (siehe _fireLongPress im Builder).
-    const grob = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
     const statusMap = {
-      select: grob ? "status_select_touch" : "status_select",
+      // Am Finger gibt es kein Strg/Shift, an der Maus kein Halten -- der
+      // Hinweis richtet sich nach der zuletzt benutzten Eingabeart.
+      select: builder.inputType === "touch" ? "status_select_touch" : "status_select",
       add: "status_add",
       panel: "status_panel",
       reinforce: "status_reinforce",

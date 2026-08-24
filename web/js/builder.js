@@ -71,6 +71,12 @@ export class Builder {
     // Die Hervorhebung aus Stueckliste/Bestand/Aufbau wurde im Bild aufgehoben
     // (Klick ins Leere) -- die Liste muss ihre markierte Zeile zuruecknehmen.
     this.onHighlightCleared = () => {};
+    // Zuletzt benutzte Eingabeart: "mouse" oder "touch". Sie entscheidet, welcher
+    // Hinweis in der Statuszeile steht -- Strg/Shift gibt es am Finger nicht,
+    // das Halten dafuer nicht an der Maus. Geraete koennen beides, deshalb
+    // zaehlt, WOMIT gerade gearbeitet wird, nicht was das Geraet kann.
+    this.inputType = "mouse";
+    this.onInputTypeChange = () => {};
 
     // "select" (Cursor: vorhandenes auswaehlen) | "add" | "panel" | "slide" |
     // "clamp" | "fitting" | "reinforce" | "assembly"
@@ -1747,6 +1753,8 @@ export class Builder {
     });
 
     el.addEventListener("pointerdown", (e) => {
+      const art = (e.pointerType === "touch" || e.pointerType === "pen") ? "touch" : "mouse";
+      if (art !== this.inputType) { this.inputType = art; this.onInputTypeChange(); }
       if (this._pointerId !== null) { this._abortGesture(); return; }
       this._pointerId = e.pointerId;
       this._down = {
