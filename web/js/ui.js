@@ -1620,7 +1620,7 @@ export function initUI({ scene, model, builder }) {
       try {
         const { daten, info } = await leseModellDatei(f);
         const name = f.name.replace(/\.[^.]+$/, "").trim() || t("doc_untitled");
-        openTab({ name, data: daten, dirty: true });
+        openTab({ name, data: daten });
         geladen++;
         letzteInfo = info;
       } catch (err) {
@@ -2316,7 +2316,7 @@ export function initUI({ scene, model, builder }) {
     if (!data) { flash(t("lib_load_failed"), "error"); return; }
     // Die Sammlung bleibt, wie sie ist: geöffnet wird eine KOPIE in einem
     // eigenen Tab, die noch zu keiner Datei gehört.
-    openTab({ name: entry.name, data, dirty: true, preview });
+    openTab({ name: entry.name, data, preview });
     scene.resetCamera(model);
     flash(t("lib_loaded", entry.name));
   }
@@ -3682,24 +3682,16 @@ export function initUI({ scene, model, builder }) {
    * Modell startet im Bau-Modus mit einem 35er Rohr, ein geöffnetes oder
    * importiertes im Auswahl-Modus.
    */
-  function openTab({ name, data, docId = null, view = null, dirty = false, preview = false }) {
+  function openTab({ name, data, docId = null, view = null, preview = false }) {
     builder.cancelPaste();
     captureActiveTab();
     // Nur EIN Vorschau-Tab: der vorige war unberührt und macht Platz.
     if (preview) discardPreview();
     const tab = {
-      tabId: docs.newTabId(), docId, name: name || t("doc_untitled"), dirty, preview,
+      tabId: docs.newTabId(), docId, name: name || t("doc_untitled"), dirty: false, preview,
       model: data || { format: 1, nodes: [], tubes: [] },
       view: view || defaultView(!data),
     };
-    const json = JSON.stringify(tab.model);
-    // Stand "wie auf Datei": daran hängt der Änderungs-Punkt. Ein importiertes
-    // oder aus der Bibliothek kopiertes Modell hat keinen -- es gilt so lange
-    // als ungespeichert, bis es wirklich gespeichert wird.
-    tab.savedJson = dirty ? null : json;
-    // Stand beim Öffnen: daran erkennt der Vorschau-Tab, dass jemand wirklich
-    // gebaut hat -- dann bleibt er stehen.
-    tab.baseJson = json;
     tabs.push(tab);
     activeTabId = tab.tabId;
     ladeVorgang = true;
@@ -3708,6 +3700,21 @@ export function initUI({ scene, model, builder }) {
     applyViewState(tab.view);
     builder.refresh();
     ladeVorgang = false;
+    // Vergleichsstand NACH dem Laden nehmen: der Änderungs-Punkt vergleicht
+    // spaeter mit `model.toJSON()`, und das steht nicht Zeichen fuer Zeichen so
+    // da wie die hereingereichten Daten (Import, Bibliothek, aeltere Staende).
+    // Sonst gilt ein Modell als geaendert, kaum dass man die Ansicht dreht.
+    //
+    // Der Punkt zeigt AUSSCHLIESSLICH an, dass jemand am Modell gearbeitet hat
+    // -- genau das, was auch im Rueckgaengig-Verlauf steht. Dass ein Modell noch
+    // in keiner Datei liegt, sagt nicht der Punkt, sondern die Nachfrage beim
+    // Schliessen (siehe closeTab).
+    const stand = JSON.stringify(model.toJSON());
+    tab.model = JSON.parse(stand);
+    tab.savedJson = stand;
+    // Stand beim Öffnen: daran erkennt der Vorschau-Tab, dass jemand wirklich
+    // gebaut hat -- dann bleibt er stehen.
+    tab.baseJson = stand;
     renderTabs();
     update();
     scheduleSessionSave();
@@ -3776,7 +3783,14 @@ export function initUI({ scene, model, builder }) {
     // Ungespeicherte Änderungen: nachfragen. Bei eingeschaltetem Auto-Save gilt
     // ein Tab mit Datei als gespeichert -- dort läuft der Stand ohnehin mit.
     // Eine Vorschau hat nichts zu verlieren: sie geht wortlos zu.
-    const offen = tab.dirty && !tab.preview && !(autosaveOn && tab.docId);
+    // Gefragt wird auch bei einem Tab OHNE Datei, in dem etwas steht: ein
+    // importiertes Modell waere sonst mit dem Schliessen weg, obwohl niemand
+    // daran gebaut hat (und der Punkt deshalb fehlt).
+    const inhalt = tabId === activeTabId
+      ? model.nodes.size > 0
+      : !!(tab.model && (tab.model.nodes || []).length);
+    const nurSitzung = !tab.docId && inhalt;
+    const offen = (tab.dirty || nurSitzung) && !tab.preview && !(autosaveOn && tab.docId);
     if (offen) {
       if (tabId !== activeTabId) activateTab(tabId);
       const antwort = await askUnsaved(tab.name);
