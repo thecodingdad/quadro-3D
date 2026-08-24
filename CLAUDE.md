@@ -270,6 +270,17 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   `three.module.js` lädt `three.core.js` nach. Beim nächsten Update beide tauschen **und** beide im
   Vorrat des Service Workers führen – fehlt die Core-Datei, startet die App ohne Netz nicht mehr.
   `OrbitControls.js` gehört zur selben Version (es erbt seit r169 von `Controls` aus dem Kern).
+- **Die Drehung einer Platte steckt in ihrer LAGE, nicht in einem eigenen Feld.** Die
+  Hersteller-Software kennt vier Stellungen (0/90/180/270°), sie unterscheiden sich nur in der
+  Rolllage um die Plattennormale – Mitte, Maße und Material bleiben gleich. Beim Einlesen ergibt
+  sich daraus von selbst das richtige Rohrpaar (`findPanelCorners` ordnet die Ecken nach den
+  lokalen Achsen), beim Schreiben dreht `rectLine` die lokale X-Achse auf die andere Kante, wenn
+  `p.turned` gesetzt ist. `turnPanel` dreht zusätzlich die gespeicherte Datei-Lage mit – sonst
+  schriebe der Export für eine eingelesene Platte weiter die alte Rolllage.
+- **Quaternionen aus der Datei sind NICHT normiert** (Werte quadriert und mit 4 skaliert).
+  `xAxisOf`/`yAxisOf`/`zAxisOf` normieren deshalb selbst: mit einer zu langen Quaternion kommt
+  nicht etwa eine zu lange Achse heraus, sondern eine ganz andere Richtung – daran sind schon die
+  Arme der Lochzapfenkupplung und die Plattendrehung gescheitert.
 - **Neue UI-Texte:** immer in **beide** Dictionaries (`de` und `en`) in `i18n.js`, dann `t('key')`
   bzw. `data-i18n`/`data-i18n-title`/`data-i18n-placeholder`/`data-i18n-aria` im HTML. Nie Strings
   in `ui.js` hardcoden.

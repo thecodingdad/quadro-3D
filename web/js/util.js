@@ -83,20 +83,32 @@ export function quatFromBasis(ex, ey, ez) {
 }
 
 /** Lokale +X-Achse in Weltkoordinaten (quat in Three-Reihenfolge x,y,z,w). */
+/**
+ * Quaternion auf Laenge 1 bringen. Noetig, weil die Lagen aus den QDF-Dateien
+ * NICHT normiert ankommen (die Datei fuehrt die Werte quadriert und mit 4
+ * skaliert). Die Achsen-Formeln unten gelten nur fuer die Einheitsquaternion --
+ * mit einer laengeren kommt nicht etwa eine zu lange Achse heraus, sondern eine
+ * ganz andere Richtung.
+ */
+function einheit(q) {
+  const n = Math.hypot(q[0], q[1], q[2], q[3]);
+  return (!n || Math.abs(n - 1) < 1e-9) ? q : [q[0] / n, q[1] / n, q[2] / n, q[3] / n];
+}
+
 export function xAxisOf(q) {
-  const [x, y, z, w] = q;
+  const [x, y, z, w] = einheit(q);
   return [1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w)];
 }
 
 /** Die lokale +Y-Achse eines Teils in Weltkoordinaten (quat: Three x,y,z,w). */
 export function yAxisOf(q) {
-  const [x, y, z, w] = q;
+  const [x, y, z, w] = einheit(q);
   return [2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w)];
 }
 
 /** Die lokale +Z-Achse eines Teils in Weltkoordinaten (quat: Three x,y,z,w). */
 export function zAxisOf(q) {
-  const [x, y, z, w] = q;
+  const [x, y, z, w] = einheit(q);
   return [2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)];
 }
 

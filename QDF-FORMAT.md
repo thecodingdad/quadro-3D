@@ -405,6 +405,23 @@ the panel is **pure scaling** — always 22 triangles, the box measures size +
 
 The local **Z** axis says which side of the tubes the panel is fastened to.
 
+**The rotation of a panel lives in the roll of that placement.** A panel has
+lips on two opposite edges, and the software lets it be turned in 90° steps;
+nothing else in the line changes — same centre, same sizes, same material.
+Four files of the same panel, only rotated (`tmp/Platte1.qdf` and friends):
+
+| Turn | Quaternion | local X | local Y |
+|---|---|---|---|
+| 0° | `{0., 0., 4., 0.}` | −X | +Y |
+| 90° | `{0., 2., 2., 0.}` | +Y | +X |
+| 180° | `{0., 4., 0., 0.}` | +X | −Y |
+| 270° | `{0., -2., 2., 0.}` | −Y | −X |
+
+So 0°/180° put the lips on one pair of tubes, 90°/270° on the other. This app
+reads the pair from the placement (the four corner connectors it finds are
+ordered by the local axes), writes it back the same way, and reproduces all
+four lines byte for byte. **✔**
+
 **The perforated panel does not exist for this software.** No field
 distinguishes it (field 7 of all 2 762 `panel2` lines is `0` or a step number),
 and it is not a matter of presentation either: all nine panel materials draw
@@ -627,7 +644,8 @@ all five occurrences in the corpus). **~**
 
 Five fields: material, placement, flag, then a number that is `0` in 31 lines
 and `1` in 23 — probably which way the quarter cylinder curves **~** — and a
-final `0`. **?**
+final `0`. **?** The count matters: writing the four fields most other
+accessories carry is enough to lose the file (§3.2).
 
 ### 5.7 Document elements
 

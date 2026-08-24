@@ -493,7 +493,7 @@ export function buildQDF(model) {
   //   * Die Plattenmitte liegt exakt in der Kupplungsebene (2603 von 2604
   //     Platten, Versatz 0). Auf welcher Seite der Rohre das Teil liegt, sagt
   //     die Normale -- siehe canonicalNormal.
-  const rectLine = (name, corners, matNum, dims, side) => {
+  const rectLine = (name, corners, matNum, dims, side, turned = false) => {
     if (!corners) return null;
     const [A, B, C, D] = corners.map((c) => ({ x: c[0], y: c[1], z: c[2] }));
     const e1 = dirOf(A, B), e2 = dirOf(A, D);
@@ -510,10 +510,15 @@ export function buildQDF(model) {
     // liess die Platte mal oben, mal unten erscheinen), sondern eindeutig
     // festlegen und mit der gespeicherten Seite multiplizieren.
     const n = panelNormal(e1, e2, [cx, cy, cz], middle).map((v) => v * (side < 0 ? -1 : 1));
-    // Rechtshaendiges Dreibein zur gewaehlten Normalen: X bleibt e1.
-    const q = encodeQuat(quatFromAxes(e1, cross(n, e1), n));
-    // w liegt auf der lokalen X-Achse, h auf Y -- geschrieben wird Y zuerst.
-    return `${name}{${matNum}, ${tuple(q, cx, cy, cz)}, 1, ${mm(h - conn)}, 0., ${mm(w - conn)}, 0., 0}`;
+    // Rechtshaendiges Dreibein zur gewaehlten Normalen. Die lokale X-Achse sagt,
+    // wo die LIPPEN der Platte liegen: laengs der Tragrohre (e1) oder quer dazu
+    // (e2). Genau daran erkennt auch die Herstellersoftware eine gedrehte
+    // Platte -- ihre beiden Dateien unterscheiden sich nur in dieser Rolllage.
+    const ex = turned ? e2 : e1;
+    const q = encodeQuat(quatFromAxes(ex, cross(n, ex), n));
+    // Geschrieben wird das Mass auf der lokalen Y-Achse zuerst, dann das auf X.
+    const [aufY, aufX] = turned ? [w, h] : [h, w];
+    return `${name}{${matNum}, ${tuple(q, cx, cy, cz)}, 1, ${mm(aufY - conn)}, 0., ${mm(aufX - conn)}, 0., 0}`;
   };
 
   for (const p of model.panels.values()) {
@@ -543,7 +548,8 @@ export function buildQDF(model) {
       continue;
     }
     const def = getPanel(p.panelId);
-    const line = rectLine("panel2", model.panelCorners(p), panelMat(p.color, lochplatte(p)), def ? [def.w, def.h] : null, p.side);
+    const line = rectLine("panel2", model.panelCorners(p), panelMat(p.color, lochplatte(p)),
+      def ? [def.w, def.h] : null, p.side, !!p.turned);
     if (line) { lines.push(line); stats.panels++; }
   }
   for (const x of (model.textiles ? model.textiles.values() : [])) {

@@ -732,7 +732,31 @@ export class BuildModel {
     const p = this.panels.get(id);
     if (!p) return false;
     p.turned = !p.turned;
+    // Eine eingelesene Platte behaelt ihre Lage aus der Datei -- die Drehung um
+    // die Normale gehoert dann mitgedreht, sonst schriebe der Export weiter die
+    // alte Rolllage und die Drehung waere beim naechsten Laden verloren. Mit den
+    // Achsen wandern die beiden Kantenmasse.
+    const g = p.geom;
+    if (g && g.quat && g.quat.length === 4) {
+      const ex = xAxisOf(g.quat), ey = yAxisOf(g.quat), ez = zAxisOf(g.quat);
+      g.quat = quatFromBasis(ey, [-ex[0], -ex[1], -ex[2]], ez).map(round4);
+      const w = g.w; g.w = g.h; g.h = w;
+      const pw = g.padW; g.padW = g.padH; g.padH = pw;
+    }
     return true;
+  }
+
+  /**
+   * Liegt diese eingelesene Platte gedreht? Verglichen wird ihre lokale X-Achse
+   * mit der Richtung der Tragrohre: laeuft sie quer dazu, sind die Lippen quer.
+   */
+  _panelTurnedFromQuat(p) {
+    if (!p.geom || !p.geom.quat) return false;
+    const ecken = this.panelCorners(p);
+    if (!ecken) return false;
+    const e1 = norm3([ecken[1][0] - ecken[0][0], ecken[1][1] - ecken[0][1], ecken[1][2] - ecken[0][2]]);
+    const ax = norm3(xAxisOf(p.geom.quat));
+    return Math.abs(dot3(ax, e1)) < 0.5;
   }
 
   /** Abstand der beiden Tragrohre (Breite der Platte). */
@@ -3373,6 +3397,12 @@ export class BuildModel {
       rec.panelId = p.panelId;
       if (p.turned) rec.turned = true;
       if (p.geom) rec.geom = p.geom;
+      // Eingelesene Platte: ob sie gedreht liegt, steht in ihrer Rolllage. Die
+      // Herstellersoftware speichert die Drehung genau so -- zwei Dateien mit
+      // derselben Platte, einmal gedreht, unterscheiden sich AUSSCHLIESSLICH im
+      // Quaternion (Platte1/Platte2.qdf). Laeuft die lokale X-Achse quer zu den
+      // Tragrohren, liegen die Lippen quer: gedreht.
+      if (!rec.turned && rec.geom && rec.geom.quat) rec.turned = this._panelTurnedFromQuat(rec);
       if (p.pool) rec.pool = p.pool;
       if (p.poolPart) rec.poolPart = true;
       this.panels.set(p.id, rec);
