@@ -807,11 +807,14 @@ body.sidebar-hidden #sidebar, body.sidebar-hidden #sidebar-resizer { display: no
 .lib-status { font-size: 11px; color: var(--muted); min-height: 1.2em; margin-bottom: 6px; }
 .lib-list { display: flex; flex-direction: column; gap: 4px; }
 .lib-row {
-  display: flex; flex-direction: column; gap: 2px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; column-gap: 8px; row-gap: 2px;
   padding: 7px 9px; text-align: left; font-family: inherit;
   border: 1px solid var(--line); border-left: 3px solid var(--line);
   border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer;
 }
+.lib-row > .lib-row-head { grid-column: 1 / -1; }
+.lib-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .lib-row:hover { border-color: var(--accent); border-left-color: var(--accent); }
 .lib-row.ok { border-left-color: var(--ok); }
 .lib-row-head { display: flex; align-items: baseline; gap: 8px; }
@@ -1260,15 +1263,16 @@ body.asm-sheet-on .status { bottom: calc(var(--asm-sheet-h, 0px) + 12px); }
 
 /* Eintrag unter "Meine Modelle": links Name, Anzahl und Datum, rechts die
    Werkzeuge -- alles in einer Zeile. */
-.own-row { display: flex; flex-direction: row; align-items: stretch; gap: 8px; }
-.own-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.own-main .lib-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.own-main .lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Rechte Spalte eines Modell-Eintrags: Abzeichen oben, Werkzeuge unten. */
-.own-side {
-  display: flex; flex-direction: column; justify-content: space-between;
-  align-items: flex-end; align-self: stretch; gap: 6px; flex: 0 0 auto;
-}
+/* Ein Modell-Eintrag stapelt vier Zeilen: Name samt Abzeichen, die Teilezahlen
+   ueber die VOLLE Breite (nebeneinander mit den Knoepfen wurden sie umgebrochen),
+   darunter Masse und Datum neben den Werkzeugen. */
+/* Spalte statt Raster -- und `align-items` aus .lib-row zuruecknehmen, sonst
+   staenden Name und Teilezeile mittig statt linksbuendig. */
+.own-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
+.own-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.own-kopf .lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.own-fuss { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.own-daten { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .own-tools { display: flex; gap: 2px; flex: 0 0 auto; }
 .own-tools .btn { padding: 3px; }
 

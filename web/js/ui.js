@@ -1791,6 +1791,12 @@ export function initUI({ scene, model, builder }) {
             <path d="M8 1.8v8.4"/><path d="M4.8 7 8 10.4 11.2 7"/><path d="M2.5 12.5v1.7h11v-1.7"/></svg>`,
     import: `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">
             <path d="M8 10.2V1.8"/><path d="M4.8 5 8 1.6 11.2 5"/><path d="M2.5 12.5v1.7h11v-1.7"/></svg>`,
+    // Ein Blatt mit Kreuz -- und fuer "Alle schliessen" ein Stapel davon.
+    schliessen: `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M3.5 1.5h5l4 4v9h-9z"/><path d="M8.5 1.5v4h4"/><path d="m6.2 8.7 3.6 3.6M9.8 8.7l-3.6 3.6"/></svg>`,
+    alleSchliessen: `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M5.5 3.5h-4v11h7v-2"/><path d="M6.5 1.5h4l4 4v7h-8z"/>
+            <path d="m8.6 6.6 3.4 3.4M12 6.6 8.6 10"/></svg>`,
   };
   /** Die Einträge des Datei-Menüs -- als Popup und als Zeilen im Hauptmenü. */
   function fileEntries() {
@@ -1799,6 +1805,8 @@ export function initUI({ scene, model, builder }) {
       { icon: DATEI_ICONS.oeffnen, label: t("btn_doc_open"), run: () => $("btn-doc-open").click() },
       { icon: DATEI_ICONS.speichern, label: t("btn_doc_save"), run: () => $("btn-doc-save").click() },
       { icon: DATEI_ICONS.speichernUnter, label: t("btn_doc_saveas"), run: () => $("btn-doc-saveas").click() },
+      { icon: DATEI_ICONS.schliessen, label: t("btn_doc_close"), run: () => { if (activeTabId) closeTab(activeTabId); } },
+      { icon: DATEI_ICONS.alleSchliessen, label: t("btn_doc_close_all"), run: () => closeAllTabs() },
       { icon: DATEI_ICONS.import, label: t("btn_import"), run: () => $("file-import").click() },
       { icon: DATEI_ICONS.export, label: t("btn_export_qdf"), run: () => exportActiveTab() },
     ];
@@ -2209,22 +2217,54 @@ export function initUI({ scene, model, builder }) {
       list.appendChild(el("p", "hint", t("lib_no_match")));
       return;
     }
+    // Der Muelleimer je Eintrag -- dasselbe Bild wie unter "Meine Modelle".
+    const MUELL = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.6h10"/><path d="M4.6 4.6 5.2 13h5.6l.6-8.4"/><path d="M6.4 4.6V3h3.2v1.6"/></svg>`;
     for (const { entry, check } of rows) {
       const m = entry.meta;
-      const row = el("button", "lib-row" + (check.ok ? " ok" : ""));
-      row.type = "button";
+      // Kein <button> mehr um die ganze Zeile: darin darf kein zweiter Knopf
+      // stehen. Die Zeile bleibt per Tastatur erreichbar (role/tabindex).
+      const row = el("div", "lib-row" + (check.ok ? " ok" : ""));
+      row.setAttribute("role", "button");
+      row.tabIndex = 0;
       row.title = check.ok ? t("lib_feasible_title") : t("lib_infeasible_title");
+      // Raster: die Kopfzeile (Name + Haken) laeuft ueber die volle Breite,
+      // darunter stehen die Kennzahlen links und der Muelleimer rechts --
+      // sonst bliebe neben dem Knopf eine leere Zeile stehen.
       const head = el("div", "lib-row-head");
       head.appendChild(el("span", "lib-name", entry.name));
       const badge = el("span", "lib-badge", check.ok ? "✓" : String(missingCount(check)));
       head.appendChild(badge);
       row.appendChild(head);
-      row.appendChild(el("span", "lib-meta", t("lib_parts", m.connectors, m.tubes, m.panels)));
-      row.appendChild(el("span", "lib-meta", t("lib_size", m.size[0], m.size[1], m.size[2])));
+      const text = el("div", "lib-text");
+      text.appendChild(el("span", "lib-meta", t("lib_parts", m.connectors, m.tubes, m.panels)));
+      text.appendChild(el("span", "lib-meta", t("lib_size", m.size[0], m.size[1], m.size[2])));
+      row.appendChild(text);
+      const werkzeuge = el("div", "own-tools");
+      const weg = el("button", "btn ghost icon-sq small");
+      weg.type = "button";
+      weg.innerHTML = MUELL;
+      weg.title = t("btn_lib_delete");
+      weg.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!(await askConfirm(t("confirm_delete_lib", entry.name),
+          { title: t("dlg_delete_title"), ok: t("dlg_delete_ok"), danger: true }))) return;
+        try {
+          await storage.libDrop(entry.id);
+          sync.nudge();
+        } catch (err) {
+          console.warn("Bibliothek:", err);
+        }
+        await loadLibrary();
+      });
+      werkzeuge.appendChild(weg);
+      row.appendChild(werkzeuge);
       row.addEventListener("click", () => openFromLibrary(entry, { preview: true }));
       row.addEventListener("dblclick", () => {
         const offen = tabs.find((x) => x.name === entry.name && x.preview);
         if (offen) pinTab(offen); else openFromLibrary(entry);
+      });
+      row.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFromLibrary(entry, { preview: true }); }
       });
       list.appendChild(row);
     }
@@ -2253,6 +2293,34 @@ export function initUI({ scene, model, builder }) {
   }
 
   let ownRenderLauf = 0;
+  /**
+   * Ein eigenes Modell in die Bibliothek kopieren. Die Bibliothek fuehrt QDF --
+   * das Modell geht deshalb durch den Export und wird wie eine eingelesene
+   * Datei ausgewertet (Teilezahlen, Aussenmasse, Bedarf). Das Original bleibt
+   * unter "Meine Modelle" stehen.
+   */
+  async function kopiereInBibliothek(name, daten) {
+    if (!daten) { flash(t("lib_copy_failed"), "error"); return; }
+    const m2 = new (model.constructor)();
+    if (!m2.loadJSON(daten).ok) { flash(t("lib_copy_failed"), "error"); return; }
+    const { text } = buildQDF(m2);
+    const eintrag = designEntry(`own|${Date.now()}`, `${name}.qdf`, text);
+    if (!eintrag) { flash(t("lib_copy_failed"), "error"); return; }
+    // designEntry putzt den Dateinamen (Bestellnummern & Co.) -- hier zaehlt
+    // aber der Name, den der Nutzer gerade eingetippt hat.
+    eintrag.name = name;
+    try {
+      await storage.libPut([eintrag]);
+      sync.nudge();
+    } catch (e) {
+      console.warn("Bibliothek:", e);
+      flash(t("lib_copy_failed"), "error");
+      return;
+    }
+    await loadLibrary();
+    flash(t("flash_lib_copied", name), "ok");
+  }
+
   async function renderOwnModels() {
     const box = $("own-list");
     if (!box) return;
@@ -2275,6 +2343,9 @@ export function initUI({ scene, model, builder }) {
     const STIFT = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M11.2 2.4 13.6 4.8 5.6 12.8 2.4 13.6 3.2 10.4z"/></svg>`;
     const PFEIL = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8"/><path d="M5 7.2 8 10.4l3-3.2"/><path d="M2.6 12.6h10.8"/></svg>`;
     const MUELL = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.6h10"/><path d="M4.6 4.6 5.2 13h5.6l.6-8.4"/><path d="M6.4 4.6V3h3.2v1.6"/></svg>`;
+    // Bibliothek: drei Buecher im Regal -- dasselbe Bild wie der Reiter
+    // "Modelle" in der Seitenleiste.
+    const REGAL = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.2" y="3" width="3" height="10" rx="0.6"/><rect x="6.5" y="3" width="3" height="10" rx="0.6"/><path d="M11.4 3.9 13.9 4.6 12 13.3 9.8 12.7z"/></svg>`;
     for (const d of liste) {
       const offen = tabs.some((x) => x.docId === d.id);
       const row = el("div", "lib-row own-row" + (offen ? " active" : ""));
@@ -2282,27 +2353,29 @@ export function initUI({ scene, model, builder }) {
       // Außenmaße -- dazu das Datum der letzten Änderung.
       const kennzahlen = modellKennzahlen(d);
       if (kennzahlen && kennzahlen.ok) row.classList.add("ok");
-      const links = el("div", "own-main");
-      const kopf = el("div", "lib-head");
+      // Aufbau: Name + Abzeichen, darunter die Teilezahlen ueber die volle
+      // Breite (sie brauchen den Platz), zuletzt Masse/Datum neben den
+      // Werkzeugen.
+      const kopf = el("div", "own-kopf");
       kopf.appendChild(el("span", "lib-name", d.name));
-      links.appendChild(kopf);
-      if (kennzahlen) row.title = kennzahlen.ok ? t("lib_feasible_title") : t("lib_infeasible_title");
       if (kennzahlen) {
-        links.appendChild(el("span", "lib-meta",
+        kopf.appendChild(el("span", "lib-badge", kennzahlen.ok ? "✓" : String(kennzahlen.fehlt)));
+        row.title = kennzahlen.ok ? t("lib_feasible_title") : t("lib_infeasible_title");
+      }
+      row.appendChild(kopf);
+      if (kennzahlen) {
+        row.appendChild(el("span", "lib-meta",
           t("lib_parts", kennzahlen.connectors, kennzahlen.tubes, kennzahlen.panels)));
-        links.appendChild(el("span", "lib-meta",
+      }
+      const fuss = el("div", "own-fuss");
+      const daten = el("div", "own-daten");
+      if (kennzahlen) {
+        daten.appendChild(el("span", "lib-meta",
           t("lib_size", kennzahlen.size[0], kennzahlen.size[1], kennzahlen.size[2])));
       }
-      links.appendChild(el("span", "lib-meta",
+      daten.appendChild(el("span", "lib-meta",
         new Date(d.updatedAt || Date.now()).toLocaleString(locale())));
-      row.appendChild(links);
-
-      // Rechte Spalte: oben das Abzeichen (Haken oder fehlende Teile), unten
-      // die Werkzeuge.
-      const rechts = el("div", "own-side");
-      if (kennzahlen) {
-        rechts.appendChild(el("span", "lib-badge", kennzahlen.ok ? "✓" : String(kennzahlen.fehlt)));
-      }
+      fuss.appendChild(daten);
       const werkzeuge = el("div", "own-tools");
       werkzeuge.appendChild(iconKnopf(STIFT, t("btn_doc_rename"), async () => {
         const gewaehlt = await askName(d.name, { eigeneId: d.id });
@@ -2311,6 +2384,17 @@ export function initUI({ scene, model, builder }) {
         for (const tab of tabs) if (tab.docId === d.id) tab.name = gewaehlt.name;
         sync.nudge();
         renderTabs(); renderOwnModels();
+      }));
+      // In die Bibliothek kopieren: dort liegen die Modelle zum Stoebern und
+      // zum Vergleich mit dem eigenen Bestand. Kopie, kein Verschieben -- die
+      // Datei bleibt unter "Meine Modelle" stehen.
+      werkzeuge.appendChild(iconKnopf(REGAL, t("btn_lib_copy"), async () => {
+        const name = await askInput(t("dlg_lib_copy_text", d.name), d.name,
+          { title: t("dlg_lib_copy_title"), ok: t("dlg_lib_copy_ok") });
+        if (!name) return;
+        const tab = tabs.find((x) => x.docId === d.id);
+        if (tab && tab.tabId === activeTabId) captureActiveTab();
+        await kopiereInBibliothek(name, tab ? tab.model : d.data);
       }));
       werkzeuge.appendChild(iconKnopf(PFEIL, t("btn_export_qdf"), () => {
         // Offener Tab? Dann den Arbeitsstand nehmen, sonst die Datei.
@@ -2327,8 +2411,8 @@ export function initUI({ scene, model, builder }) {
         sync.nudge();
         renderTabs(); renderOwnModels();
       }));
-      rechts.appendChild(werkzeuge);
-      row.appendChild(rechts);
+      fuss.appendChild(werkzeuge);
+      row.appendChild(fuss);
       row.addEventListener("click", () => openDocById(d.id, { preview: true }));
       row.addEventListener("dblclick", () => openDocById(d.id));
       box.appendChild(row);
@@ -3811,9 +3895,14 @@ export function initUI({ scene, model, builder }) {
     }).then((r) => (r ? r.key : "cancel"));
   }
 
+  /**
+   * Schliesst einen Tab. Ergebnis: `true` wenn er weg ist, `false` wenn der
+   * Nutzer abgebrochen hat -- "Alle schliessen" haengt daran und hoert beim
+   * ersten Abbruch auf.
+   */
   async function closeTab(tabId) {
     const i = tabs.findIndex((x) => x.tabId === tabId);
-    if (i < 0) return;
+    if (i < 0) return true;
     const tab = tabs[i];
     // Ungespeicherte Änderungen: nachfragen. Bei eingeschaltetem Auto-Save gilt
     // ein Tab mit Datei als gespeichert -- dort läuft der Stand ohnehin mit.
@@ -3829,11 +3918,11 @@ export function initUI({ scene, model, builder }) {
     if (offen) {
       if (tabId !== activeTabId) activateTab(tabId);
       const antwort = await askUnsaved(tab.name);
-      if (antwort === "cancel") return;
+      if (antwort === "cancel") return false;
       if (antwort === "save") {
         if (!tab.docId) {
           const gewaehlt = await askName(tab.name);
-          if (!gewaehlt) return;
+          if (!gewaehlt) return false;
           await saveActiveTab({ name: gewaehlt.name, docId: gewaehlt.doc ? gewaehlt.doc.id : null });
         } else {
           await saveActiveTab();
@@ -3862,6 +3951,19 @@ export function initUI({ scene, model, builder }) {
     renderTabs();
     update();
     scheduleSessionSave();
+    return true;
+  }
+
+  /**
+   * Alle Tabs zu. Der Reihe nach, damit jede Rueckfrage einzeln kommt --
+   * `closeTab` holt den jeweiligen Tab dafuer nach vorn, man sieht also das
+   * Modell, um das es gerade geht. Ein "Abbrechen" beendet den ganzen Zug.
+   */
+  async function closeAllTabs() {
+    for (const id of tabs.map((x) => x.tabId)) {
+      if (!tabs.some((x) => x.tabId === id)) continue;
+      if (!(await closeTab(id))) return;
+    }
   }
 
   /**
