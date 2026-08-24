@@ -5,6 +5,7 @@
    die IMMER dunkel sind (Statuszeile, Beschriftungen über der Szene).
    Welches Schema gilt, setzt das Skript im <head> als data-theme. */
 :root {
+  --edge-shadow: rgba(0, 0, 0, 0.30);
   --bg: #f4f6f9;              /* Arbeitsfläche hinter allem */
   --panel: #ffffff;           /* Leisten, Karten, Seitenleiste */
   --surface: #ffffff;         /* Knöpfe, Eingaben, Popups */
@@ -43,6 +44,7 @@
 
 /* Dunkles Schema: gedämpftes Anthrazit, keine schwarzen Flächen. */
 :root[data-theme="dark"] {
+  --edge-shadow: rgba(0, 0, 0, 0.65);
   --bg: #171b21;
   --panel: #232a33;
   --surface: #2a323d;
@@ -1082,6 +1084,13 @@ body.asm-sheet-on .status { bottom: calc(var(--asm-sheet-h, 0px) + 12px); }
   border-top: 1px solid var(--line);
   min-height: 34px;
 }
+/* Waagerecht scrollbare Leisten (Tabs, Bauteil-Gruppe, linke Kopfzeile) zeigen
+   am rechten Ende einen schmalen Schatten, solange dort noch etwas kommt --
+   sonst schneidet der Bereich hart am Nachbarn (+-Knopf, Farbwahl) ab und man
+   sieht nicht, dass sich scrollen lohnt. Der Schatten liegt INNEN, damit er
+   nicht mitwandert; gesetzt wird die Klasse in ui.js. */
+.scroll-more { box-shadow: inset -12px 0 9px -9px var(--edge-shadow); }
+
 .tab-list {
   display: flex;
   align-items: stretch;

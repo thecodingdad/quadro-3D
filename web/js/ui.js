@@ -227,6 +227,29 @@ export function initUI({ scene, model, builder }) {
   }
   applyViewCubeLabels();
 
+  // --- Rand-Schatten an scrollbaren Leisten -------------------------------
+  // Tabs und Bauteil-Gruppe scrollen waagerecht; rechts daneben stehen der
+  // +-Knopf bzw. die Farbwahl. Ohne Hinweis schneidet der Bereich dort hart ab.
+  // Solange noch etwas nach rechts kommt, traegt er `.scroll-more`.
+  function beobachteScrollrand(el) {
+    if (!el) return;
+    let warte = false;
+    const pruefen = () => {
+      warte = false;
+      const mehr = el.scrollWidth - el.clientWidth - el.scrollLeft > 1;
+      el.classList.toggle("scroll-more", mehr);
+    };
+    const anstossen = () => { if (!warte) { warte = true; requestAnimationFrame(pruefen); } };
+    el.addEventListener("scroll", anstossen, { passive: true });
+    // Breite UND Inhalt koennen sich aendern: ein neuer Tab macht den Bereich
+    // laenger, ohne dass sich seine Groesse aendert -- dafuer der zweite Waechter.
+    if (window.ResizeObserver) new ResizeObserver(anstossen).observe(el);
+    if (window.MutationObserver) new MutationObserver(anstossen).observe(el, { childList: true, subtree: true });
+    window.addEventListener("resize", anstossen);
+    anstossen();
+  }
+  for (const el of [$("tab-list"), $("grp-build"), $("toolbar-left")]) beobachteScrollrand(el);
+
   // --- Hinweise + Undo-Verfuegbarkeit ------------------------------------
   builder.onNotice = (msg, art) => flash(msg, art);
   builder.onHistoryChange = () => updateUndoButton();
