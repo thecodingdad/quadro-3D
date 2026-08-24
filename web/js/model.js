@@ -1298,6 +1298,12 @@ export class BuildModel {
     const out = [];
     for (const n of this.nodes.values()) {
       if (n.c45body) continue;                       // Adapterkoerper ist keine Kupplung
+      // Knoten mit festem Katalogteil (Lochzapfen-, Lagerkupplung, Flexi) sind
+      // keine Kupplung mit freien Stutzen -- ein Anbauteil sitzt dort nicht.
+      // Die Multirad-Arretierung, die eine Lochzapfenkupplung festhaelt, gehoert
+      // auf den Stutzen der TRAGENDEN Kupplung; ihr Punkt kommt von dort. Ohne
+      // diese Zeile stand ein zweiter, um eine Kupplungslaenge zu weit aussen.
+      if (n.part) continue;
       const taken = new Set();
       for (const t of this.tubes.values()) {
         const other = t.a === n.id ? this.nodes.get(t.b) : t.b === n.id ? this.nodes.get(t.a) : null;
