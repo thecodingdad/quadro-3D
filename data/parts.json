@@ -172,8 +172,9 @@
       "kind": "special",
       "price": 8.99,
       "buildable": false,
-      "note": "frei einstellbar · das ganze Gelenk: zwei Scharniere und ein Bolzen. In der QDF-Datei steht KEINE eigene Zeile dafür, sondern zwei flexi-connector3 (die Scharniere) plus ein bolt2",
-      "url": "https://quadroshop.com/products/flexi-connector"
+      "note": "frei einstellbar · das ganze Gelenk: zwei Scharniere und ein Bolzen. In der QDF-Datei steht KEINE eigene Zeile dafür, sondern zwei flexi-connector3 (die Scharniere) plus ein bolt2 -- gezählt und bevorratet werden deshalb jene, nicht das Gelenk",
+      "url": "https://quadroshop.com/products/flexi-connector",
+      "stock": false
     },
     {
       "id": "flexi_hinge",
