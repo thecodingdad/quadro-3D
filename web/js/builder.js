@@ -2036,14 +2036,20 @@ export class Builder {
     // Zeichenflaeche (im Platten-Modus: drehen) -- ohne diese Pruefung lief
     // beides zugleich und die Platte klappte nebenbei auf die andere Seite.
     if (e.button !== 0) { finish(); return; }
-    // Klick ins Leere hebt eine Hervorhebung aus Stueckliste, Bestand oder
-    // Aufbau wieder auf. Sie gehoert keinem Modus -- ohne das bliebe sie beim
-    // Weiterbauen stehen. Die Hervorhebungen der Platten- und Verstaerkungs-
-    // Ablaeufe haengen dagegen an ihrem Rohr und bleiben.
-    if (this.highlight && !this.panelRail && !this.reinforceRail
-        && !this.scene.pickForDelete(e.clientX, e.clientY)) {
+    // JEDER Klick ins Bild hebt eine Hervorhebung aus Stueckliste, Bestand oder
+    // Aufbau wieder auf -- auch einer, der ein Teil trifft. Sie gehoert keinem
+    // Modus, und in einem dichten Modell trifft man beim Wegklicken fast immer
+    // irgendetwas; mit der Bedingung "nur ins Leere" blieb sie deshalb gefuehlt
+    // haengen. Die Hervorhebungen der Platten- und Verstaerkungs-Ablaeufe
+    // haengen dagegen an ihrem Rohr und bleiben.
+    if (this.highlight && !this.panelRail && !this.reinforceRail) {
       this.highlight = null;
       this.onHighlightCleared();
+      // Neu zeichnen MUSS hier passieren: die Klick-Behandlung der Modi kommt
+      // ohne Auswahl oft gar nicht bis zu einem refresh (clearSelection steigt
+      // bei leerer Auswahl sofort aus). Ohne diese Zeile war die Hervorhebung
+      // zwar weg, das Bild zeigte sie aber weiter.
+      this.refresh();
     }
     if (this.mode === "select") this._clickSelect(e);
     else if (this.mode === "add") this._clickAdd(e);

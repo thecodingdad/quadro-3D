@@ -1294,14 +1294,18 @@ export function initUI({ scene, model, builder }) {
       `<line x1="2.5" y1="8" x2="13.5" y2="8" stroke="currentColor" stroke-width="1.3"/>`],
   ];
   /**
-   * Sinnbild einer Lochzapfenkupplung: Stutzen von links, Ring darauf, dazu
-   * ihre Arme. `arme` ist eine Liste von Strichen [x1,y1,x2,y2].
+   * Sinnbild einer Lochzapfenkupplung: der Ring ist ihr LOCH (von der Seite der
+   * Lochachse gesehen), die Striche sind ihre Arme -- einer, zwei
+   * gegenueberliegende oder drei im T. `arme` ist eine Liste von Strichen
+   * [x1,y1,x2,y2]; gezaehlt wird genau so viel, wie das Teil hat.
    */
   const HOLE_ICON = (arme) =>
-    `<line x1="1.4" y1="8" x2="5.2" y2="8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>` +
     arme.map(([x1, y1, x2, y2]) =>
-      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`).join("") +
-    `<circle cx="8" cy="8" r="2.9" fill="none" stroke="currentColor" stroke-width="1.5"/>`;
+      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>`).join("") +
+    `<circle cx="8" cy="8" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+  // Die vier moeglichen Arme, jeweils vom Ringrand nach aussen.
+  const HOLE_ARM = { rechts: [11.1, 8, 14.6, 8], links: [1.4, 8, 4.9, 8],
+    unten: [8, 11.1, 8, 14.6], oben: [8, 1.4, 8, 4.9] };
 
   // Eigenes Sinnbild je Teil -- vorher trug jede Zeile einer Gruppe dasselbe
   // Gruppen-Icon, in der aufgeklappten Liste war damit nichts zu unterscheiden.
@@ -1331,10 +1335,10 @@ export function initUI({ scene, model, builder }) {
     // dicke Strich von links), quer dazu stehen ihre eigenen ein bis drei Arme.
     // Der Doppelrohrverbinder darunter hat dagegen ZWEI Ringe nebeneinander --
     // daran sind sie im Menue auseinanderzuhalten.
-    "hole_1": HOLE_ICON([[8, 10.9, 8, 14.6]]),
-    "hole_2": HOLE_ICON([[8, 10.9, 8, 14.6], [8, 5.1, 8, 1.4]]),
-    "hole_t": HOLE_ICON([[8, 10.9, 8, 14.6], [8, 5.1, 8, 1.4], [10.9, 8, 14.6, 8]]),
-    "hole-connector4": HOLE_ICON([[8, 10.9, 8, 14.6]]),
+    "hole_1": HOLE_ICON([HOLE_ARM.rechts]),
+    "hole_2": HOLE_ICON([HOLE_ARM.rechts, HOLE_ARM.links]),
+    "hole_t": HOLE_ICON([HOLE_ARM.rechts, HOLE_ARM.links, HOLE_ARM.unten]),
+    "hole-connector4": HOLE_ICON([HOLE_ARM.rechts]),
     // Doppelrohrverbinder: eine "8" mit den beiden Rohren mittendurch.
     "double_tube": `<line x1="1" y1="5.2" x2="15" y2="5.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<line x1="1" y1="10.8" x2="15" y2="10.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
