@@ -26,6 +26,11 @@ const PANEL_DBLCLICK_MS = 250;
 const RAIL_FITTINGS = new Set(["lattice2", "bag2", "textil2"]);
 
 const CLICK_TOLERANCE = 9; // px: groessere Bewegung = Kamera drehen, kein Klick (Touch-tauglich)
+// Halten auf dem Touchscreen: ersetzt Strg/Shift, die es dort nicht gibt.
+// Auf einem Teil schaltet es dieses zur Auswahl hinzu, im Leeren beginnt es ein
+// Auswahl-Rechteck. 450 ms sind lang genug, dass ein Tipper nicht ausloest, und
+// kurz genug, dass niemand wartet.
+const LONG_PRESS_MS = 450;
 
 // C45_SLEEVE_LEN / C45_ARM_LEN stehen in config.js. Ausgemessen an den Dateien
 // der Herstellersoftware (alle sechs Adapter identisch): dazwischen liegt ein
@@ -1774,15 +1779,30 @@ export class Builder {
         if (e.button === 0) this.scene.beginOrbit(e.clientX, e.clientY);
         return;
       }
+      this._dragKandidat = null;
       if (e.button === 0 && !this._down.box && this.mode === "select" && this.selection.size) {
         const pick = this.scene.pickForDelete(e.clientX, e.clientY);
         if (pick && this._isMoveHandle(pick.data.id)) {
-          this._beginMoveDrag(e, pick);
-          return;
+          if (e.pointerType === "touch") {
+            // Mit dem Finger entscheidet erst die BEWEGUNG, ob geschoben wird --
+            // sonst kaeme das Halten auf einem gewaehlten Teil nie an, weil der
+            // Zug schon begonnen haette.
+            this._dragKandidat = { e, pick };
+          } else {
+            this._beginMoveDrag(e, pick);
+            return;
+          }
         }
       }
       // Linke Taste ohne Strg: eigene Drehung um den Punkt unter dem Zeiger.
       if (e.button === 0 && !this._down.box) this.scene.beginOrbit(e.clientX, e.clientY);
+      // Touch im Cursor-Modus: das Halten vorbereiten.
+      this._clearLongPress();
+      if (e.button === 0 && e.pointerType === "touch" && this.mode === "select"
+          && !this._paste && !this._drag && !this._down.box) {
+        const px = e.clientX, py = e.clientY;
+        this._longPress = setTimeout(() => this._fireLongPress(px, py), LONG_PRESS_MS);
+      }
     });
     // Zeiger, die nicht zum laufenden Zug gehoeren, bleiben aussen vor.
     const fremd = (e) => this._pointerId !== null && e.pointerId !== this._pointerId;
@@ -1797,11 +1817,53 @@ export class Builder {
     el.addEventListener("pointercancel", (e) => { if (!fremd(e)) this._abortGesture(); });
   }
 
+  /** Wartenden Halte-Timer verwerfen. */
+  _clearLongPress() {
+    if (this._longPress) { clearTimeout(this._longPress); this._longPress = null; }
+  }
+
+  /**
+   * Der Finger hat lange genug still gehalten. Auf einem Teil: es kommt zur
+   * Auswahl dazu oder faellt heraus -- das, was am Zeiger Strg/Shift tut. Im
+   * Leeren: von hier an zieht der Finger ein Auswahl-Rechteck auf, statt die
+   * Ansicht zu drehen.
+   */
+  _fireLongPress(x, y) {
+    this._longPress = null;
+    this._dragKandidat = null;      // gehalten statt geschoben
+    if (!this._down || this.mode !== "select") return;
+    this._longDone = true;            // das folgende pointerup ist kein Klick
+    this.scene.endOrbit();            // ab jetzt dreht der Finger nicht mehr
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch { /* egal */ } }
+    const pick = this.scene.pickForDelete(x, y);
+    if (pick) {
+      // Wie beim Klick: ein Verstaerkungsprofil meint alle Rohre seines Laufs.
+      const ids = Array.isArray(pick.data.tubes) && pick.data.tubes.length
+        ? pick.data.tubes : [pick.data.id];
+      const drin = ids.every((id) => this.selection.has(id));
+      for (const id of ids) {
+        if (drin) this.selection.delete(id);
+        else this.selection.set(id, pick.data.kind);
+      }
+      this.onNotice(t("notice_touch_selected", this.selection.size), "info");
+      this.refresh();
+      return;
+    }
+    this._down.box = true;
+    this._boxing = false;
+    this.scene.showSelectBox(x, y, x, y);
+    this.scene.setHover(null);
+    this.onNotice(t("notice_touch_box"), "info");
+  }
+
   /**
    * Laufenden Zug ohne Wirkung beenden: Drehen aufheben, Auswahl-Rechteck
    * wegnehmen, ein begonnenes Verschieben auf den Stand davor zuruecksetzen.
    */
   _abortGesture() {
+    this._clearLongPress();
+    this._longDone = false;
+    this._dragKandidat = null;
     this._pointerId = null;
     this.cancelPaste();
     this._down = null;
@@ -1828,6 +1890,11 @@ export class Builder {
   _onMove(e) {
     // Zeigerstelle merken -- Strg+V setzt die Kopie dorthin.
     this._lastPointer = { x: e.clientX, y: e.clientY };
+    // Wer den Finger bewegt, will nicht halten -- er dreht die Ansicht.
+    if (this._longPress && this._down
+        && Math.hypot(e.clientX - this._down.x, e.clientY - this._down.y) > CLICK_TOLERANCE) {
+      this._clearLongPress();
+    }
     // Am Wuerfel ziehen dreht die Ansicht frei -- um den Bezugspunkt, denn der
     // Zeiger steht ja neben der Szene.
     if (this._cubeDown && (e.buttons & 1)) {
@@ -1867,6 +1934,17 @@ export class Builder {
     }
     // Cursor-Modus: mit gedrueckter linker Taste ziehen zieht ein Auswahl-
     // Rechteck auf, statt zu drehen (das liegt dort auf der rechten Taste).
+    // Finger auf einem gewaehlten Teil, jetzt bewegt: der Zug beginnt hier.
+    if (this._dragKandidat && (e.buttons & 1) && this._down
+        && Math.hypot(e.clientX - this._down.x, e.clientY - this._down.y) > CLICK_TOLERANCE) {
+      const kandidat = this._dragKandidat;
+      this._dragKandidat = null;
+      this._clearLongPress();
+      this.scene.endOrbit();
+      this._beginMoveDrag(kandidat.e, kandidat.pick);
+      this._updateMoveDrag(e);
+      return;
+    }
     // Auswahl wird gerade geschoben.
     if (this._drag && (e.buttons & 1)) { this._updateMoveDrag(e); return; }
     // Linke Taste gedrueckt und kein Rechteck: um den Zeigerpunkt drehen.
@@ -2010,6 +2088,10 @@ export class Builder {
     }
     const d = this._down;
     this._down = null;
+    this._dragKandidat = null;
+    this._clearLongPress();
+    const gehalten = this._longDone;
+    this._longDone = false;
     // Kopie absetzen -- aber nur bei einem ECHTEN Klick. Wer mit gedrueckter
     // Taste gezogen hat, wollte die Ansicht drehen.
     if (this._paste) {
@@ -2038,6 +2120,9 @@ export class Builder {
       this.refresh();
       return;
     }
+    // Das Halten WAR die Geste (Teil geschaltet oder Rechteck begonnen) -- der
+    // Finger hebt danach ab, ohne dass noch ein Klick gemeint ist.
+    if (gehalten) { finish(); return; }
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > CLICK_TOLERANCE) { finish(); return; } // Drehen
     // Nur die LINKE Taste setzt/loescht. Rechts gehoert dem Kontextmenue der
     // Zeichenflaeche (im Platten-Modus: drehen) -- ohne diese Pruefung lief

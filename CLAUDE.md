@@ -281,6 +281,11 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   `xAxisOf`/`yAxisOf`/`zAxisOf` normieren deshalb selbst: mit einer zu langen Quaternion kommt
   nicht etwa eine zu lange Achse heraus, sondern eine ganz andere Richtung – daran sind schon die
   Arme der Lochzapfenkupplung und die Plattendrehung gescheitert.
+- **Touch im Cursor-Modus:** Strg/Shift gibt es dort nicht, deshalb übernimmt das **Halten**
+  (`LONG_PRESS_MS`, 450 ms) beide Aufgaben – auf einem Teil schaltet es dieses zur Auswahl hinzu,
+  im Leeren beginnt es das Auswahl-Rechteck (danach greift derselbe Ablauf wie bei Strg + Ziehen).
+  Damit das Halten überhaupt ankommt, beginnt das **Verschieben** einer Auswahl per Finger erst
+  bei der ersten Bewegung (`_dragKandidat`) – vorher startete der Zug schon beim Aufsetzen.
 - **Neue UI-Texte:** immer in **beide** Dictionaries (`de` und `en`) in `i18n.js`, dann `t('key')`
   bzw. `data-i18n`/`data-i18n-title`/`data-i18n-placeholder`/`data-i18n-aria` im HTML. Nie Strings
   in `ui.js` hardcoden.

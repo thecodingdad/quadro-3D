@@ -808,8 +808,11 @@ export function initUI({ scene, model, builder }) {
     updateWakeLock();
     syncPartHighlights();
     syncDeleteButton();
+    // Auf dem Touchscreen gibt es kein Strg/Shift -- dort gilt der Hinweis mit
+    // dem Halten (siehe _fireLongPress im Builder).
+    const grob = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
     const statusMap = {
-      select: "status_select",
+      select: grob ? "status_select_touch" : "status_select",
       add: "status_add",
       panel: "status_panel",
       reinforce: "status_reinforce",

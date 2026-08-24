@@ -347,6 +347,9 @@ const de = {
   status_slide_end: 'Auslauf: er hängt nur an einem gesetzten Rutschenteil – auf den grünen Punkt an dessen freiem Ausgang klicken.',
   status_assembly: 'Aufbau: mit ‹ › oder Pfeiltasten Schritt für Schritt durch den Bauplan.',
   status_select: 'Auswahl: Teile anklicken (Strg/Shift = mehrere) oder mit Strg ein Rechteck aufziehen – das ergänzt. Klick ins Leere hebt auf.',
+  status_select_touch: 'Auswahl: Teil antippen. Auf einem Teil HALTEN nimmt es dazu, im Leeren halten und ziehen wählt ein Rechteck. Tippen ins Leere hebt auf.',
+  notice_touch_selected: (n) => n === 1 ? '1 Teil gewählt.' : `${n} Teile gewählt.`,
+  notice_touch_box: 'Ziehen zieht jetzt ein Auswahl-Rechteck auf.',
 
   // Hinweise aus dem Builder (onNotice)
   notice_collision: 'Hier liegt schon ein Rohr – kein Platz.',
@@ -806,6 +809,9 @@ const en = {
   status_slide_end: 'Run-out: it only hangs off a placed slide part – click the green dot at its free exit.',
   status_assembly: 'Assembly: use ‹ › or arrow keys to step through the build plan.',
   status_select: 'Select: click parts (Ctrl/Shift = multiple) or hold Ctrl and drag a rectangle – it adds. Click empty space to clear.',
+  status_select_touch: 'Select: tap a part. HOLD on a part to add it, hold on empty space and drag for a rectangle. Tap empty space to clear.',
+  notice_touch_selected: (n) => n === 1 ? '1 part selected.' : `${n} parts selected.`,
+  notice_touch_box: 'Dragging now draws a selection rectangle.',
 
   // Notices from the builder (onNotice)
   notice_collision: 'There is already a tube here – no room.',
