@@ -455,6 +455,9 @@ export function initUI({ scene, model, builder }) {
 
   function renderGridButton() {
     if (gridWert) gridWert.textContent = t("grid_step", builder.moveStep);
+    // Das Bodenraster zeigt dieselbe Weite -- sonst sagt das Bild etwas anderes
+    // als die Pfeiltasten tun.
+    scene.setGridCell(builder.moveStep);
   }
   renderGridButton();
 
@@ -801,8 +804,14 @@ export function initUI({ scene, model, builder }) {
       c45: "status_c45",
       fitting: "status_fitting",
       assembly: "status_assembly",
+      slide: "status_slide",
     };
-    setStatusHint(t(m === "fitting" ? fittingHintKey(builder.fittingKind) : (statusMap[m] || "status_add")));
+    const key = m === "fitting" ? fittingHintKey(builder.fittingKind)
+      // Der Auslauf haengt NUR an einem gesetzten Rutschenteil -- fuer ihn gibt
+      // es keine Feld-Ankerpunkte, also auch einen eigenen Hinweis.
+      : m === "slide" && builder.slideKind === "slide-end2" ? "status_slide_end"
+      : (statusMap[m] || "status_add");
+    setStatusHint(t(key));
     renderCurrentPart();
     if (m === "assembly") renderAssembly();
   }

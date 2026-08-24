@@ -153,7 +153,10 @@ const BG_DARK = 0x171b21;
 // breitere Aufbauten noch darauf stehen. Es bleibt deutlich innerhalb der
 // Grasflaeche, sonst schwebte das Raster ueber deren Rand hinaus.
 const GRID_SIZE = 1040;
-const GRID_CELL = 20;    // cm je Linie -- zwei Linien je Rasterfeld
+// Voreingestellte Zellweite. Sie folgt der Schrittweite, die der Nutzer fuers
+// Verschieben waehlt (setGridCell) -- das Bild zeigt damit genau das Raster, in
+// dem sich Teile bewegen lassen. Alle Stufen teilen GRID_SIZE glatt.
+const GRID_CELL = 20;
 
 // Die Wiese um das Raster herum. Sie muss deutlich groesser sein als das
 // Raster, sonst endet die Welt gleich hinter dem Aufbau; ihr Rand liegt am
@@ -4723,6 +4726,18 @@ export class SceneManager {
    * Geometrie, also gibt es zum Umfaerben nur den Austausch. Ueber dem Gras
    * bleiben die hellen Linien: die Szene ist immer Tag.
    */
+  /**
+   * Zellweite des Bodenrasters setzen (cm). Es zeigt damit dasselbe Raster, in
+   * dem sich eine Auswahl verschieben laesst.
+   */
+  setGridCell(cm) {
+    const wert = Number(cm);
+    if (!(wert > 0) || wert === this._gridCell) return false;
+    this._gridCell = wert;
+    this._applyGrid();
+    return true;
+  }
+
   _applyGrid() {
     const [major, minor] = (this._dark && !this._sceneOn) ? GRID_DARK : GRID_LIGHT;
     if (this._grid) {
@@ -4730,7 +4745,8 @@ export class SceneManager {
       this._grid.geometry.dispose();
       this._grid.material.dispose();
     }
-    const grid = new THREE.GridHelper(GRID_SIZE, GRID_SIZE / GRID_CELL, major, minor);
+    const zelle = this._gridCell || GRID_CELL;
+    const grid = new THREE.GridHelper(GRID_SIZE, Math.round(GRID_SIZE / zelle), major, minor);
     grid.position.y = -GROUND_DROP;
     this.scene.add(grid);
     this._grid = grid;

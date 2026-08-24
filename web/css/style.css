@@ -543,7 +543,9 @@ body.sidebar-hidden #sidebar, body.sidebar-hidden #sidebar-resizer { display: no
   padding: 7px 12px;
   border-radius: 8px;
   font-size: 13px;
-  max-width: 70%;
+  /* Unten rechts stehen die Canvas-Knoepfe (Tastenkuerzel, Rasterweite) -- die
+     Zeile darf nicht darunter laufen. */
+  max-width: min(70%, calc(100% - 190px));
   pointer-events: none;
 }
 /* Der Hinweis zum Werkzeug bleibt grau. Kurze Rückmeldungen sagen über die
@@ -1044,7 +1046,9 @@ body.mobile-portrait #tab-bar.single { display: none; }
 #asm-sheet .asm-nav { margin: 0 0 8px; }
 #asm-sheet .asm-nav .btn { flex: 1 1 0; min-height: 44px; font-size: 20px; }
 /* Statusmeldung nicht an den Rand der unteren Leiste kleben lassen. */
-body.mobile-portrait .status { bottom: 16px; max-width: calc(100% - 24px); }
+/* Auf dem Telefon faellt der Tastenkuerzel-Knopf weg, der Rasterweiten-Knopf
+   bleibt -- so viel Platz muss die Zeile ihm lassen. */
+body.mobile-portrait .status { bottom: 16px; max-width: calc(100% - 120px); }
 /* Steht die Aufbau-Karte unten im Bild, gehoert die Statuszeile UEBER sie --
    sonst liegt der Hinweis zum laufenden Schritt darunter und ist weg. Die Hoehe
    der Karte meldet ein ResizeObserver in ui.js als --asm-sheet-h; beim Ziehen
