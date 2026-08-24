@@ -204,6 +204,9 @@ export function initUI({ scene, model, builder }) {
       renderLibHint();
       renderLibSort();
       renderGridButton();
+      // Die Zeilen des Hauptmenues im Hochformat bauen ihre Beschriftungen
+      // selbst -- applyTranslations erwischt sie nicht.
+      renderMenuFileRows(document.body.classList.contains("mobile-portrait"));
       renderTabs();          // der Schliessen-Knopf jedes Tabs traegt einen Tooltip
       renderFittingButton();
       syncProjectionButton();
