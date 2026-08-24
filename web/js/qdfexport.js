@@ -564,7 +564,13 @@ export function buildQDF(model) {
     const q = c.dir
       ? encodeQuat(c.off ? clampQuat(c.dir, c.off, kind === "clip2") : quatFromX(c.dir))
       : IDENTITY;
-    lines.push(`${kind}{${TUBE_MAT.red}, ${tuple(q, c.x, c.y, c.z)}, 1, 0, 0}`);
+    // ACHTUNG Feldzahl: die Herstellersoftware wirft eine Datei mit falsch
+    // besetzter Zeile KOMPLETT weg. Der Doppelrohrverbinder fuehrt hinter der
+    // Lage ZWEI Felder (`1, 2` / `1, 968` im Bestand), die Rohrklammer DREI
+    // (`1, 0, 3`).
+    lines.push(kind === "clip2"
+      ? `clip2{${TUBE_MAT.red}, ${tuple(q, c.x, c.y, c.z)}, 1, 0, 0}`
+      : `clamp2{${TUBE_MAT.red}, ${tuple(q, c.x, c.y, c.z)}, 1, 0}`);
     stats.clamps++;
   }
   // Anbauteile: Punkt + Ausrichtung, beim Netz zusaetzlich die Masse. Die
@@ -607,6 +613,10 @@ export function buildQDF(model) {
       // Rohrkappe): die Felder hinter der Lage stehen noch so da, wie sie beim
       // Einlesen in der Datei standen.
       lines.push(`${f.kind}{${mat}, ${tuple(q, fx, fy, fz)}, ${f.rest}}`);
+    } else if (f.kind === "textil-round2") {
+      // Auch hier zaehlt die Feldzahl: die Rundwand fuehrt DREI Felder hinter
+      // der Lage (54 von 54 Vorkommen), nicht zwei wie die uebrigen Teile.
+      lines.push(`textil-round2{${mat}, ${tuple(q, fx, fy, fz)}, 1, 0, 0}`);
     } else {
       lines.push(`${f.kind}{${mat}, ${tuple(q, fx, fy, fz)}, 1, 0}`);
     }
