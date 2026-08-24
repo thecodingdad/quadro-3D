@@ -3353,16 +3353,21 @@ export function initUI({ scene, model, builder }) {
     const zubehoer = accessories();
     const istRutsche = (a) => typeof a.qdf === "string" && /slide/.test(a.qdf);
     const ausGruppe = (name) => zubehoer.filter((a) => !istRutsche(a) && zubehoerGruppe(a.qdf) === name);
+    // `stock: false` heisst: das Teil gibt es, es laesst sich aber nicht
+    // bevorraten -- weil kein Modell es je anfordert. Die gelochten Rohre kann
+    // die QDF-Datei nicht ausdruecken (dort steht nur eine Laenge), und das
+    // offene Verbinderende ist ein Vermerk an einer Kupplung, kein Bauteil.
+    const lager = (liste) => liste.filter((x) => x && x.stock !== false);
     const abschnitte = [
-      ["bom-tubes", "tubes", allTubes()],
-      ["bom-connectors", "connectors", allConnectors()],
-      ["bom-panels", "panels", panels()],
-      ["bom-textiles", "fittings", ausGruppe("textiles")],
-      ["bom-slides", "fittings", zubehoer.filter(istRutsche)],
-      ["bom-wheels", "fittings", ausGruppe("wheels")],
-      ["bom-fittings", "fittings", ausGruppe("fittings")],
-      ["bom-reinforcements", "reinforcements", reinforcements()],
-      ["bom-screws", "screws", screws()],
+      ["bom-tubes", "tubes", lager(allTubes())],
+      ["bom-connectors", "connectors", lager(allConnectors())],
+      ["bom-panels", "panels", lager(panels())],
+      ["bom-textiles", "fittings", lager(ausGruppe("textiles"))],
+      ["bom-slides", "fittings", lager(zubehoer.filter(istRutsche))],
+      ["bom-wheels", "fittings", lager(ausGruppe("wheels"))],
+      ["bom-fittings", "fittings", lager(ausGruppe("fittings"))],
+      ["bom-reinforcements", "reinforcements", lager(reinforcements())],
+      ["bom-screws", "screws", lager(screws())],
     ];
     // Farbige Teile bekommen je Farbe eine eigene Zeile, sobald die Liste nach
     // Farben getrennt ist -- sonst ließe sich der Bestand nicht farbgenau

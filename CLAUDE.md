@@ -286,6 +286,10 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   im Leeren beginnt es das Auswahl-Rechteck (danach greift derselbe Ablauf wie bei Strg + Ziehen).
   Damit das Halten überhaupt ankommt, beginnt das **Verschieben** einer Auswahl per Finger erst
   bei der ersten Bewegung (`_dragKandidat`) – vorher startete der Zug schon beim Aufsetzen.
+- **`stock: false` im Katalog** heisst: das Teil bleibt, taucht aber im Bestand nicht auf – weil kein
+  Modell es je anfordert. Das haben die sieben gelochten Rohre (die QDF-Datei führt für ein Rohr nur
+  eine Länge, Löcher und Winkel kann sie nicht ausdrücken) und das offene Verbinderende (ein Vermerk
+  an einer Kupplung, kein Bauteil). Gezeichnet, gezählt und geschrieben werden sie weiterhin.
 - **Neue UI-Texte:** immer in **beide** Dictionaries (`de` und `en`) in `i18n.js`, dann `t('key')`
   bzw. `data-i18n`/`data-i18n-title`/`data-i18n-placeholder`/`data-i18n-aria` im HTML. Nie Strings
   in `ui.js` hardcoden.

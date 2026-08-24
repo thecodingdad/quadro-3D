@@ -385,7 +385,8 @@
       "buildable": false,
       "colored": true,
       "note": "steht nicht in der Toolbar (gelochte Winkelrohre lassen sich nicht sinnvoll ins Raster bauen), zählt aber in der Stückliste vorhandener Modelle",
-      "url": "https://quadroshop.com/products/tube-15cm-90deg-4hole"
+      "url": "https://quadroshop.com/products/tube-15cm-90deg-4hole",
+      "stock": false
     },
     {
       "id": "TS2",
@@ -399,7 +400,8 @@
       "buildable": false,
       "colored": true,
       "note": "steht nicht in der Toolbar (gelochte Winkelrohre lassen sich nicht sinnvoll ins Raster bauen), zählt aber in der Stückliste vorhandener Modelle",
-      "url": "https://quadroshop.com/products/tube-15cm-135deg-3hole"
+      "url": "https://quadroshop.com/products/tube-15cm-135deg-3hole",
+      "stock": false
     },
     {
       "id": "TS3",
@@ -413,7 +415,8 @@
       "buildable": false,
       "colored": true,
       "note": "steht nicht in der Toolbar (gelochte Winkelrohre lassen sich nicht sinnvoll ins Raster bauen), zählt aber in der Stückliste vorhandener Modelle",
-      "url": "https://quadroshop.com/products/tube-15cm-180deg-4hole"
+      "url": "https://quadroshop.com/products/tube-15cm-180deg-4hole",
+      "stock": false
     },
     {
       "id": "TS4",
@@ -427,7 +430,8 @@
       "buildable": false,
       "colored": true,
       "note": "steht nicht in der Toolbar (gelochte Winkelrohre lassen sich nicht sinnvoll ins Raster bauen), zählt aber in der Stückliste vorhandener Modelle",
-      "url": "https://quadroshop.com/products/tube-35cm-90deg-4hole"
+      "url": "https://quadroshop.com/products/tube-35cm-90deg-4hole",
+      "stock": false
     },
     {
       "id": "TS5",
@@ -441,7 +445,8 @@
       "buildable": false,
       "colored": true,
       "note": "steht nicht in der Toolbar (gelochte Winkelrohre lassen sich nicht sinnvoll ins Raster bauen), zählt aber in der Stückliste vorhandener Modelle",
-      "url": "https://quadroshop.com/products/tube-35cm-135deg-3hole"
+      "url": "https://quadroshop.com/products/tube-35cm-135deg-3hole",
+      "stock": false
     },
     {
       "id": "TS6",
@@ -455,7 +460,8 @@
       "buildable": false,
       "colored": true,
       "note": "steht nicht in der Toolbar (gelochte Winkelrohre lassen sich nicht sinnvoll ins Raster bauen), zählt aber in der Stückliste vorhandener Modelle",
-      "url": "https://quadroshop.com/products/tube-35cm-180deg-4hole"
+      "url": "https://quadroshop.com/products/tube-35cm-180deg-4hole",
+      "stock": false
     },
     {
       "id": "TS7",
@@ -469,7 +475,8 @@
       "buildable": false,
       "colored": true,
       "note": "steht nicht in der Toolbar (gelochte Winkelrohre lassen sich nicht sinnvoll ins Raster bauen), zählt aber in der Stückliste vorhandener Modelle",
-      "url": "https://quadroshop.com/products/curved-tube-135deg-3hole"
+      "url": "https://quadroshop.com/products/curved-tube-135deg-3hole",
+      "stock": false
     }
   ],
   "panels": [
@@ -564,32 +571,6 @@
       "colored": true,
       "note": "GIBT ES NICHT als Platte – gehört zum Pool-/Bällebad-Set und wird dort als Teil des Beckens gezeichnet; frei setzbar war sie ein Versehen",
       "url": "https://quadroshop.com/collections/pools"
-    },
-    {
-      "id": "pool_wall",
-      "code": "BAD",
-      "name": "Bällebad-Wand 120 x 40 cm",
-      "name_en": "Ball pit wall 120 x 40 cm",
-      "w": 120,
-      "h": 40,
-      "price": 0,
-      "buildable": false,
-      "colored": true,
-      "note": "Bällebad-Seitenwand; feste Geometrie (pool2 in QDF) · gehört zum Pool-/Bällebad-Set, im Shop nicht einzeln gelistet",
-      "url": "https://quadroshop.com/collections/pools"
-    },
-    {
-      "id": "pool_floor",
-      "code": "BAF",
-      "name": "Bällebad-Boden",
-      "name_en": "Ball pit floor",
-      "w": 120,
-      "h": 160,
-      "price": 0,
-      "buildable": false,
-      "colored": true,
-      "note": "Synthetischer Bällebad-Boden (pool2); scene.js rendert darüber Wasser-Volumen · gehört zum Pool-/Bällebad-Set, im Shop nicht einzeln gelistet",
-      "url": "https://quadroshop.com/collections/pools"
     }
   ],
   "reinforcements": [
@@ -634,7 +615,8 @@
       "price": 0,
       "qdf": "open-connector2",
       "note": "50 mm lange, beidseitig offene Hülse auf einem Stutzen der Kupplung · erzwingt diesen Stutzen: ohne Rohr wird dort sonst keiner gezeichnet und keiner gerechnet · im Shop nicht als Einzelteil gelistet, deshalb ohne Preis",
-      "url": "https://quadroshop.com/collections/connectors"
+      "url": "https://quadroshop.com/collections/connectors",
+      "stock": false
     },
     {
       "id": "safety_clamp",
