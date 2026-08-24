@@ -1,7 +1,7 @@
 // Verkabelt die Bedienoberflaeche (Toolbar, Tastatur, Stueckliste, Bestand).
 
 import { buildableTubes, buildableCurvedTubes, buildablePanels, tubeColors, geometry, allTubes, allConnectors, panels, reinforcements, screws, slideKindName, partName, partForFitting, accessories, getPartById, poolLinerFor, getTube, getPanel } from "./catalog.js";
-import { PLACEABLE_FITTINGS, POOL_KINDS, HOLE_MASKS } from "./model.js";
+import { PLACEABLE_FITTINGS, POOL_KINDS, HOLE_MASKS, ROTATABLE_FITTINGS } from "./model.js";
 import { computeBOM, compareInventory, connectorsForNode } from "./bom.js";
 import { computeBuildPlan, BUILD_ORDERS } from "./buildplan.js";
 import { parseQDF } from "./qdfimport.js";
@@ -802,9 +802,35 @@ export function initUI({ scene, model, builder }) {
       fitting: "status_fitting",
       assembly: "status_assembly",
     };
-    setStatusHint(t(statusMap[m] || "status_add"));
+    setStatusHint(t(m === "fitting" ? fittingHintKey(builder.fittingKind) : (statusMap[m] || "status_add")));
     renderCurrentPart();
     if (m === "assembly") renderAssembly();
+  }
+
+  /**
+   * Der Hinweis unten links haengt beim Anbauteil an der TEILEART: die
+   * Ankerpunkte liegen je nach Teil ganz woanders -- an einem Stutzen, frei auf
+   * einem Rohr, am Rohrende oder zwischen zwei Rohren. Ein Sammeltext ("einen
+   * Ankerpunkt anklicken") half dort niemandem weiter.
+   */
+  const FITTING_HINTS = {
+    "multi-wheel2": "status_fitting_wheel",
+    "floating-wheel2": "status_fitting_tube",
+    "hub-cap2": "status_fitting_cap",
+    "tube-cap2": "status_fitting_cap",
+    "bearing-clamp": "status_fitting_bearing",
+    "textil-round2": "status_fitting_round",
+    "bag2": "status_fitting_rail",
+    "lattice2": "status_fitting_rail",
+    "textil2": "status_fitting_rail",
+  };
+  function fittingHintKey(kind) {
+    if (FITTING_HINTS[kind]) return FITTING_HINTS[kind];
+    if (HOLE_MASKS[kind]) return "status_fitting_hole";
+    // Alles Uebrige sitzt auf einem Stutzen der Kupplung: Radlager, Laufrolle,
+    // Arretierung, Adapter, offenes Verbinderende. Weiterdrehen laesst sich nur
+    // ein Teil der Truppe -- der Hinweis darf nichts versprechen, was nicht geht.
+    return ROTATABLE_FITTINGS.has(kind) ? "status_fitting_arm" : "status_fitting_arm_fixed";
   }
 
   /**
@@ -1416,7 +1442,7 @@ export function initUI({ scene, model, builder }) {
           return;
         }
         builder.setFitting(p.qdf);
-        setMode("fitting");
+        setMode("fitting");      // setzt auch den Hinweis zur gewaehlten Teileart
       });
     });
     btn.innerHTML = icon() + `<span></span>`;

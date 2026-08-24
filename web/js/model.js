@@ -295,7 +295,7 @@ export function nodeClampOffset(node, cs = 5) {
 
 // Anbauteile, die sich per Klick weiterdrehen lassen: sie sitzen an einer
 // Kupplung und haben eine Achse, fuer die es mehrere Richtungen gibt.
-const ROTATABLE_FITTINGS = new Set([
+export const ROTATABLE_FITTINGS = new Set([
   "bearing2", "casters2", "open-connector2",
 ]);
 
@@ -1161,11 +1161,17 @@ export class BuildModel {
     for (const n of this.nodes.values()) {
       if (n.c45body || n.part) continue;
       const arms = [];
+      // Eine Winkelkupplung haengt ueber eine Arm-Kante am Knoten, ein
+      // Doppelrohrverbinder ueber eine Link-Kante. Beide zaehlen nicht als Rohr,
+      // besetzen den Knoten aber trotzdem: eine Kappe kommt dorthin nicht mehr.
+      let besetzt = !!n.c45 || !!n.bearingOn;
       for (const t of this.tubes.values()) {
-        if (t.arm || t.link) continue;
+        const dran = t.a === n.id || t.b === n.id;
+        if (t.arm || t.link) { if (dran) besetzt = true; continue; }
         const other = t.a === n.id ? this.nodes.get(t.b) : t.b === n.id ? this.nodes.get(t.a) : null;
         if (other) arms.push(other);
       }
+      if (besetzt) continue;
       if (arms.length !== 1) continue;                 // nur freie Rohrenden
       if (this.hasEndPiece(n)) continue;               // dort steckt schon eine Kappe
       const o = arms[0];
