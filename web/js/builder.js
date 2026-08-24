@@ -1483,10 +1483,17 @@ export class Builder {
       const tb = this.model.tubes.get(tubeId);
       return !!tb && (tb.a === sel || tb.b === sel);
     };
+    // Belegt ist eine Stelle nur, wenn dort schon dasselbe Teil in DERSELBEN
+    // Richtung sitzt: an einer Kupplung liegen alle Stutzen-Punkte auf ihrem
+    // Mittelpunkt, erst die Richtung sagt, welcher Stutzen gemeint ist. Ohne den
+    // Vergleich sperrte eine einzige Multirad-Arretierung die ganze Kupplung.
     const frei = (m) => {
       for (const f of this.model.fittings.values()) {
         if (f.kind !== this.fittingKind) continue;
-        if (Math.hypot(f.x - m.pos[0], f.y - m.pos[1], f.z - m.pos[2]) < 2) return false;
+        if (Math.hypot(f.x - m.pos[0], f.y - m.pos[1], f.z - m.pos[2]) >= 2) continue;
+        if (!m.dir || !f.quat) return false;
+        const ax = xAxisOf(f.quat);
+        if (ax[0] * m.dir[0] + ax[1] * m.dir[1] + ax[2] * m.dir[2] > 0.9) return false;
       }
       return true;
     };

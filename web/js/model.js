@@ -1847,7 +1847,13 @@ export class BuildModel {
     const blocken = CAPS.includes(kind) ? CAPS : [kind];
     for (const f of this.fittings.values()) {
       if (!blocken.includes(f.kind)) continue;
-      if (Math.hypot(f.x - mount.pos[0], f.y - mount.pos[1], f.z - mount.pos[2]) < 3) return null;
+      if (Math.hypot(f.x - mount.pos[0], f.y - mount.pos[1], f.z - mount.pos[2]) >= 3) continue;
+      // Teile an einer Kupplung sitzen alle auf DEREN Punkt -- erst die
+      // Richtung sagt, welcher Stutzen belegt ist. An einer Kupplung duerfen
+      // durchaus mehrere Arretierungen sitzen, nur nicht zwei auf einem Stutzen.
+      if (!mount.dir || !f.quat) return null;
+      const ax = xAxisOf(f.quat);
+      if (ax[0] * mount.dir[0] + ax[1] * mount.dir[1] + ax[2] * mount.dir[2] > 0.9) return null;
     }
     const half = (FITTING_WIDTH[kind] || 0) / 2;
     if (half && this._fittingBlocked(kind, mount.pos, mount.dir || [1, 0, 0], half)) return null;
