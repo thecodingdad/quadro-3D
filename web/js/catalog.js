@@ -102,7 +102,10 @@ export function partForFitting(kind, mask) {
     return getConnector(arms >= 3 ? "hole_t" : arms === 2 ? "hole_2" : "hole_1");
   }
   const all = [...allConnectors(), ...accessories(), ...allTubes(), ...panels()];
-  return all.find((x) => x.qdf === kind) || null;
+  // Manche Teile waehlt die Leiste unter ihrer KATALOG-Kennung statt unter der
+  // QDF-Art: die Lochzapfenkupplungen und die beiden Teile der Flexikupplung.
+  // Ohne diesen zweiten Griff stand ueber der Szene kein Name.
+  return all.find((x) => x.qdf === kind) || all.find((x) => x.id === kind) || null;
 }
 
 // Verstaerkungen (Holz-Profile), die in Rohre geschoben werden. Zu kaufen gibt

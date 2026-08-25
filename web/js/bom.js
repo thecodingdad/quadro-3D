@@ -2,7 +2,7 @@
 
 import { getTube, getConnector, getPanel, colorName, partName, reinforcementPart, partForFitting, getPartById, getScrew, poolLinerFor, geometry } from "./catalog.js";
 import { round2, xAxisOf } from "./util.js";
-import { POOL_KINDS, isHolePart } from "./model.js";
+import { POOL_KINDS, isHolePart, isBoltPart, BOLT_PART, HINGE_PART } from "./model.js";
 
 // Einheitsvektoren der Nachbarn eines Knotens. Doppelrohr-Verbindungen (link)
 // sind KEIN Arm der Kupplung und zaehlen nicht in die Kupplungstyp-Heuristik
@@ -185,6 +185,10 @@ export function infeasibleConnectors(model) {
   for (const n of model.nodes.values()) {
     if (n.unused) continue;             // haelt nichts, also auch nichts zu pruefen
     if (n.c45body) continue;            // Adapter-Koerper ist immer einarmig
+    // Flexikupplungs-Bolzen: dort steckt keine Kupplung, seine Arme sind der
+    // Bolzen selbst und die Scharniere -- und die stehen frei in 45-Grad-
+    // Schritten. An einer Kupplung gemessen waere das nie herstellbar.
+    if (isBoltPart(n.part)) continue;
     if (armsFeasible(dirsAt.get(n.id) || [])) bad.add(n.id);
   }
   return bad;
@@ -222,6 +226,11 @@ export function connectorsForNode(model, node) {
   // das Rohr selbst auf -- sie zaehlt allein. Die Lagerkupplung traegt eine
   // ganze Kupplung, die zusaetzlich in die Liste gehoert.
   if (isHolePart(node.part)) return [node.part];
+  // Flexikupplung, im Editor gesetzt: der Knoten IST der Bolzen, dazu kommt je
+  // Scharnier eines. Eine Kupplung steckt dort nicht -- der Bolzen ersetzt sie.
+  if (isBoltPart(node.part)) {
+    return [BOLT_PART, ...(node.hinges || []).map(() => HINGE_PART)];
+  }
   // Flexikupplung: an diesem Punkt sitzt keine Kupplung, sondern zwei ihrer
   // Arme, die ein Bolzen haelt. Gezaehlt werden die Arme als Anbauteile (je
   // eine Zeile der Datei) -- hier also nichts, sonst stuende beides in der

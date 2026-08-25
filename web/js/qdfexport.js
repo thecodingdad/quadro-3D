@@ -23,7 +23,7 @@
 
 import { geometry, getPanel, getTube } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
-import { isHolePart, HOLE_MASKS, BLACK_FITTINGS } from "./model.js";
+import { isHolePart, HOLE_MASKS, BLACK_FITTINGS, isBoltPart, boltAxis, hingeDir } from "./model.js";
 
 // Farbtabelle wie in den Dateien der Herstellersoftware: erst der Satz fuer
 // Rohre und Kupplungen (kind 1), dann derselbe Satz fuer Platten (kind 2). Die
@@ -175,6 +175,25 @@ function clampQuat(dir, off, clip) {
 }
 
 /**
+ * Die beiden Zahlenfelder einer `flexi-connector3`-Zeile, die nicht in der
+ * Drehung stecken -- gelesen aus den 168 Vorkommen des Bestands:
+ *   Feld 4 ist 0, wenn der Arm des Scharniers senkrecht nach unten haengt, und
+ *          60, wenn er 45 Grad daneben steht (andere Werte kommen nicht vor).
+ *   Feld 7 zaehlt bei haengendem Arm die Bolzenachse durch (+X 32, +Z 33,
+ *          -X 34, -Z 35); bei 45 Grad steht dort 16, 17 oder 18. Welche Regel
+ *          das genau ist, wissen wir NICHT -- gezeichnet wird das Teil aus der
+ *          Drehung, deshalb genuegt ein Wert, der im Bestand vorkommt (17).
+ * Beide Felder sind damit VERMUTET, siehe QDF-FORMAT.md.
+ */
+function hingeFields(achse, arm) {
+  const unten = arm[1] < -0.9;
+  if (!unten) return "60, 0, 8, 0, 17";
+  const idx = Math.abs(achse[0]) > 0.5 ? (achse[0] > 0 ? 0 : 2)
+    : Math.abs(achse[2]) > 0.5 ? (achse[2] > 0 ? 1 : 3) : 0;
+  return `0, 0, 8, 0, ${32 + idx}`;
+}
+
+/**
  * Drehung aus einem vollstaendigen Dreibein: lokale X-, Y- und Z-Achse gehen auf
  * ex, ey, ez. Gebraucht fuer Boegen (Tangente + Normale) und Platten (die beiden
  * Kantenrichtungen).
@@ -303,6 +322,29 @@ export function buildQDF(model) {
     // zwei Flexi-Arme und ein Bolzen die Rohre. Die Arme stehen als Anbauteile
     // in der Liste und werden weiter unten geschrieben.
     if (n.part === "flexi") continue;
+    // Selbst gesetzte Flexikupplung: der Knoten IST der Bolzen. Er steht als
+    // eigene Zeile in der Datei, dazu je Scharnier eine -- eine connector3 gibt
+    // es an dieser Stelle nicht.
+    if (isBoltPart(n.part)) {
+      const ex = boltAxis(n);
+      const qb = n.partQuat && n.partQuat.length === 4
+        ? encodeQuat([n.partQuat[3], n.partQuat[0], n.partQuat[1], n.partQuat[2]])
+        : encodeQuat(quatFromX(ex));
+      // Feld 3 ist die Bolzenlaenge (150 in jeder Zeile des Bestands), Feld 4
+      // sagt, wo die Scharniere sitzen: 1 = auf dem mittleren Segment (der
+      // Bolzen steht dann mittig auf dem Punkt), 0 = 50 mm daneben. Wir setzen
+      // sie immer auf die Mitte, also 1.
+      lines.push(`bolt2{${CONNECTOR_MAT}, ${tuple(qb, n.x, n.y, n.z)}, 1, 150., 1, 0}`);
+      stats.fittings++;
+      for (const grad of n.hinges || []) {
+        const arm = hingeDir(n, grad);
+        const ey = [-arm[0], -arm[1], -arm[2]];
+        const qh = encodeQuat(quatFromAxes(ex, ey, cross(ex, ey)));
+        lines.push(`flexi-connector3{${CONNECTOR_MAT}, ${tuple(qh, n.x, n.y, n.z)}, 1, ${hingeFields(ex, arm)}, 0}`);
+        stats.fittings++;
+      }
+      continue;
+    }
     // Klemm-Kupplung: eigene Zeile statt connector3. Der Punkt ist die
     // Muendung des offenen Anschlusses, das lokale -Y zeigt in ihn hinein und
     // das lokale X laeuft am umschlossenen Rohr entlang -- so steht es in allen

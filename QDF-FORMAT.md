@@ -551,13 +551,30 @@ flexi-connector3{1, {…}, 1, 60, 0, 8, 0, 17, 0}
 bolt2{1, {0., 0., 4., 0., 2000., 1200., 0.}, 1, 150., 1, 0}
 ```
 
-A flexi joint is **two arms and a bolt**, and there is deliberately no
-`connector3` at that point. `flexi-connector3` field 5 is `8` in every line,
-field 7 takes eight values (17, 32, 18, 33, 16, 35, …) and probably encodes
-the arm direction **~**; fields 3, 4, 6 and 8 are open **?**.
+A flexi joint is a **bolt with up to two hinges**, and there is deliberately no
+`connector3` at that point. Measured on all 84 bolts and 168 hinges of the
+corpus, plus the meshes captured from `Quadro.exe`:
 
-`bolt2` field 3 is `150.` in every line (the bolt length), field 4 is 0 or 1.
-**✔** / **?**
+- **`bolt2`** is a 150 mm rod of **three 50 mm segments** along its local +X,
+  drawn centred on its own point (field 3 is `150.` in every line — the length).
+  Two segments plug into tubes or stay open, the middle one carries the hinges.
+  **Field 4 says where the joint sits: `1` = on the bolt's point, `0` = 50 mm
+  along local −X.** Every hinge of that joint sits exactly on that point
+  (83 of 84 bolts have exactly two hinges, all of them there). **✔**
+- **`flexi-connector3`** is the hinge: a 50 mm collar around the bolt (local +X
+  = the bolt axis, bore radius 21 mm) with its own socket 75 mm along local
+  **−Y**. Both collars are toothed, so two hinges of a joint rest in 45°
+  steps — the angle between their arms is **135° in all 83 joints**, never 0.
+  Field 5 is `8` in every line. Field 3 is `0` when the arm hangs straight down
+  and `60` when it stands 45° off; field 7 is `32 + k` (k = 0…3 by bolt axis:
+  +X, +Z, −X, −Z) in the first case and 16, 17 or 18 in the second. What
+  exactly those two encode is **?** — the part is drawn from the quaternion, so
+  this app writes a combination that occurs in the corpus.
+
+This app turns bolt and hinges into ONE node (`part = "flexi_bolt"`, hinge
+angles in `hinges`) whenever a node sits on the joint point — 63 of the 84
+bolts of the corpus. The rest keeps its original lines and is written back
+untouched.
 
 #### `open-connector2`, `adapter2`, `tube-cap2`
 

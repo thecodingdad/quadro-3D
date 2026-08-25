@@ -6,7 +6,8 @@ import { computeBuildPlan, connectorLabelInfo } from "./buildplan.js";
 import { infeasibleConnectors, inferConnectorType } from "./bom.js";
 import { t } from "./i18n.js";
 import { round2, panelNormal, modelMiddle, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
-import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, holeClampDirsAt, HOLE_MASKS } from "./model.js";
+import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, holeClampDirsAt, HOLE_MASKS,
+  BOLT_PART, HINGE_PART, isBoltPart, boltArmDirs, hingeDir } from "./model.js";
 
 // Kupplungen, die auf einem Rohr sitzen statt im Raster: QDF-Art -> Katalogteil.
 // Teile, die sich um ein Rohr klemmen lassen. Die Lochzapfenkupplung gehört
@@ -1160,6 +1161,12 @@ export class Builder {
    * Liefert `null` fuer die ungedrehte Kupplung; dort gelten die Weltachsen.
    */
   _armDirsOf(node) {
+    // Flexikupplung: der Bolzen hat seine beiden Stutzen auf der Achse, dazu je
+    // Scharnier dessen Arm -- und sonst nichts. Sie kommen aus seiner Lage,
+    // gelten also auch nach jeder Drehung eines Scharniers.
+    if (isBoltPart(node.part)) {
+      return boltArmDirs(node).map((v, i) => ({ name: "bolt" + i, vec: v }));
+    }
     if (node.quat && node.quat.length === 4) {
       const ex = xAxisOf(node.quat), ey = yAxisOf(node.quat), ez = zAxisOf(node.quat);
       const neg = (v) => [-v[0], -v[1], -v[2]];
@@ -1484,6 +1491,21 @@ export class Builder {
         this._fittingMountNodes.add(m.nodeId);
         if (sel0 && m.nodeId !== sel0) continue;
         this.scene.addHandle(m.pos, { holeArm: m }, "dir");
+      }
+      return;
+    }
+    // Flexikupplung: der Bolzen kommt auf ein freies Rohrende (er ersetzt die
+    // Dummy-Kupplung), das Scharnier auf das mittlere Segment eines Bolzens.
+    if (this.fittingKind === BOLT_PART || this.fittingKind === HINGE_PART) {
+      const sel0 = this.selectedNodeId;
+      const cs = geometry().connectorSize;
+      const stellen = this.fittingKind === BOLT_PART
+        ? this.model.boltMounts(cs).map((m) => ({ m, pos: m.handle || m.pos, art: "boltMount" }))
+        : this.model.hingeMounts(cs).map((m) => ({ m, pos: m.pos, art: "hingeMount" }));
+      for (const s of stellen) {
+        this._fittingMountNodes.add(s.m.nodeId);
+        if (sel0 && s.m.nodeId !== sel0) continue;
+        this.scene.addHandle(s.pos, { [s.art]: s.m }, "dir");
       }
       return;
     }
@@ -2309,6 +2331,7 @@ export class Builder {
   _clickFitting(e) {
     if (RAIL_FITTINGS.has(this.fittingKind)) { this._clickLattice(e); return; }
     if (HOLE_MASKS[this.fittingKind]) { this._clickHoleClamp(e); return; }
+    if (this.fittingKind === BOLT_PART || this.fittingKind === HINGE_PART) { this._clickFlexi(e); return; }
     if (TUBE_CLAMP_PARTS[this.fittingKind]) { this._clickTubeClamp(e); return; }
     if (TUBE_FITTINGS[this.fittingKind]) { this._clickTubeFitting(e); return; }
     const h = this.scene.pickHandle(e.clientX, e.clientY);
@@ -2489,6 +2512,48 @@ export class Builder {
       if (n && isHolePart(n.part)) {
         let gedreht = false;
         this.recordHistory(() => { gedreht = this.model.turnHoleClamp(n.id); });
+        if (!gedreht) this.onNotice(t("notice_fitting_fixed"), "warn");
+        this.refresh();
+        return;
+      }
+    }
+    this._pickFittingNode(pick);
+  }
+
+  /**
+   * Flexikupplung: der BOLZEN kommt auf ein freies Rohrende und ersetzt dort
+   * die Dummy-Kupplung, das SCHARNIER auf das mittlere Segment eines Bolzens
+   * (hoechstens zwei). Ein Klick auf ein gesetztes Scharnier dreht es um 45
+   * Grad um die Bolzenachse weiter -- die Stellung des zweiten Scharniers wird
+   * dabei uebersprungen, und ein Arm mit Rohr bleibt stehen.
+   */
+  _clickFlexi(e) {
+    const cs = geometry().connectorSize;
+    const h = this.scene.pickHandle(e.clientX, e.clientY);
+    if (h && h.data && h.data.boltMount) {
+      let gesetzt = null;
+      this.recordHistory(() => { gesetzt = this.model.addBolt(h.data.boltMount.nodeId, cs); });
+      if (gesetzt) this._notePlaced(gesetzt.id, "node");
+      else this.onNotice(t("notice_fitting_exists"), "warn");
+      this.refresh();
+      return;
+    }
+    if (h && h.data && h.data.hingeMount) {
+      let gesetzt = null;
+      this.recordHistory(() => { gesetzt = this.model.addHinge(h.data.hingeMount.nodeId); });
+      if (gesetzt) this._notePlaced(gesetzt.id, "node");
+      else this.onNotice(t("notice_fitting_exists"), "warn");
+      this.refresh();
+      return;
+    }
+    const pick = this.scene.pickForDelete(e.clientX, e.clientY);
+    // Getroffen wird das Scharnier selbst: sein Index steht am Treffer, sonst
+    // wuesste man bei zwei Scharnieren nicht, welches gemeint ist.
+    if (pick && pick.data.kind === "node" && pick.data.hinge != null) {
+      const n = this.model.nodes.get(pick.data.id);
+      if (n && isBoltPart(n.part)) {
+        let gedreht = false;
+        this.recordHistory(() => { gedreht = this.model.turnHinge(n.id, pick.data.hinge); });
         if (!gedreht) this.onNotice(t("notice_fitting_fixed"), "warn");
         this.refresh();
         return;

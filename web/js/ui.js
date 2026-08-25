@@ -905,6 +905,8 @@ export function initUI({ scene, model, builder }) {
   function fittingHintKey(kind) {
     if (FITTING_HINTS[kind]) return FITTING_HINTS[kind];
     if (HOLE_MASKS[kind]) return "status_fitting_hole";
+    if (kind === "flexi_bolt") return "status_fitting_bolt";
+    if (kind === "flexi_hinge") return "status_fitting_hinge";
     // Alles Uebrige sitzt auf einem Stutzen der Kupplung: Radlager, Laufrolle,
     // Arretierung, Adapter, offenes Verbinderende. Weiterdrehen laesst sich nur
     // ein Teil der Truppe -- der Hinweis darf nichts versprechen, was nicht geht.
@@ -1333,6 +1335,7 @@ export function initUI({ scene, model, builder }) {
       `<circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.6"/>` +
       `<circle cx="8" cy="8" r="1.6" fill="currentColor"/>`],
     ["grp_joints", [C45_ENTRY, "bearing-clamp", "hole_1", "hole_2", "hole_t",
+      "flexi_bolt", "flexi_hinge",
       CLAMP_ENTRY, CLIP_ENTRY, "tube-cap2", "open-connector2"],
       `<line x1="2.5" y1="6" x2="13.5" y2="6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
@@ -1405,6 +1408,15 @@ export function initUI({ scene, model, builder }) {
     "open-connector2": `<line x1="1.5" y1="8" x2="7" y2="8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>` +
       `<path d="M7 4.6 L13.4 4.6 M7 11.4 L13.4 11.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` +
       `<ellipse cx="13.4" cy="8" rx="1.5" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.4"/>`,
+    // Flexikupplung, Bolzen: ein Stab aus drei Segmenten -- das mittlere ist
+    // dicker gezeichnet, dort sitzen die Scharniere.
+    "flexi_bolt": `<line x1="1.5" y1="8" x2="14.5" y2="8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>` +
+      `<rect x="5.6" y="4.6" width="4.8" height="6.8" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"/>`,
+    // Flexikupplung, Scharnier: sein Kranz sitzt auf dem Bolzen, sein eigener
+    // Stutzen steht quer dazu.
+    "flexi_hinge": `<line x1="1.5" y1="5" x2="14.5" y2="5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
+      `<circle cx="8" cy="5" r="3" fill="none" stroke="currentColor" stroke-width="1.4"/>` +
+      `<line x1="8" y1="8" x2="8" y2="14.2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>`,
     "adapter2": `<path d="M2.4 6.4 L8.6 6.4 L8.6 9.6 L2.4 9.6" fill="none" stroke="currentColor" stroke-width="1.4"/>` +
       `<rect x="8.6" y="4.8" width="5" height="6.4" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"/>`,
     // Sonstiges
@@ -1500,7 +1512,8 @@ export function initUI({ scene, model, builder }) {
     const items = kinds.map((k) => {
       // Klemmen und Lochzapfenkupplungen stehen unter ihrer Katalog-Kennung im
       // Menue, die uebrigen unter ihrer QDF-Art.
-      const def = (k === CLAMP_ENTRY || k === CLIP_ENTRY || HOLE_MASKS[k])
+      const def = (k === CLAMP_ENTRY || k === CLIP_ENTRY || HOLE_MASKS[k]
+        || k === "flexi_bolt" || k === "flexi_hinge")
         ? allConnectors().find((c) => c.id === k)
         : k === C45_ENTRY ? allConnectors().find((c) => c.id === "diagonal")
         : partForFitting(k);
@@ -3091,9 +3104,10 @@ export function initUI({ scene, model, builder }) {
   // Zeile ohne jede Wirkung.
   // Anbauteile, die die Szene NICHT zeichnet -- ihre Hervorhebung braucht einen
   // sichtbaren Ersatz in der Naehe. Seit die abgegriffenen Modelle da sind, ist
-  // das nur noch die Flexikupplung; Bolzen, Lagerkupplung und Rohrkappe werden
-  // gezeichnet und heben sich selbst hervor.
-  const UNDRAWN_FITTINGS = new Set(["flexi-connector3"]);
+  // die Liste leer: auch Scharnier und Bolzen der Flexikupplung werden
+  // gezeichnet (als Knoten, oder -- wo der Import sie nicht zusammenfassen
+  // konnte -- als Anbauteil auf ihrer Lage aus der Datei).
+  const UNDRAWN_FITTINGS = new Set();
 
   /** Sichtbarer Stellvertreter für ein Teil, das nicht gezeichnet wird. */
   function visibleStandIn(f) {

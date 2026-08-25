@@ -4,7 +4,8 @@ import * as THREE from "three";
 import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
-import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs, BLACK_FITTINGS } from "./model.js";
+import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs, BLACK_FITTINGS,
+  isBoltPart, boltAxis, hingeDir } from "./model.js";
 import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
@@ -2379,6 +2380,66 @@ export class SceneManager {
   }
 
   /**
+   * Flexikupplung zeichnen: der Bolzen liegt mit seiner Achse (lokal +X) im
+   * Rohrende, sein mittleres Segment traegt bis zu zwei Scharniere. Jedes
+   * Scharnier sitzt mit dem Kranz auf derselben Achse; sein eigener Stutzen
+   * zeigt nach lokal -Y, also in die Armrichtung.
+   *
+   * Jedes Scharnier bekommt seinen Index an den Treffer (`hinge`) -- nur so
+   * weiss der Klick, welches der beiden gedreht werden soll.
+   */
+  _addFlexiJoint(model, n, mat, st) {
+    const pos = new THREE.Vector3(n.x, n.y, n.z);
+    const pick = st !== "future" ? this.pickNodes : null;
+    const achse = boltAxis(n);
+    const ex = new THREE.Vector3(achse[0], achse[1], achse[2]).normalize();
+    const bolzen = this._q().meshes && this._fitMeshes ? this._fitMeshes["bolt2"] : null;
+    const scharnier = this._q().meshes && this._fitMeshes ? this._fitMeshes["flexi-connector3"] : null;
+    const q = n.partQuat && n.partQuat.length === 4
+      ? new THREE.Quaternion(n.partQuat[0], n.partQuat[1], n.partQuat[2], n.partQuat[3]).normalize()
+      : new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), ex);
+    const g = geometry();
+    if (bolzen) {
+      this._batchAdd(this._meshGeometry("fit:bolt2", bolzen), mat,
+        new THREE.Matrix4().compose(pos, q, ONE), "node", n.id, pick);
+    } else {
+      // Rueckfall ohne Modelldatei: ein Stab von drei Segmenten Laenge.
+      const seg = Math.max(8, this._q().tube);
+      const stab = new THREE.Mesh(this._cachedGeo(`bolt${seg}`,
+        () => new THREE.CylinderGeometry(g.armRadius, g.armRadius, g.connectorSize * 3, seg)), mat);
+      stab.quaternion.setFromUnitVectors(UP, ex);
+      stab.position.copy(pos);
+      stab.userData = { kind: "node", id: n.id };
+      this.buildGroup.add(stab);
+      if (pick) pick.push(stab);
+    }
+    const winkel = n.hinges || [];
+    for (let i = 0; i < winkel.length; i++) {
+      const d = hingeDir(n, winkel[i]);
+      const arm = new THREE.Vector3(d[0], d[1], d[2]).normalize();
+      if (scharnier) {
+        // Lokales +X = Bolzenachse, lokales -Y = Arm. Daraus die Basis; die
+        // dritte Achse ergibt sich aus den beiden.
+        const ey = arm.clone().negate();
+        const ez = new THREE.Vector3().crossVectors(ex, ey);
+        this._batchAdd(this._meshGeometry("fit:flexi-connector3", scharnier), mat,
+          new THREE.Matrix4().makeBasis(ex, ey, ez).setPosition(pos),
+          "node", n.id, pick, { hinge: i });
+      } else {
+        const seg = Math.max(8, this._q().tube);
+        const len = g.connectorSize * 1.5;
+        const stab = new THREE.Mesh(this._cachedGeo(`hingeArm${seg}`,
+          () => new THREE.CylinderGeometry(g.armRadius, g.armRadius, len, seg)), mat);
+        stab.quaternion.setFromUnitVectors(UP, arm);
+        stab.position.copy(pos).addScaledVector(arm, len / 2);
+        stab.userData = { kind: "node", id: n.id, hinge: i };
+        this.buildGroup.add(stab);
+        if (pick) pick.push(stab);
+      }
+    }
+  }
+
+  /**
    * Lochzapfenkupplung zeichnen. Sie klemmt NICHT um ein Rohr, sie sieht aus
    * wie "O--": ein Ring greift ueber den Stutzen einer Kupplung, quer dazu
    * steht ihr eigener Stutzen, in dem das Rohr steckt. Der Knoten liegt an
@@ -2806,7 +2867,7 @@ export class SceneManager {
       // Zeile blieb es in einem Modell ohne Anbauteile beim gezeichneten
       // Innenstab, das abgegriffene Profil kam nie.
       || [...model.tubes.values()].some((t) => t.reinforced)
-      || [...model.nodes.values()].some((n) => n.c45 || isHolePart(n.part));
+      || [...model.nodes.values()].some((n) => n.c45 || isHolePart(n.part) || isBoltPart(n.part));
     const braucht = [];
     if (model.nodes.size) braucht.push("connectors");
     if ([...model.tubes.values()].some((t) => t.bow)) braucht.push("tubes");
@@ -2908,10 +2969,13 @@ export class SceneManager {
       // braucht keinen Wuerfel; die Lagerkupplung traegt eine ganze Kupplung --
       // die wird unten zusaetzlich gezeichnet.
       if (n.stub && isHolePart(n.part)) this._addPinConnector(model, n, matFor(n.id, mat), st);
+      else if (isBoltPart(n.part)) this._addFlexiJoint(model, n, matFor(n.id, mat), st);
       else if (n.stub && n.part) this._addTubeClamp(model, n, matFor(n.id, mat), st);
       // Wo eine Radkappe sitzt, gibt es keine Kupplung mehr -- die Kappe
-      // schliesst das Rohrende selbst ab.
-      if (!n.c45body && !isHolePart(n.part) && !(model.hasWheelCap && model.hasWheelCap(n))) {
+      // schliesst das Rohrende selbst ab. Der Flexikupplungs-Bolzen ersetzt sie
+      // ebenfalls: er steckt selbst im Rohrende.
+      if (!n.c45body && !isHolePart(n.part) && !isBoltPart(n.part)
+          && !(model.hasWheelCap && model.hasWheelCap(n))) {
         const pos = new THREE.Vector3(n.x, n.y, n.z);
         const quat = this._nodeCubeQuat(model, n);
         // Das abgegriffene Originalteil, wenn es zum Anschlussbild passt: EIN

@@ -465,10 +465,24 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     **belegt** (`holeClampDirsAt`): dort geht kein Rohr und kein weiteres Teil mehr hin – nur die
     **Multirad-Arretierung** (`onClamp: true` in `FITTING_MOUNTS`), die sie festhält; so steht
     sie auch in den Herstellerdateien direkt daneben.
-  - **`flexi-connector3` ist das Scharnier**, nicht die ganze Flexikupplung: je Gelenk stehen
-    zwei davon plus ein `bolt2` in der Datei. Am Katalogteil `flexi_hinge` hängt deshalb das
-    `qdf`, nicht am Teil `flexi` – sonst zählte die Stückliste jedes Gelenk als zwei ganze
-    Flexikupplungen.
+  - **Die Flexikupplung ist ein KNOTEN aus drei Teilen**: der Bolzen (`bolt2`, 15 cm, drei
+    Segmente zu je 5 cm entlang seiner lokalen +X) und bis zu zwei Scharniere
+    (`flexi-connector3`, Kranz um den Bolzen, eigener Stutzen nach lokal −Y). Am Katalogteil
+    `flexi_hinge` hängt deshalb das `qdf`, nicht am Teil `flexi` – sonst zählte die Stückliste
+    jedes Gelenk als zwei ganze Flexikupplungen. Im Modell trägt der Knoten `part =
+    "flexi_bolt"`, seine Lage steht in `partQuat` (lokal +X = Bolzenachse, vom Rohr weg) und
+    die Stellungen der Scharniere als Winkel in `hinges` (0 = lokal −Y). Gesetzt wird über
+    `boltMounts()`/`addBolt()` – nur auf eine **Dummy-Kupplung** (Rohrende mit genau einem
+    Rohr), dort ersetzt der Bolzen die Kupplung – und `hingeMounts()`/`addHinge()`. Ein Klick
+    auf ein Scharnier dreht es um 45° weiter (`turnHinge`); die **Kränze sind verzahnt**, zwei
+    Scharniere können deshalb nie in dieselbe Richtung zeigen (im Bestand stehen sie an allen
+    83 Gelenken genau 135° auseinander), und ein Arm mit Rohr dreht sich nicht mehr. Die
+    Anschlussrichtungen (`boltArmDirs`) sind seine beiden Stutzen plus je Scharnier dessen
+    Arm – der Builder holt sie über `_armDirsOf`, damit Ankerpunkte und Belegung stimmen.
+    Beim Import wird das Gelenk zusammengefasst, sobald an seinem Punkt ein Knoten steht
+    (63 der 84 Bolzen des Bestands); die übrigen bleiben Anbauteile mit ihrem Rohtext und
+    gehen unverändert wieder hinaus. Wo der Punkt liegt, sagt **Feld 4 der bolt2-Zeile**
+    (1 = mittig, 0 = 50 mm entlang −X) – siehe QDF-FORMAT.md.
   - **Die Lagerkupplung** (`bearing-connector4`, Katalog `bearing`) klemmt um ein Rohr und
     **trägt eine Kupplung**. Die steht in der Datei als eigene `connector3`, 10 cm entgegen der
     +X-Achse der Klemme (gemessen: alle 47 eindeutigen Fälle). Ein eigener Durchlauf im Import

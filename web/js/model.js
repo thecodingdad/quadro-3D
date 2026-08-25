@@ -304,6 +304,71 @@ const round4 = (v) => Math.round(v * 1e4) / 1e4;
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 
+// --- Flexikupplung: Bolzen + Scharniere ---------------------------------
+// Das Gelenk besteht aus DREI Teilen. Der Bolzen (QDF `bolt2`) ist 15 cm lang
+// und hat drei Segmente zu je 5 cm: die beiden aeusseren sind Stutzen wie die
+// Arme einer Kupplung, auf dem mittleren sitzen bis zu zwei Scharniere
+// (QDF `flexi-connector3`), jedes mit einem eigenen Stutzen am anderen Ende.
+//
+// Im Modell ist der Bolzen ein KNOTEN mit festem Katalogteil -- wie die
+// Lochzapfenkupplung. Er ersetzt die einarmige Kupplung am Rohrende: das eine
+// aeussere Segment steckt im Rohr, die beiden anderen schauen heraus. Seine
+// Lage steht in `partQuat` (lokales +X = Bolzenachse, vom Rohr weg), die
+// Stellung der Scharniere in `hinges` -- Grad um diese Achse, 0 = lokal -Y.
+export const BOLT_PART = "flexi_bolt";
+export const HINGE_PART = "flexi_hinge";
+// Die Kraenze der beiden Scharniere sind verzahnt: sie rasten in 45-Grad-
+// Schritten und koennen deshalb nie in dieselbe Richtung zeigen.
+export const HINGE_STEP = 45;
+export const MAX_HINGES = 2;
+export const BOLT_SEGMENT = 5;              // Laenge eines Bolzensegments (cm)
+
+/** Ist dieser Knoten ein Flexikupplungs-Bolzen? */
+export function isBoltPart(part) {
+  return part === BOLT_PART;
+}
+
+/** Bolzenachse in Weltkoordinaten -- das lokale +X seiner Lage. */
+export function boltAxis(node) {
+  if (!node || !node.partQuat || node.partQuat.length !== 4) return [1, 0, 0];
+  // Normieren: eine Lage aus der Datei hat nicht Laenge 1 (siehe holeArmDirs).
+  return norm3(xAxisOf(node.partQuat));
+}
+
+/**
+ * Armrichtung eines Scharniers. Es sitzt mit seinem Kranz auf der Bolzenachse
+ * und zeigt mit dem eigenen Stutzen quer dazu; `grad` ist die Stellung um die
+ * Achse, 0 = lokal -Y (bei waagerechtem Bolzen also nach unten).
+ */
+export function hingeDir(node, grad) {
+  if (!node || !node.partQuat || node.partQuat.length !== 4) return [0, -1, 0];
+  const ey = norm3(yAxisOf(node.partQuat)), ez = norm3(zAxisOf(node.partQuat));
+  const b = (grad * Math.PI) / 180, c = Math.cos(b), s = Math.sin(b);
+  return [round4(-ey[0] * c + ez[0] * s), round4(-ey[1] * c + ez[1] * s),
+    round4(-ey[2] * c + ez[2] * s)];
+}
+
+/** Die Arme aller Scharniere eines Bolzens, in der Reihenfolge von `hinges`. */
+export function hingeDirs(node) {
+  if (!isBoltPart(node && node.part)) return [];
+  return (node.hinges || []).map((g) => hingeDir(node, g));
+}
+
+/**
+ * Alle Anschlussrichtungen eines Bolzens: seine beiden Stutzen auf der Achse
+ * und je Scharnier dessen Arm. Dorthin gehoeren Rohre -- wie an die Arme einer
+ * Kupplung.
+ */
+export function boltArmDirs(node) {
+  if (!isBoltPart(node && node.part)) return [];
+  const ex = boltAxis(node);
+  return [
+    [round4(ex[0]), round4(ex[1]), round4(ex[2])],
+    [round4(-ex[0]), round4(-ex[1]), round4(-ex[2])],
+    ...hingeDirs(node),
+  ];
+}
+
 // Name der naechsten Achsrichtung -- reicht, um belegte Arme zu erkennen.
 function cardinalName(v) {
   const ax = Math.abs(v[0]), ay = Math.abs(v[1]), az = Math.abs(v[2]);
@@ -1559,6 +1624,133 @@ export class BuildModel {
     const arme = holeArmDirs(n);
     if (arme.length) n.stub = arme[0];
     return true;
+  }
+
+  /**
+   * Haengt an dieser Richtung des Knotens schon ein Rohr? Gebraucht fuer die
+   * Scharniere: ein Arm mit Rohr darf sich nicht mehr wegdrehen.
+   */
+  _armHasTube(node, dir) {
+    for (const t of this.tubes.values()) {
+      if (t.link) continue;
+      const o = t.a === node.id ? this.nodes.get(t.b) : t.b === node.id ? this.nodes.get(t.a) : null;
+      if (!o) continue;
+      const v = norm3([o.x - node.x, o.y - node.y, o.z - node.z]);
+      if (dot3(v, dir) > 0.9) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Ankerpunkte fuer den Flexikupplungs-Bolzen: jede DUMMY-Kupplung, also ein
+   * Rohrende mit genau einem Rohr und ohne weiteres Teil. Der Bolzen ersetzt
+   * sie -- er steckt mit einem Segment im Rohr, zwei schauen heraus.
+   */
+  boltMounts(cs = 5) {
+    const out = [];
+    for (const n of this.nodes.values()) {
+      if (n.part || n.c45 || n.c45body || n.bearingOn || n.unused) continue;
+      if (this.hasWheelCap(n) || this.hasEndPiece(n)) continue;
+      const nachbarn = [];
+      for (const t of this.tubes.values()) {
+        if (t.arm || t.link) continue;
+        const o = t.a === n.id ? this.nodes.get(t.b) : t.b === n.id ? this.nodes.get(t.a) : null;
+        if (o) nachbarn.push(norm3([o.x - n.x, o.y - n.y, o.z - n.z]));
+      }
+      if (nachbarn.length !== 1) continue;      // nur die einarmige Dummy-Kupplung
+      const dir = [round4(-nachbarn[0][0]), round4(-nachbarn[0][1]), round4(-nachbarn[0][2])];
+      out.push({
+        nodeId: n.id, dir, pos: [n.x, n.y, n.z],
+        // Der Punkt selbst steckt im Wuerfel -- der gruene Griff gehoert davor.
+        handle: [round(n.x + dir[0] * cs), round(n.y + dir[1] * cs), round(n.z + dir[2] * cs)],
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Bolzen auf eine Dummy-Kupplung setzen. Der Knoten bleibt, bekommt aber das
+   * feste Katalogteil: gezeichnet wird ab jetzt der Bolzen statt des Wuerfels.
+   * Die lokale +X-Achse zeigt vom Rohr weg, die Rollage ist frei -- genommen
+   * wird die, bei der ein Scharnier bei 0 Grad nach unten haengt.
+   */
+  addBolt(nodeId, cs = 5) {
+    const n = this.nodes.get(nodeId);
+    if (!n || n.part) return null;
+    const m = this.boltMounts(cs).find((x) => x.nodeId === nodeId);
+    if (!m) return null;
+    const ex = norm3(m.dir);
+    const hoch = Math.abs(ex[1]) > 0.9 ? [0, 0, 1] : [0, 1, 0];
+    const ey = norm3([hoch[0] - ex[0] * dot3(hoch, ex), hoch[1] - ex[1] * dot3(hoch, ex),
+      hoch[2] - ex[2] * dot3(hoch, ex)]);
+    n.part = BOLT_PART;
+    n.partQuat = quatFromBasis(ex, ey, cross3(ex, ey)).map(round4);
+    n.hinges = [];
+    return n;
+  }
+
+  /**
+   * Die naechste freie Stellung fuer ein Scharnier an diesem Bolzen -- in
+   * 45-Grad-Schritten, und nie die, in der schon eines steht (die Kraenze sind
+   * verzahnt, zwei Scharniere koennen nicht in dieselbe Richtung zeigen).
+   */
+  freeHingeAngle(node) {
+    if (!isBoltPart(node && node.part)) return null;
+    const belegt = new Set((node.hinges || []).map((g) => ((g % 360) + 360) % 360));
+    for (let g = 0; g < 360; g += HINGE_STEP) if (!belegt.has(g)) return g;
+    return null;
+  }
+
+  /**
+   * Ankerpunkte fuer ein Scharnier: je Bolzen mit weniger als zwei Scharnieren
+   * einer. Der Griff liegt dort, wo der Arm des naechsten Scharniers landet --
+   * so sieht man vorher, wohin es zeigt.
+   */
+  hingeMounts(cs = 5) {
+    const out = [];
+    for (const n of this.nodes.values()) {
+      if (!isBoltPart(n.part)) continue;
+      if ((n.hinges || []).length >= MAX_HINGES) continue;
+      const grad = this.freeHingeAngle(n);
+      if (grad == null) continue;
+      const d = hingeDir(n, grad);
+      const pos = [round(n.x + d[0] * cs * 1.5), round(n.y + d[1] * cs * 1.5),
+        round(n.z + d[2] * cs * 1.5)];
+      out.push({ nodeId: n.id, grad, pos });
+    }
+    return out;
+  }
+
+  /** Scharnier auf das mittlere Segment eines Bolzens setzen. */
+  addHinge(nodeId) {
+    const n = this.nodes.get(nodeId);
+    if (!isBoltPart(n && n.part)) return null;
+    if (!n.hinges) n.hinges = [];
+    if (n.hinges.length >= MAX_HINGES) return null;
+    const grad = this.freeHingeAngle(n);
+    if (grad == null) return null;
+    n.hinges.push(grad);
+    return n;
+  }
+
+  /**
+   * Scharnier um 45 Grad um die Bolzenachse weiterdrehen. Die Stellung des
+   * anderen Scharniers wird uebersprungen -- zwischen beiden bleibt immer
+   * mindestens ein Rastschritt. Haengt an diesem Arm ein Rohr, bleibt es
+   * stehen: sonst risse die Drehung das Rohr vom Stutzen.
+   */
+  turnHinge(nodeId, index = 0) {
+    const n = this.nodes.get(nodeId);
+    if (!isBoltPart(n && n.part) || !n.hinges || index >= n.hinges.length) return false;
+    if (this._armHasTube(n, hingeDir(n, n.hinges[index]))) return false;
+    const andere = new Set(n.hinges.filter((_, i) => i !== index)
+      .map((g) => ((g % 360) + 360) % 360));
+    let g = n.hinges[index];
+    for (let i = 0; i < 360 / HINGE_STEP; i++) {
+      g = (g + HINGE_STEP) % 360;
+      if (!andere.has(g)) { n.hinges[index] = g; return true; }
+    }
+    return false;
   }
 
   /**
@@ -3294,6 +3486,7 @@ export class BuildModel {
         if (n.unused) o.unused = true;   // aus der Datei, aber ohne Rohr/Platte
         if (n.partQuat) o.partQuat = n.partQuat; // Ausrichtung der Klemm-Kupplung aus der Datei
         if (n.partMask) o.partMask = n.partMask; // Arm-Maske der Lochzapfenkupplung
+        if (n.hinges && n.hinges.length) o.hinges = n.hinges.slice(); // Stellungen der Flexi-Scharniere
         if (n.c45body) o.c45body = true; // Adapter-Koerper am Arm-Ende der C45
         if (n.c45axis) o.c45axis = n.c45axis; // kardinale Huelsenachse des Adapters
         if (n.c45quat) o.c45quat = n.c45quat; // eigene Lage der Winkelkupplung (Three x,y,z,w)
@@ -3387,7 +3580,8 @@ export class BuildModel {
         part: n.part || null, clampOn: n.clampOn || null, stub: n.stub || null,
         bearingOn: n.bearingOn || null,
         ownConnector: !!n.ownConnector, c45file: !!n.c45file, unused: !!n.unused,
-        partQuat: n.partQuat || null, partMask: n.partMask || null });
+        partQuat: n.partQuat || null, partMask: n.partMask || null,
+        hinges: Array.isArray(n.hinges) ? n.hinges.slice() : null });
       maxSeq = Math.max(maxSeq, parseSeq(n.id));
     }
     for (const t of data.tubes || []) {

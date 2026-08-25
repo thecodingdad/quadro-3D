@@ -25,9 +25,9 @@
 //
 // Bewusst ohne Three.js/DOM, damit per Node testbar und Backend-tauglich.
 
-import { round2 as round, panelNormal, modelMiddle } from "./util.js";
+import { round2 as round, panelNormal, modelMiddle, quatFromBasis } from "./util.js";
 import { FORMAT_VERSION } from "./config.js";
-import { holePartForMask, holeArmDirs } from "./model.js";
+import { holePartForMask, holeArmDirs, BOLT_PART, MAX_HINGES, HINGE_STEP } from "./model.js";
 
 // Alle benannten Richtungen (kardinal + 45°-diagonal) fuer Arm-Erkennung.
 const S45 = Math.SQRT1_2;
@@ -147,6 +147,13 @@ function rotateByQuat(q, v) {
   const c2 = cross(u, t);
   return [v[0] + w * t[0] + c2[0], v[1] + w * t[1] + c2[1], v[2] + w * t[2] + c2[2]];
 }
+// Vektor auf Laenge 1 -- die Achsen aus einer Datei-Quaternion kommen sonst um
+// deren Skalierung zu lang heraus.
+function einsVec(v) {
+  const L = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / L, v[1] / L, v[2] / L];
+}
+
 function cross(a, b) {
   return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
@@ -1054,19 +1061,73 @@ export function parseQDF(text, opts = {}) {
     }
   }
 
-  // Flexikupplung: ihre Arme sitzen zu zweit an einem Punkt, den ein Bolzen
-  // zusammenhaelt -- eine Kupplung steht dort NICHT (die Datei fuehrt an der
-  // Stelle keine connector3). Der Knoten bekommt sie deshalb als Teil, damit
-  // Stueckliste und Anzeige "Flexikupplung" sagen, statt aus den Rohren eine
-  // Raumkupplung zu raten. Gezaehlt und geschrieben werden die Arme selbst als
-  // Anbauteile, je einer je Zeile der Datei.
-  for (const f of fittings) {
-    if (f.kind !== "flexi-connector3") continue;
-    for (const n of nodes) {
-      if (n.part || n.fromFile) continue;
-      if (Math.hypot(n.x - f.x, n.y - f.y, n.z - f.z) > 1.5) continue;
-      n.part = "flexi";
-      break;
+  // Flexikupplung: ein Bolzen (bolt2) und bis zu zwei Scharniere
+  // (flexi-connector3) sitzen an EINER Stelle -- eine connector3 fuehrt die
+  // Datei dort nicht. Daraus wird EIN Knoten mit Katalogteil: der Bolzen ist
+  // das Teil (lokales +X = seine Achse), die Stellungen der Scharniere stehen
+  // als Winkel um diese Achse in `hinges`. Genau so setzt sie auch der Editor,
+  // und der Export schreibt daraus wieder dieselben Zeilen.
+  //
+  // Wo das Gelenk sitzt, sagt Feld 4 der bolt2-Zeile (an allen 83 Gelenken des
+  // Bestands geprueft): 1 = der Bolzen steht mittig auf dem Punkt, 0 = er ist
+  // 50 mm entlang seiner Achse hineingeschoben. Die Scharniere liegen in beiden
+  // Faellen auf dem Gelenkpunkt.
+  const flexiWeg = new Set();
+  for (const b of fittings) {
+    if (b.kind !== "bolt2" || !b.quat) continue;
+    const qb = [b.quat[3], b.quat[0], b.quat[1], b.quat[2]];   // Three -> Datei
+    let ex = einsVec(rotateByQuat(qb, [1, 0, 0]));
+    const felder = String(b.rest || "").split(",").map((s) => s.trim());
+    const mittig = felder[2] === "1";
+    const px = b.x - (mittig ? 0 : ex[0] * 5);
+    const py = b.y - (mittig ? 0 : ex[1] * 5);
+    const pz = b.z - (mittig ? 0 : ex[2] * 5);
+    const nd = nodes.find((n) => !n.part && Math.hypot(n.x - px, n.y - py, n.z - pz) < 2);
+    if (!nd) continue;              // ohne Knoten bleibt die Zeile, wie sie war
+    // Die Achse zeigt vom gehaltenen Rohr WEG -- auf dieser Seite steht der
+    // freie Stutzen. Steckt auf beiden oder auf keiner Seite ein Rohr, bleibt
+    // es bei der Richtung aus der Datei.
+    let vorne = 0, hinten = 0;
+    for (const t of tubes) {
+      const o = t.a === nd.id ? nodes.find((n) => n.id === t.b)
+        : t.b === nd.id ? nodes.find((n) => n.id === t.a) : null;
+      if (!o) continue;
+      const d = einsVec([o.x - nd.x, o.y - nd.y, o.z - nd.z]);
+      const s = d[0] * ex[0] + d[1] * ex[1] + d[2] * ex[2];
+      if (s > 0.9) vorne++;
+      else if (s < -0.9) hinten++;
+    }
+    if (vorne && !hinten) ex = [-ex[0], -ex[1], -ex[2]];
+    const hoch = Math.abs(ex[1]) > 0.9 ? [0, 0, 1] : [0, 1, 0];
+    const sk = hoch[0] * ex[0] + hoch[1] * ex[1] + hoch[2] * ex[2];
+    const ey = einsVec([hoch[0] - ex[0] * sk, hoch[1] - ex[1] * sk, hoch[2] - ex[2] * sk]);
+    const ez = [ex[1] * ey[2] - ex[2] * ey[1], ex[2] * ey[0] - ex[0] * ey[2],
+      ex[0] * ey[1] - ex[1] * ey[0]];
+    nd.part = BOLT_PART;
+    nd.partQuat = quatFromBasis(ex, ey, ez).map((v) => Math.round(v * 1e4) / 1e4);
+    nd.hinges = [];
+    flexiWeg.add(b.id);
+    for (const h of fittings) {
+      if (h.kind !== "flexi-connector3" || !h.quat) continue;
+      if (Math.hypot(h.x - px, h.y - py, h.z - pz) > 2) continue;
+      if (nd.hinges.length >= MAX_HINGES) break;
+      const qh = [h.quat[3], h.quat[0], h.quat[1], h.quat[2]];
+      // Der eigene Stutzen des Scharniers zeigt nach lokal -Y.
+      const arm = einsVec(rotateByQuat(qh, [0, -1, 0]));
+      const u = -(arm[0] * ey[0] + arm[1] * ey[1] + arm[2] * ey[2]);   // 0 Grad = -Y
+      const v = arm[0] * ez[0] + arm[1] * ez[1] + arm[2] * ez[2];
+      let grad = Math.round((Math.atan2(v, u) * 180) / Math.PI / HINGE_STEP) * HINGE_STEP;
+      grad = ((grad % 360) + 360) % 360;
+      if (!nd.hinges.includes(grad)) nd.hinges.push(grad);
+      flexiWeg.add(h.id);
+    }
+  }
+  // Was zum Knoten geworden ist, faellt aus der Anbauteil-Liste: sonst stuende
+  // die Flexikupplung zweimal in der Stueckliste und der Export schriebe jede
+  // Zeile doppelt.
+  if (flexiWeg.size) {
+    for (let i = fittings.length - 1; i >= 0; i--) {
+      if (flexiWeg.has(fittings[i].id)) fittings.splice(i, 1);
     }
   }
 
@@ -1105,6 +1166,7 @@ export function parseQDF(text, opts = {}) {
       if (n.quat) o.quat = n.quat; // Wuerfel-Orientierung der Kupplung (Three x,y,z,w)
       if (n.part) o.part = n.part; // festes Katalogteil (Klemm-Kupplung)
       if (n.partMask) o.partMask = n.partMask; // Arm-Maske der Lochzapfenkupplung
+      if (n.hinges && n.hinges.length) o.hinges = n.hinges.slice(); // Stellungen der Flexi-Scharniere
       if (n.clampOn) o.clampOn = n.clampOn; // umschlossenes Rohr + Stelle darauf
       if (n.stub) o.stub = n.stub; // Richtung des offenen Anschlusses
       if (n.bearingOn) o.bearingOn = n.bearingOn; // getragen von dieser Lagerkupplung

@@ -86,10 +86,6 @@ SLIDES = {
 #                               nicht abgegriffen (lattice2)
 #   alu-connector2, wood-bed2,  kommen im Bestand nicht vor, die App kennt sie
 #   chairseatback2              nicht
-#   flexi-connector3            steht in der Datei zweimal je Gelenk und liegt
-#                               auf einem Knoten, den die App schon als Kupplung
-#                               zeichnet (`part = "flexi"`) -- das Modell käme
-#                               doppelt und über den Würfel
 FITTINGS = {
     "multi-wheel2": "multi-wheel2.obj",
     "floating-wheel2": "floating-wheel2.obj",
@@ -113,7 +109,11 @@ FITTINGS = {
     "hole-connector4_15": "hole-connector4_mask15.obj",
     "hole-connector4_31": "hole-connector4_mask31.obj",
     "hole-connector4_59": "hole-connector4_mask59.obj",
+    # Flexikupplung: der Bolzen (drei Segmente zu je 50 mm, lokale X-Achse)
+    # und das Scharnier, das mit seinem Kragen auf dem mittleren Segment
+    # sitzt (Kragenachse = lokal X, sein eigener Stutzen zeigt nach lokal -Y).
     "bolt2": "bolt2.obj",
+    "flexi-connector3": "flexi-connector3.obj",
     "textil-round2": "textil-round2.obj",
     "roof-large2": "roof-large2.obj",
     "bag2": "bag2.obj",
