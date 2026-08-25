@@ -645,6 +645,15 @@ export function buildQDF(model) {
       const ez = rotateByQuat([f.quat[3], f.quat[0], f.quat[1], f.quat[2]], [0, 0, 1]);
       fx -= ez[0] * 20; fy -= ez[1] * 20; fz -= ez[2] * 20;
     }
+    // Das kleine Baellebad haengt in der Datei nicht an der Mitte seiner
+    // Frontwand, sondern 20 cm daneben (so liegt sein abgegriffenes Modell:
+    // -22,5 bis +62,5 cm in lokal X). Wir fuehren die Mitte -- also zurueck.
+    // Nur das echte 80er-Becken: der 40 cm breite Rahmen der XS-Folie hat
+    // seinen Punkt mittig, sonst faende der Einleser seine Frontwand nicht.
+    if (f.kind === "pool-small2" && f.quat && Math.abs((f.w || 80) - 80) < 1) {
+      const ex = rotateByQuat([f.quat[3], f.quat[0], f.quat[1], f.quat[2]], [1, 0, 0]);
+      fx -= ex[0] * 20; fy -= ex[1] * 20; fz -= ex[2] * 20;
+    }
     if (f.kind === "lattice2" && f.w != null && f.h != null) {
       lines.push(`lattice2{${mat}, ${tuple(q, fx, fy, fz)}, 1, ${mm(f.w)}, 0., ${mm(f.h)}, 0., 0}`);
     } else if (f.kind === "hole-connector4") {

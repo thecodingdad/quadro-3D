@@ -577,6 +577,23 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   und die **Geräteform** direkt nach `<body>` (`mobile-portrait`, `sidebar-overlay`, dieselben
   Medienabfragen wie `applyLayout()`). Ohne sie blitzte erst die helle, dann die
   Schreibtisch-Fassung auf. Beide Werte pflegt danach `ui.js` weiter.
+- **Bällebad als Bausatz:** `model.poolFragment(spec, {color, linerColor, tubeFor})` liefert
+  Rahmen **und** Folie als **Fragment** – dasselbe Format, das `extractSelection` beim Kopieren
+  erzeugt. `builder.startPool(linerId)` reicht es an `startPaste()` weiter; damit gelten
+  Rasterung, Kollisionsprüfung, „nur in der Ebene" und Escape ohne eine Zeile eigenen Codes.
+  Die vier Größen stehen in `POOL_SETS` (Herstellermaß: Innenmaß der Folie = Rahmen + 2,5 cm):
+  XS 80×80, S 80×120, L 120×160, XXL 120×240, Wandhöhe 20 bzw. 40. Eine Seite wird mit 75ern
+  geteilt, wo ihre Länge durch 80 aufgeht (XXL = 3 × 75), sonst mit 35ern. Den Katalog kennt
+  `model.js` nicht – das Rohr zu einer Spannweite liefert der Aufrufer über `tubeFor()`.
+- **Das QDF-Format kennt nur ZWEI Becken:** `pool-small2` (80 × 120 × 20) und `pool2`
+  (120 × 160 × 40) – die Maße stehen nicht in der Datei, sie stecken im Modell. Die Tiefe
+  leitet der Import aus dem Rahmen ab, deshalb lassen sich XS (80 × 80) und XXL (120 × 240)
+  trotzdem schreiben und wieder einlesen; die Folie in der Stückliste stimmt in allen vier
+  Fällen. Zwei Fallstricke: der Nullpunkt des **kleinen** Beckens liegt **20 cm neben der
+  Mitte** seiner Frontwand (abgegriffenes Modell: −22,5 bis +62,5 cm in lokal X) – Import und
+  Export rechnen das um, aber nur für die echten 80er, denn der 40 cm breite Rahmen der alten
+  XS-Fassung hat seinen Punkt mittig. Und das abgegriffene Modell hat **eine feste Größe**:
+  passt sie nicht zu `w`/`d`, zeichnet `scene.js` das Becken wieder aus Wänden und Boden.
 - **Offene Menüs wandern mit der Maus:** Jeder Knopf, der ein Popup aufklappt, trägt
   `data-popup="1"` (Helfer `popupKnopf()` in `ui.js`). Ist eines offen, löst ein `pointerover`
   mit `pointerType === "mouse"` einfach den **Klick** des überfahrenen Knopfes aus – die Logik

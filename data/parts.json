@@ -795,20 +795,20 @@
     },
     {
       "id": "pool_liner_xs",
-      "code": "",
+      "code": "10017",
       "name": "Poolfolie XS",
       "name_en": "Pool liner XS",
       "price": 89.99,
       "pool": {
-        "short": 40,
-        "long": 40
+        "short": 80,
+        "long": 80
       },
-      "note": "kleines Baellebad (pool-small2) · Preis: quadroshop.com „Poolfolie XS“, Stand 2026-08-18",
+      "note": "Pool XS, Art. 10017 · Außenmaß 85 x 85 x 25 cm, Innenmaß der Folie 82,5 x 82,5 x 25 cm · Rahmen 80 x 80 cm bei 20 cm Wandhöhe · Preis: quadroshop.com „Poolfolie XS“, Stand 2026-08-18",
       "url": "https://quadroshop.com/products/pool-liner-xs"
     },
     {
       "id": "pool_liner_s",
-      "code": "",
+      "code": "10960",
       "name": "Poolfolie S",
       "name_en": "Pool liner S",
       "price": 99.99,
@@ -816,12 +816,12 @@
         "short": 80,
         "long": 120
       },
-      "note": "Pool S, Innenmass 82,5 x 122,5 cm · Preis: quadroshop.com „Poolfolie S“, Stand 2026-08-18",
+      "note": "Pool S, Art. 10960 · Außenmaß 145 x 85 x 25 cm, Innenmaß der Folie 122,5 x 82,5 x 25 cm · Rahmen 120 x 80 cm bei 20 cm Wandhöhe · Preis: quadroshop.com „Poolfolie S“, Stand 2026-08-18",
       "url": "https://quadroshop.com/products/pool-liner-s"
     },
     {
       "id": "pool_liner_l",
-      "code": "",
+      "code": "11670",
       "name": "Poolfolie L",
       "name_en": "Pool liner L",
       "price": 119.99,
@@ -829,12 +829,12 @@
         "short": 120,
         "long": 160
       },
-      "note": "Pool L, Innenmass 122,5 x 162,5 cm · Preis: quadroshop.com „Poolfolie L“, Stand 2026-08-18",
+      "note": "Pool L, Art. 11670 · Außenmaß 245 x 125 x 45 cm, Innenmaß der Folie 162,5 x 122,5 x 45 cm · Rahmen 160 x 120 cm bei 40 cm Wandhöhe · Preis: quadroshop.com „Poolfolie L“, Stand 2026-08-18",
       "url": "https://quadroshop.com/products/pool-liner-l"
     },
     {
       "id": "pool_liner_xxl",
-      "code": "",
+      "code": "11680",
       "name": "Poolfolie XXL",
       "name_en": "Pool liner XXL",
       "price": 149.99,
@@ -842,7 +842,7 @@
         "short": 120,
         "long": 240
       },
-      "note": "Pool XXL, Innenmass 122,5 x 242,5 cm · Preis: quadroshop.com „Poolfolie XXL“, Stand 2026-08-18",
+      "note": "Pool XXL, Art. 11680 · Außenmaß 325 x 125 x 45 cm, Innenmaß der Folie 242,5 x 122,5 x 45 cm · Rahmen 240 x 120 cm bei 40 cm Wandhöhe · Preis: quadroshop.com „Poolfolie XXL“, Stand 2026-08-18",
       "url": "https://quadroshop.com/products/pool-liner-xxl"
     }
   ],

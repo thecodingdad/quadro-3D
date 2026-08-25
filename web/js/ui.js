@@ -1,7 +1,7 @@
 // Verkabelt die Bedienoberflaeche (Toolbar, Tastatur, Stueckliste, Bestand).
 
 import { buildableTubes, buildableCurvedTubes, buildablePanels, tubeColors, geometry, allTubes, allConnectors, panels, reinforcements, screws, slideKindName, partName, partForFitting, accessories, getPartById, poolLinerFor, getTube, getPanel } from "./catalog.js";
-import { PLACEABLE_FITTINGS, POOL_KINDS, HOLE_MASKS, ROTATABLE_FITTINGS, SLIDE_PARTS } from "./model.js";
+import { PLACEABLE_FITTINGS, POOL_KINDS, HOLE_MASKS, ROTATABLE_FITTINGS, SLIDE_PARTS, POOL_SETS } from "./model.js";
 import { computeBOM, compareInventory, connectorsForNode } from "./bom.js";
 import { computeBuildPlan, BUILD_ORDERS } from "./buildplan.js";
 import { parseQDF } from "./qdfimport.js";
@@ -1357,10 +1357,12 @@ export function initUI({ scene, model, builder }) {
     slideGroupBtn = btn;
   }
 
-  // --- Anbauteile: drei Gruppen mit je einer Klappliste -------------------
-  // Geordnet wie am Bauteil gedacht: alles rund ums Rad, alles was Rohre
-  // verbindet, und der Rest. Der Doppelrohrverbinder ist kein Anbauteil, er hat
-  // einen eigenen Modus -- in der Liste steht er trotzdem bei den Verbindungen.
+  // --- Anbauteile: vier Gruppen mit je einer Klappliste -------------------
+  // Geordnet wie am Bauteil gedacht: alles rund ums Rad, alles aus Stoff, die
+  // Baellebaeder und alles, was Rohre verbindet. Der Doppelrohrverbinder ist
+  // kein Anbauteil, er hat einen eigenen Modus -- in der Liste steht er
+  // trotzdem bei den Verbindungen, und das Verstaerken schliesst in der Leiste
+  // direkt daran an.
   const CLAMP_ENTRY = "double_tube";
   const CLIP_ENTRY = "tube_clamp";
   // Die 45-Grad-Winkelkupplung ist ein eigenes Teil: sie steckt auf einem Arm
@@ -1370,15 +1372,20 @@ export function initUI({ scene, model, builder }) {
     ["grp_wheels", ["multi-wheel2", "floating-wheel2", "casters2", "bearing2", "hub-cap2", "steering-lock2"],
       `<circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.6"/>` +
       `<circle cx="8" cy="8" r="1.6" fill="currentColor"/>`],
+    // Textilien: Netz, Tuch, Spielsack, Rundwand -- alles aus Stoff.
+    ["grp_textiles", ["bag2", "lattice2", "textil2", "textil-round2"],
+      `<rect x="2.5" y="2.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>` +
+      `<line x1="2.5" y1="8" x2="13.5" y2="8" stroke="currentColor" stroke-width="1.3"/>`],
+    // Baellebaeder: vier Folien, jede mit ihrem eigenen Rahmen.
+    ["grp_pools", ["pool_liner_xs", "pool_liner_s", "pool_liner_l", "pool_liner_xxl"],
+      `<path d="M2.5 4 L2.5 12.5 L13.5 12.5 L13.5 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>` +
+      `<path d="M3.5 8.6 C5.2 7.5 6.6 9.7 8.2 8.6 C9.8 7.5 11.2 9.7 12.8 8.6" fill="none" stroke="currentColor" stroke-width="1.1"/>`],
     ["grp_joints", [C45_ENTRY, "bearing-clamp", "hole_1", "hole_2", "hole_t",
       "flexi_bolt", "flexi_hinge",
       CLAMP_ENTRY, CLIP_ENTRY, "tube-cap2", "open-connector2"],
       `<line x1="2.5" y1="6" x2="13.5" y2="6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>` +
       `<rect x="6" y="3" width="4" height="11" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.3"/>`],
-    ["grp_other", ["bag2", "lattice2", "textil2", "textil-round2"],
-      `<rect x="2.5" y="2.5" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>` +
-      `<line x1="2.5" y1="8" x2="13.5" y2="8" stroke="currentColor" stroke-width="1.3"/>`],
   ];
   /**
    * Sinnbild einer Lochzapfenkupplung: der Ring ist ihr LOCH (von der Seite der
@@ -1390,6 +1397,17 @@ export function initUI({ scene, model, builder }) {
     arme.map(([x1, y1, x2, y2]) =>
       `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>`).join("") +
     `<circle cx="8" cy="8" r="3.1" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+  /**
+   * Baellebad von oben: Rechteck im Seitenverhaeltnis der Folie, mit
+   * Wasserlinie. So sind XS, S, L und XXL im Menue zu unterscheiden.
+   */
+  const POOL_TOP_ICON = (kurz, lang) => {
+    const s = 13 / Math.max(kurz, lang);
+    const bw = Math.max(4, kurz * s), bh = Math.max(4, lang * s);
+    const x = (16 - bw) / 2, y = (16 - bh) / 2;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.2" fill="currentColor" opacity="0.18" stroke="currentColor" stroke-width="1.4"/>` +
+      `<path d="M${(x + 1.2).toFixed(1)} ${(y + bh / 2).toFixed(1)} c ${(bw / 4).toFixed(1)} -1.1 ${(bw / 4).toFixed(1)} 1.1 ${(bw / 2).toFixed(1)} 0 c ${(bw / 8).toFixed(1)} -0.6 ${(bw / 8).toFixed(1)} 0.6 ${(bw / 4 - 1.2).toFixed(1)} 0" fill="none" stroke="currentColor" stroke-width="1"/>`;
+  };
   // Die vier moeglichen Arme, jeweils vom Ringrand nach aussen.
   const HOLE_ARM = { rechts: [11.1, 8, 14.6, 8], links: [1.4, 8, 4.9, 8],
     unten: [8, 11.1, 8, 14.6], oben: [8, 1.4, 8, 4.9] };
@@ -1456,6 +1474,11 @@ export function initUI({ scene, model, builder }) {
     "adapter2": `<path d="M2.4 6.4 L8.6 6.4 L8.6 9.6 L2.4 9.6" fill="none" stroke="currentColor" stroke-width="1.4"/>` +
       `<rect x="8.6" y="4.8" width="5" height="6.4" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"/>`,
     // Sonstiges
+    // Baellebaeder: die Wanne von oben, im Seitenverhaeltnis der Folie.
+    "pool_liner_xs": POOL_TOP_ICON(40, 40),
+    "pool_liner_s": POOL_TOP_ICON(80, 120),
+    "pool_liner_l": POOL_TOP_ICON(120, 160),
+    "pool_liner_xxl": POOL_TOP_ICON(120, 240),
     "bag2": `<path d="M3 4 L13 4 L11.6 13 L4.4 13 Z" fill="none" stroke="currentColor" stroke-width="1.4"/>` +
       `<line x1="3" y1="4" x2="13" y2="4" stroke="currentColor" stroke-width="1.8"/>`,
     "lattice2": `<rect x="2.5" y="4" width="11" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/>` +
@@ -1548,8 +1571,11 @@ export function initUI({ scene, model, builder }) {
     const items = kinds.map((k) => {
       // Klemmen und Lochzapfenkupplungen stehen unter ihrer Katalog-Kennung im
       // Menue, die uebrigen unter ihrer QDF-Art.
-      const def = (k === CLAMP_ENTRY || k === CLIP_ENTRY || HOLE_MASKS[k]
-        || k === "flexi_bolt" || k === "flexi_hinge")
+      // Die Poolfolien stehen im Katalog beim Zubehoer, die uebrigen
+      // Sonderfaelle bei den Kupplungen -- beide unter ihrer Katalog-Kennung.
+      const def = POOL_SETS[k] ? getPartById(k)
+        : (k === CLAMP_ENTRY || k === CLIP_ENTRY || HOLE_MASKS[k]
+          || k === "flexi_bolt" || k === "flexi_hinge")
         ? allConnectors().find((c) => c.id === k)
         : k === C45_ENTRY ? allConnectors().find((c) => c.id === "diagonal")
         : partForFitting(k);
@@ -1567,6 +1593,12 @@ export function initUI({ scene, model, builder }) {
         : builder.mode === "c45" ? C45_ENTRY : builder.fittingKind;
       showPartPopup(btn, items, gewaehlt, icon, (p) => {
         if (p.qdf === C45_ENTRY) { setMode("c45"); return; }
+        // Baellebad: kein Anbauteil-Modus -- der Bausatz haengt sich wie eine
+        // Kopie an den Zeiger und wird mit einem Klick abgesetzt.
+        if (POOL_SETS[p.qdf]) {
+          if (builder.startPool(p.qdf)) flash(t("flash_pool_ready"));
+          return;
+        }
         if (p.qdf === CLAMP_ENTRY || p.qdf === CLIP_ENTRY) {
           builder.setClampPart(p.qdf);
           setMode("clamp");
@@ -1579,9 +1611,12 @@ export function initUI({ scene, model, builder }) {
     btn.innerHTML = icon() + `<span></span>`;
     btn.lastChild.textContent = t(key);
     btn.title = t(key);
-    // Die Raeder gehoeren noch zu den Rutschen, danach beginnt die Gruppe der
-    // Verbindungen -- der Trenner steht deshalb MITTEN in dieser Reihe.
-    if (key === "grp_joints") $("fitting-buttons").appendChild(el("span", "divider"));
+    // Die Raeder gehoeren noch zu den Rutschen, danach kommen Textilien und
+    // Baellebaeder, zuletzt die Verbindungen (mit dem Verstaerken dahinter) --
+    // zwei der Trenner stehen deshalb MITTEN in dieser Reihe.
+    if (key === "grp_textiles" || key === "grp_joints") {
+      $("fitting-buttons").appendChild(el("span", "divider"));
+    }
     $("fitting-buttons").appendChild(btn);
     fittingGroupBtns.push({ btn, kinds, key });
   }

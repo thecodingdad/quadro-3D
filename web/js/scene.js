@@ -5,7 +5,7 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs, BLACK_FITTINGS,
-  isBoltPart, boltAxis, hingeDir } from "./model.js";
+  isBoltPart, boltAxis, hingeDir, POOL_KINDS } from "./model.js";
 import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
@@ -1329,7 +1329,15 @@ export class SceneManager {
     // Zwei Arten brauchen trotzdem noch etwas: der Spielsack haengt IMMER nach
     // unten (seine Datei-Lage wuerde ihn kippen), und im Baellebad steht Wasser,
     // das die Herstellersoftware nicht kennt.
-    const echt = this._q().meshes && this._fitMeshes ? this._fitMeshes[f.kind] : null;
+    let echt = this._q().meshes && this._fitMeshes ? this._fitMeshes[f.kind] : null;
+    // Das Baellebad gibt es als abgegriffenes Modell in genau EINER Groesse je
+    // Art (pool2 120 x 160, pool-small2 80 x 120). Ein Becken mit anderer Tiefe
+    // -- XS und XXL bauen wir selbst -- zeichnet der Pfad darunter aus Waenden
+    // und Boden, sonst staende dort ein Becken der falschen Groesse.
+    if (echt && POOL_KINDS.has(f.kind)) {
+      const [mw, md] = f.kind === "pool2" ? [120, 160] : [80, 120];
+      if (Math.abs((f.w || mw) - mw) > 1 || Math.abs(Math.abs(f.d || md) - md) > 1) echt = null;
+    }
     if (echt) {
       const geoEcht = this._meshGeometry("fit:" + f.kind, echt);
       const matEcht = this._fittingMaterial(hex, false);

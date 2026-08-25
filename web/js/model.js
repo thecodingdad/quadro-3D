@@ -304,6 +304,24 @@ const round4 = (v) => Math.round(v * 1e4) / 1e4;
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 
+// Baellebad-Bausaetze: die vier Poolfolien und der Rahmen, den jede braucht.
+// `w` ist die Breite der Frontwand, `d` die Tiefe, `h` die Wandhoehe -- so
+// steht es auch im Anbauteil. Die Masse stammen vom Hersteller; das Innenmass
+// der Folie ist das Rahmenmass + 2,5 cm, das Aussenmass + 5 cm (Rohrbreite):
+//   XS   82,5 x  82,5 x 25  ->  80 x  80, Wandhoehe 20
+//   S   122,5 x  82,5 x 25  ->  80 x 120, Wandhoehe 20
+//   L   162,5 x 122,5 x 45  -> 120 x 160, Wandhoehe 40
+//   XXL 242,5 x 122,5 x 45  -> 120 x 240, Wandhoehe 40 Die Datei kennt nur ZWEI Becken-Elemente
+// (gemessen an den abgegriffenen Modellen: `pool-small2` ist 80 x 120 cm bei
+// 20 cm Wandhoehe, `pool2` 120 x 160 bei 40); XS und XXL unterscheiden sich
+// davon nur in der Tiefe, die die Datei ohnehin aus dem Rahmen ableitet.
+export const POOL_SETS = {
+  pool_liner_xs:  { liner: "pool_liner_xs",  kind: "pool-small2", w: 80,  d: 80,  h: 20 },
+  pool_liner_s:   { liner: "pool_liner_s",   kind: "pool-small2", w: 80,  d: 120, h: 20 },
+  pool_liner_l:   { liner: "pool_liner_l",   kind: "pool2",       w: 120, d: 160, h: 40 },
+  pool_liner_xxl: { liner: "pool_liner_xxl", kind: "pool2",       w: 120, d: 240, h: 40 },
+};
+
 // --- Flexikupplung: Bolzen + Scharniere ---------------------------------
 // Das Gelenk besteht aus DREI Teilen. Der Bolzen (QDF `bolt2`) ist 15 cm lang
 // und hat drei Segmente zu je 5 cm: die beiden aeusseren sind Stutzen wie die
@@ -2487,6 +2505,71 @@ export class BuildModel {
   }
 
   // --- Kopieren und Einfuegen ---------------------------------------------
+
+  /**
+   * Bausatz fuer ein Baellebad: der Rahmen aus Rohren und Kupplungen und die
+   * Folie darin. Geliefert wird ein FRAGMENT wie beim Kopieren -- der Builder
+   * haengt es an den Zeiger und setzt es mit einem Klick ab.
+   *
+   * Der Rahmen ist das Mindeste, was die Folie braucht: ein Rechteck aus Rohren
+   * unten und oben, dazwischen an jeder Ecke und jedem Zwischenpunkt ein
+   * senkrechter Pfosten. Eine Seite wird mit 75er-Rohren geteilt, wenn ihre
+   * Laenge durch 80 cm aufgeht (der XXL-Pool ist in der Laenge genau
+   * 3 x 75 cm), sonst mit 35ern -- so baut es auch die Herstellersoftware in
+   * ihren Beispielmodellen ("Pool groß": Langseite 2 x 75, Breitseite 3 x 35).
+   *
+   * `tubeFor(spannweite)` liefert das Rohr zu einem Kupplungsabstand; der
+   * Katalog gehoert nicht hierher (siehe Trennung in CLAUDE.md).
+   */
+  poolFragment(spec, { color = "blue", linerColor = null, tubeFor } = {}) {
+    if (!spec || typeof tubeFor !== "function") return null;
+    const { w, d, h } = spec;
+    // Seite in Abschnitte teilen: 80 cm, wo es aufgeht, sonst 40 cm.
+    const teile = (L) => {
+      const schritt = L % 80 === 0 ? 80 : 40;
+      const out = [];
+      for (let s = 0; s < L; s += schritt) out.push([s, Math.min(s + schritt, L)]);
+      return out;
+    };
+    const xTeile = teile(w), zTeile = teile(d);
+    const xPos = [0, ...xTeile.map(([, b]) => b)];
+    const zPos = [0, ...zTeile.map(([, b]) => b)];
+    // Umlaufende Punkte des Rechtecks, im Kreis herum und ohne Doppelte.
+    const rund = [];
+    for (const x of xPos) rund.push([x, 0]);
+    for (const z of zPos.slice(1)) rund.push([w, z]);
+    for (const x of xPos.slice(0, -1).reverse()) rund.push([x, d]);
+    for (const z of zPos.slice(1, -1).reverse()) rund.push([0, z]);
+
+    const nodes = [], tubes = [];
+    const idOf = (i, oben) => `pn${i}${oben ? "o" : "u"}`;
+    rund.forEach(([x, z], i) => {
+      nodes.push({ id: idOf(i, false), x, y: 0, z });
+      nodes.push({ id: idOf(i, true), x, y: h, z });
+    });
+    let lauf = 0;
+    const rohr = (a, b, span) => {
+      const teil = tubeFor(span);
+      if (!teil) return;
+      tubes.push({ id: `pt${lauf++}`, a, b, tubeId: teil.id, color, length: teil.length_cm });
+    };
+    // Die beiden Ringe -- unten und oben um das ganze Becken.
+    for (let i = 0; i < rund.length; i++) {
+      const j = (i + 1) % rund.length;
+      const span = Math.round(Math.hypot(rund[j][0] - rund[i][0], rund[j][1] - rund[i][1]));
+      for (const oben of [false, true]) rohr(idOf(i, oben), idOf(j, oben), span);
+    }
+    // Pfosten an jedem Punkt des Rings.
+    for (let i = 0; i < rund.length; i++) rohr(idOf(i, false), idOf(i, true), h);
+
+    // Die Folie: ihr Bezugspunkt ist die Oberkante der Frontwand, also die
+    // Mitte der vorderen Breitseite; von dort geht es `d` in die Tiefe.
+    const fittings = [{
+      id: "pf0", kind: spec.kind, x: round(w / 2), y: h, z: 0,
+      quat: [0, 0, 0, 1], color: linerColor || color, w, h, d,
+    }];
+    return { anchor: [0, 0, 0], nodes, tubes, panels: [], textiles: [], clamps: [], slides: [], fittings };
+  }
 
   /**
    * Ausschnitt aus dem Modell: alles, was zur Auswahl gehoert, als reines JSON.

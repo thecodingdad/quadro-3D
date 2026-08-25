@@ -1,13 +1,13 @@
 // Bau-Interaktion: Auswahl, Anbau ueber Richtungs-Handles, Loeschen.
 
 import { DIRECTIONS, DIAGONAL_DIRECTIONS, DIR_ALIGN_TOL, ARM_ALIGN_TOL, CLAMP_LINK_DIST, C45_SLEEVE_LEN, C45_ARM_LEN } from "./config.js";
-import { accessories, geometry, getTube, spacingFor, getPanel, defaultPanel, diagonalTubeId, slideKindLabel, slideKindName, isCurvedTube, gridSpacing, tubeColors, partName, partForFitting, getPartById, getConnector, poolLinerFor, reinforcementPart } from "./catalog.js";
+import { accessories, buildableTubes, geometry, getTube, spacingFor, getPanel, defaultPanel, diagonalTubeId, slideKindLabel, slideKindName, isCurvedTube, gridSpacing, tubeColors, partName, partForFitting, getPartById, getConnector, poolLinerFor, reinforcementPart } from "./catalog.js";
 import { computeBuildPlan, connectorLabelInfo } from "./buildplan.js";
 import { infeasibleConnectors, inferConnectorType } from "./bom.js";
 import { t } from "./i18n.js";
 import { round2, panelNormal, modelMiddle, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
 import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, holeClampDirsAt, HOLE_MASKS,
-  BOLT_PART, HINGE_PART, isBoltPart, boltArmDirs, hingeDir } from "./model.js";
+  BOLT_PART, HINGE_PART, isBoltPart, boltArmDirs, hingeDir, POOL_SETS } from "./model.js";
 
 // Kupplungen, die auf einem Rohr sitzen statt im Raster: QDF-Art -> Katalogteil.
 // Teile, die sich um ein Rohr klemmen lassen. Die Lochzapfenkupplung gehört
@@ -357,6 +357,37 @@ export class Builder {
    * zeichnet die Szene sie und nur so laesst sich auf Kollisionen pruefen);
    * abgebrochen wird ueber den Schnappschuss.
    */
+  /**
+   * Baellebad an den Zeiger haengen: Rahmen und Folie kommen als FRAGMENT ins
+   * Modell und werden wie eine Kopie abgesetzt -- mit Rasterung, Kollisions-
+   * pruefung und Abbruch per Escape. Ein Becken steht immer auf dem Boden,
+   * also wandert es nur in der Ebene; genau das tut das Einfuegen ohnehin.
+   */
+  startPool(linerId) {
+    const spec = POOL_SETS[linerId];
+    if (!spec) return false;
+    const cs = geometry().connectorSize;
+    const frag = this.model.poolFragment(spec, {
+      color: this.colorFor("tube"),
+      linerColor: this.colorFor("fitting"),
+      // Zu einer Spannweite das passende Rohr: die Kupplung steuert `cs` bei.
+      tubeFor: (span) => getTube(this._tubeIdForSpan(span, cs)),
+    });
+    return frag ? this.startPaste(frag) : false;
+  }
+
+  /** Katalog-Rohr zu einem Kupplungsabstand (Spannweite = Rohr + Kupplung). */
+  _tubeIdForSpan(span, cs) {
+    const gesucht = span - cs;
+    let best = null, bestD = Infinity;
+    for (const tb of buildableTubes()) {
+      if (tb.length_cm == null || tb.shape === "curved") continue;
+      const d = Math.abs(tb.length_cm - gesucht);
+      if (d < bestD) { bestD = d; best = tb; }
+    }
+    return best ? best.id : null;
+  }
+
   startPaste(frag) {
     if (!frag) return false;
     this.cancelPaste();

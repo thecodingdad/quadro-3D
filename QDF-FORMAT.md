@@ -576,6 +576,20 @@ angles in `hinges`) whenever a node sits on the joint point — 63 of the 84
 bolts of the corpus. The rest keeps its original lines and is written back
 untouched.
 
+#### `pool2`, `pool-small2` — ball pool
+
+```
+pool2{8, {2., 0., 2., 0., -800., 400., -600.}, 1, 0}
+```
+
+Four fields, and **no dimensions**: there are exactly two pools, and their size
+sits in the meshes captured from `Quadro.exe` — `pool2` is 125 × 165 × 40 cm
+and `pool-small2` 85 × 125 × 20 (basin 120 × 160 and 80 × 120 plus half a tube
+width on each side). The placement is the **top edge of the front wall**; for
+`pool2` it sits in the middle of that wall, for `pool-small2` **20 cm off
+centre** (its mesh runs from −22.5 to +62.5 cm in local X). The depth is not in
+the file at all — it is read from the frame around the pool. **✔**
+
 #### `open-connector2`, `adapter2`, `tube-cap2`
 
 Four fields each: material, placement, flag, `0`. They are single small parts

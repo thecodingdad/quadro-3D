@@ -87,6 +87,11 @@ const FITTING_KINDS = {
 // Liste greift die Suche in alles, was zufaellig dahinter steht.
 const POOL_DEPTHS = new Set([40, 80, 120, 160, 240]);
 
+// Der Nullpunkt des kleinen Beckens liegt 20 cm neben der Mitte seiner
+// Frontwand (abgegriffenes Modell: -22,5 bis +62,5 cm in lokal X). Beim
+// grossen Becken sitzt er mittig.
+const POOL_SMALL_OFFSET = 20;
+
 // Farbnamen aus material3 auf unsere Farb-IDs abbilden.
 const COLOR_BY_NAME = {
   red: "red", green: "green", blue: "blue", yellow: "yellow",
@@ -743,18 +748,36 @@ export function parseQDF(text, opts = {}) {
       // Bällebad: feste Geometrie (keine Maße im QDF -- im Original-Binary hardcoded).
       // Entity-Ursprung = OBERKANTE der Front-Wand -> wahre Mitte = Ursprung - lokaleY*(span1/2).
       //   pool2:       Frontwand 120 x 40 cm (3 x 1 Felder)
-      //   pool-small2: Frontwand  40 x 20 cm (1 x 0,5 Felder)
+      //   pool-small2: Frontwand  80 x 20 cm (2 x 0,5 Felder)
+      // Die Masse stehen im abgegriffenen Modell: pool2 misst 125 x 165 cm
+      // (Becken 120 x 160 plus je eine halbe Rohrbreite), pool-small2
+      // 85 x 125 -- also 80 x 120. Mit den frueheren 40 cm fand die Suche nur
+      // die halbe Frontwand, das kleine Becken kam 40 x 40 herein und die
+      // Stueckliste bot die XS-Folie statt der S-Folie an.
       // Die Datei enthält nur EINE Entity je Bällebad (die Front-Wand); die Tiefe
       // steht nicht darin und wird aus dem Kupplungsnetz hergeleitet
       // (Tiefenrichtung = cross(A→B, A→D) der Front-Wand).
       if (!p.tuple || p.tuple.length < 7) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
-      const [span0, span1] = p.name === "pool2" ? [120, 40] : [40, 20];
+      // Breite, Hoehe und der Versatz des Nullpunkts -- die erste Fassung, zu
+      // der es vier Ecken gibt, gewinnt. Beim KLEINEN Becken liegt der
+      // Nullpunkt nicht in der Mitte der Frontwand: das abgegriffene Modell
+      // reicht von -22,5 bis +62,5 cm, die Wandmitte liegt also 20 cm in
+      // lokaler +X-Richtung. Die zweite Fassung (40 cm, mittig) ist der
+      // Rahmen der XS-Folie, den diese App selbst baut.
+      const kandidaten = p.name === "pool2"
+        ? [[120, 40, 0]]
+        : [[80, 20, POOL_SMALL_OFFSET], [40, 20, 0]];
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const ay = rotateByQuat(q, [0, 1, 0]); // lokale Y-Achse (Wandhöhe)
-      const cx = p.tuple[4] / 10 + ay[0] * (-span1 / 2);
-      const cy = p.tuple[5] / 10 + ay[1] * (-span1 / 2);
-      const cz = p.tuple[6] / 10 + ay[2] * (-span1 / 2);
-      const nodesFound = findPanelCorners(q, cx, cy, cz, span0 / 2, span1 / 2);
+      const ax = rotateByQuat(q, [1, 0, 0]); // lokale X-Achse (Wandbreite)
+      let span0 = 0, span1 = 0, versatz = 0, nodesFound = null;
+      for (const [b0, b1, off] of kandidaten) {
+        const px = p.tuple[4] / 10 + ax[0] * off + ay[0] * (-b1 / 2);
+        const py = p.tuple[5] / 10 + ax[1] * off + ay[1] * (-b1 / 2);
+        const pz = p.tuple[6] / 10 + ax[2] * off + ay[2] * (-b1 / 2);
+        const ecken = findPanelCorners(q, px, py, pz, b0 / 2, b1 / 2);
+        if (ecken) { span0 = b0; span1 = b1; versatz = off; nodesFound = ecken; break; }
+      }
       if (!nodesFound) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
       const mat = typeof p.rest[0] === "number" ? p.rest[0] : null;
       const color = materials.get(mat) || FALLBACK_COLOR;
@@ -816,9 +839,14 @@ export function parseQDF(text, opts = {}) {
       // stehen. In `d` steckt beides -- Tiefe UND Richtung.
       const localZ = rotateByQuat(q, [0, 0, 1]);
       const sign = (dv[0] * localZ[0] + dv[1] * localZ[1] + dv[2] * localZ[2]) < 0 ? -1 : 1;
+      // Unser Anbauteil fuehrt die MITTE der Frontwand (dort zeichnet scene.js
+      // die Waende); beim kleinen Becken liegt sie neben dem Nullpunkt der
+      // Datei. Der Export rechnet den Versatz wieder heraus.
       fittings.push({
         id: "f" + seq++, kind: p.name,
-        x: round(p.tuple[4] / 10), y: round(p.tuple[5] / 10), z: round(p.tuple[6] / 10),
+        x: round(p.tuple[4] / 10 + ax[0] * versatz),
+        y: round(p.tuple[5] / 10 + ax[1] * versatz),
+        z: round(p.tuple[6] / 10 + ax[2] * versatz),
         quat: [q[1], q[2], q[3], q[0]], color,
         w: span0, h: span1, d: round(depth * sign),
       });
