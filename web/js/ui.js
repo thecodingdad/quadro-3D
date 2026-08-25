@@ -720,6 +720,7 @@ export function initUI({ scene, model, builder }) {
   // Verstaerken ist eine Gruppe wie Rohre oder Platten: der Knopf oeffnet die
   // Liste, gewaehlt wird darin. Zu kaufen gibt es nur das Holz-Profil 80 cm --
   // bis es ein zweites Teil gibt, steht dort eben genau eine Zeile.
+  popupKnopf($("mode-reinforce"));
   $("mode-reinforce").addEventListener("click", (e) => {
     e.stopPropagation();
     const items = reinforcements();
@@ -1004,6 +1005,29 @@ export function initUI({ scene, model, builder }) {
     return true;
   }
 
+  /**
+   * Knopf, der ein Popup aufklappt. Gemerkt wird er nur mit einem Kennzeichen;
+   * geoeffnet wird weiter ueber seinen eigenen Klick-Handler -- so gibt es die
+   * Logik jedes Menues genau einmal.
+   */
+  function popupKnopf(btn) {
+    if (btn) btn.dataset.popup = "1";
+    return btn;
+  }
+
+  // Ist EIN Menue offen, wandert es mit der Maus weiter -- wie in jeder
+  // Schreibtisch-Anwendung. Nur mit der Maus: per Finger gibt es kein
+  // Darueberfahren, dort waere jedes Streifen ein Menuewechsel.
+  document.addEventListener("pointerover", (e) => {
+    if (!activePopup || e.pointerType !== "mouse") return;
+    const btn = e.target && e.target.closest ? e.target.closest('[data-popup="1"]') : null;
+    if (!btn || btn === popupAnchor || btn.disabled) return;
+    // Nicht aus dem offenen Popup heraus: dort liegen eigene Zeilen, und der
+    // Anker selbst soll seinen Toggle behalten.
+    if (activePopup.contains(btn)) return;
+    btn.click();
+  });
+
   function closePopup() {
     if (!activePopup) return;
     if (popupCleanup) { popupCleanup(); popupCleanup = null; }
@@ -1163,7 +1187,7 @@ export function initUI({ scene, model, builder }) {
     return tube.shape === "curved" ? t("part_bow") : String(tube.length_cm);
   }
 
-  const tubeBtn = el("button", "btn part");
+  const tubeBtn = popupKnopf(el("button", "btn part"));
   tubeBtn.dataset.tube = "";
   tubeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1264,7 +1288,7 @@ export function initUI({ scene, model, builder }) {
       holes + `</svg>`;
   }
 
-  const panelBtn = el("button", "btn part");
+  const panelBtn = popupKnopf(el("button", "btn part"));
   panelBtn.dataset.panel = "";
   panelBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1317,7 +1341,7 @@ export function initUI({ scene, model, builder }) {
     }).filter(Boolean);
     const icon = (item) => `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">` +
       `${SLIDE_ICONS[(item && item.qdf) || builder.slideKind] || SLIDE_ICONS["slide-new2"]}</svg>`;
-    const btn = el("button", "btn part");
+    const btn = popupKnopf(el("button", "btn part"));
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       showPartPopup(btn, items, builder.slideKind, icon, (p) => {
@@ -1536,7 +1560,7 @@ export function initUI({ scene, model, builder }) {
     // eigenes.
     const icon = (item) => `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">` +
       `${(item && FITTING_ICONS[item.qdf]) || path}</svg>`;
-    const btn = el("button", "btn part");
+    const btn = popupKnopf(el("button", "btn part"));
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const gewaehlt = builder.mode === "clamp" ? builder.clampPart
@@ -1861,6 +1885,7 @@ export function initUI({ scene, model, builder }) {
     ];
   }
 
+  popupKnopf($("btn-file-menu"));
   $("btn-file-menu").addEventListener("click", (e) => {
     e.stopPropagation();
     showMenuPopup($("btn-file-menu"), fileEntries());
@@ -4526,10 +4551,12 @@ export function initUI({ scene, model, builder }) {
   }
   document.addEventListener("visibilitychange", updateWakeLock);
 
+  popupKnopf($("btn-color"));
   $("btn-color").addEventListener("click", (e) => {
     e.stopPropagation();
     openGroupPopup($("btn-color"), $("color-buttons"), "color-popup");
   });
+  popupKnopf($("btn-view"));
   $("btn-view").addEventListener("click", (e) => {
     e.stopPropagation();
     openGroupPopup($("btn-view"), document.querySelector(".view-row"), "view-popup");

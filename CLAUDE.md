@@ -577,6 +577,11 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   und die **Geräteform** direkt nach `<body>` (`mobile-portrait`, `sidebar-overlay`, dieselben
   Medienabfragen wie `applyLayout()`). Ohne sie blitzte erst die helle, dann die
   Schreibtisch-Fassung auf. Beide Werte pflegt danach `ui.js` weiter.
+- **Offene Menüs wandern mit der Maus:** Jeder Knopf, der ein Popup aufklappt, trägt
+  `data-popup="1"` (Helfer `popupKnopf()` in `ui.js`). Ist eines offen, löst ein `pointerover`
+  mit `pointerType === "mouse"` einfach den **Klick** des überfahrenen Knopfes aus – die Logik
+  jedes Menüs bleibt damit an genau einer Stelle. Per Finger passiert nichts, sonst wäre jedes
+  Streifen ein Menüwechsel.
 - **Kein Seiten-Zoom:** Gezoomt wird im 3D-Bild, nicht an der Oberfläche. Dafür braucht es
   **drei** Stellen, jede allein reicht nicht: `user-scalable=no` im Viewport-Meta (das Chrome
   bewusst überhört), `touch-action: pan-x pan-y` am `body` (fängt Kneifen und Doppeltipp ab und
