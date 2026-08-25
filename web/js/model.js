@@ -2554,12 +2554,13 @@ export class BuildModel {
     const xTeile = abschnitte(w, w % 80 === 0 ? [80] : [40]);
     const zTeile = abschnitte(d, [80, 40]);
     const xPos = [0, ...xTeile.map(([, b]) => b)];
-    const zRechts = [0, ...zTeile.map(([, b]) => b)];
-    // Die zweite Laengsseite laeuft VERSETZT: dort kommt erst das kurze Rohr
-    // und dann das lange. So liegen die Stoesse nicht auf einer Linie
-    // gegenueber -- beim S-Pool also 75 + 35 auf der einen, 35 + 75 auf der
-    // anderen Seite. Bei gleich langen Abschnitten aendert das nichts.
-    const zLinks = zRechts.map((z) => d - z).reverse();
+    // Die beiden Laengsseiten laufen VERSETZT gegeneinander: auf der einen
+    // kommt erst das lange Rohr, auf der anderen erst das kurze. So liegen die
+    // Stoesse nicht auf einer Linie gegenueber -- beim S-Pool also 75 + 35
+    // links und 35 + 75 rechts. Bei gleich langen Abschnitten aendert das
+    // nichts.
+    const zLinks = [0, ...zTeile.map(([, b]) => b)];
+    const zRechts = zLinks.map((z) => d - z).reverse();
     // Umlaufende Punkte des Rechtecks, im Kreis herum und ohne Doppelte.
     const rund = [];
     for (const x of xPos) rund.push([x, 0]);
