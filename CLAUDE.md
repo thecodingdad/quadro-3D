@@ -474,9 +474,14 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     die Stellungen der Scharniere als Winkel in `hinges` (0 = lokal −Y). Gesetzt wird über
     `boltMounts()`/`addBolt()` – nur auf eine **Dummy-Kupplung** (Rohrende mit genau einem
     Rohr), dort ersetzt der Bolzen die Kupplung – und `hingeMounts()`/`addHinge()`. Ein Klick
-    auf ein Scharnier dreht es um 45° weiter (`turnHinge`); die **Kränze sind verzahnt**, zwei
-    Scharniere können deshalb nie in dieselbe Richtung zeigen (im Bestand stehen sie an allen
-    83 Gelenken genau 135° auseinander), und ein Arm mit Rohr dreht sich nicht mehr. Die
+    auf ein Scharnier dreht es um 45° weiter (`turnHinge`); die Kränze rasten zwar in 45°-
+    Schritten, zwei Scharniere dürfen aber nie **näher als 90°** zusammenstehen
+    (`HINGE_MIN_GAP`) – dafür sind ihre Riemen zu breit, und im Bestand stehen sie an allen 83
+    Gelenken 135° auseinander. Verbotene Rastungen überspringt der Klick. Ein Arm mit Rohr
+    dreht sich nicht mehr. Das **zweite Scharnier zeichnet `scene.js` um seine Armachse
+    gewendet** (180°, von vorn auf den Stutzen gesehen), sonst liegen die Riemen beider
+    übereinander; die **Datei kennt diese Wendung nicht** (beide Scharniere tragen dort
+    dieselbe X-Richtung), sie gehört deshalb nicht in den Export. Die
     Anschlussrichtungen (`boltArmDirs`) sind seine beiden Stutzen plus je Scharnier dessen
     Arm – der Builder holt sie über `_armDirsOf`, damit Ankerpunkte und Belegung stimmen.
     Beim Import wird das Gelenk zusammengefasst, sobald an seinem Punkt ein Knoten steht
@@ -572,6 +577,16 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   und die **Geräteform** direkt nach `<body>` (`mobile-portrait`, `sidebar-overlay`, dieselben
   Medienabfragen wie `applyLayout()`). Ohne sie blitzte erst die helle, dann die
   Schreibtisch-Fassung auf. Beide Werte pflegt danach `ui.js` weiter.
+- **Kein Seiten-Zoom:** Gezoomt wird im 3D-Bild, nicht an der Oberfläche. Dafür braucht es
+  **drei** Stellen, jede allein reicht nicht: `user-scalable=no` im Viewport-Meta (das Chrome
+  bewusst überhört), `touch-action: pan-x pan-y` am `body` (fängt Kneifen und Doppeltipp ab und
+  lässt Scrollen zu) und ein `wheel`-Handler in `ui.js`, der **nur mit Strg/Cmd**
+  `preventDefault()` ruft – ohne die Bedingung stünde jede Liste still. Safaris eigene
+  `gesture*`-Ereignisse kommen dazu.
+- **„Als Bild speichern"** (`scene.snapshot()`): rendert die Hauptszene EINMAL zusätzlich ohne
+  Raster, Bau-Punkte und Beschriftungen und liest den Puffer **sofort** aus – der Renderer läuft
+  ohne `preserveDrawingBuffer`, nach dem nächsten Bild wäre er leer. Der Ansichtswürfel fehlt von
+  selbst, weil er erst danach über `_renderViewCube()` in denselben Puffer gezeichnet wird.
 - **Schwebendes über der Szene:** Szene-Knopf und Ansichtswürfel weichen der Schnittebenen-Leiste,
   sobald sie auf schmalen Schirmen als Leiste über dem Bild liegt – **eine** Quelle dafür ist
   `syncCubeInset()` in `ui.js` (`scene.setViewCubeInset()` + CSS-Variable `--slice-inset`). Eine

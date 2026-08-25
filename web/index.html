@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <!-- viewport-fit=cover: ohne das bleiben die env(safe-area-inset-*)-Werte 0,
        und die untere Bedienleiste läge unter dem Home-Balken. -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Kein Seiten-Zoom: gezoomt wird im 3D-Bild. Ohne user-scalable=no hat die
+       Kneifgeste neben dem Canvas die ganze Oberflaeche vergroessert. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>QUADRO 3D</title>
   <!-- Installierbare Web-App: Manifest, Symbole und Farbe der Systemleiste.
        Manifest und Service Worker liegen eine Ebene höher, damit ihr

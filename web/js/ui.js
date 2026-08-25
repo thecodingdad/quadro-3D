@@ -1241,14 +1241,26 @@ export function initUI({ scene, model, builder }) {
   const panelWrap = $("panel-buttons");
   const panelList = buildablePanels();
 
+  /**
+   * Sinnbild einer Platte im MASSSTAB ihrer Kanten: die 40er-Platte fuellt das
+   * Feld, die halbe wird halb so hoch, die 30er kleiner. Groesseres wird
+   * gedeckelt, sonst liefe die 120er aus dem Feld.
+   */
   function panelIcon(p) {
+    const proCm = 11 / 40;                       // 40 cm = 11 px
+    const kante = (cm) => Math.max(3, Math.min(13, (cm || 40) * proCm));
+    const bw = kante(p.w), bh = kante(p.h);
+    const x = (16 - bw) / 2, y = (16 - bh) / 2;
     let holes = "";
-    if (p.holes === 9)
-      for (const cy of [4.6, 8, 11.4])
-        for (const cx of [4.6, 8, 11.4])
-          holes += `<circle cx="${cx}" cy="${cy}" r="1.35" fill="currentColor"/>`;
+    if (p.holes === 9) {
+      // Die Loecher sitzen im Raster der gezeichneten Platte, nicht im Feld.
+      const r = Math.max(0.7, Math.min(bw, bh) / 8);
+      for (let iy = 1; iy <= 3; iy++)
+        for (let ix = 1; ix <= 3; ix++)
+          holes += `<circle cx="${(x + (bw * ix) / 4).toFixed(2)}" cy="${(y + (bh * iy) / 4).toFixed(2)}" r="${r.toFixed(2)}" fill="currentColor"/>`;
+    }
     return `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">` +
-      `<rect x="2.5" y="2.5" width="11" height="11" rx="1.5" fill="currentColor" opacity="0.18" stroke="currentColor" stroke-width="1.4"/>` +
+      `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${bw.toFixed(2)}" height="${bh.toFixed(2)}" rx="1.2" fill="currentColor" opacity="0.18" stroke="currentColor" stroke-width="1.4"/>` +
       holes + `</svg>`;
   }
 
@@ -1580,6 +1592,25 @@ export function initUI({ scene, model, builder }) {
     exportiereModell(tab.name, tab.model);
   }
 
+  /**
+   * Die Szene als PNG herunterladen -- ohne Bodenraster, ohne Bau-Punkte und
+   * ohne den Ansichtswuerfel. Die Knoepfe und die Statuszeile liegen als
+   * HTML ueber dem Bild und sind darin ohnehin nicht enthalten.
+   */
+  function speichereBild() {
+    const tab = activeTab();
+    let url = null;
+    try { url = scene.snapshot(); } catch (e) { console.warn("Bild:", e); }
+    if (!url) { flash(t("image_failed"), "warn"); return; }
+    const a2 = document.createElement("a");
+    a2.href = url;
+    a2.download = `${dateiName(tab ? tab.name : "quadro")}.png`;
+    document.body.appendChild(a2);
+    a2.click();
+    document.body.removeChild(a2);
+    flash(t("flash_image_saved"), "ok");
+  }
+
   /** Aus einem Entwurfsnamen einen brauchbaren Dateinamen machen. */
   function dateiName(name) {
     return (name || "quadro").replace(/[\\/:*?"<>|]/g, "-").trim() || "quadro";
@@ -1804,6 +1835,10 @@ export function initUI({ scene, model, builder }) {
             <path d="M8 1.8v8.4"/><path d="M4.8 7 8 10.4 11.2 7"/><path d="M2.5 12.5v1.7h11v-1.7"/></svg>`,
     import: `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">
             <path d="M8 10.2V1.8"/><path d="M4.8 5 8 1.6 11.2 5"/><path d="M2.5 12.5v1.7h11v-1.7"/></svg>`,
+    // Bild: Rahmen mit Bergen und Sonne.
+    bild: `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">
+            <rect x="1.6" y="3" width="12.8" height="10" rx="1.4"/><circle cx="5.4" cy="6.4" r="1.1"/>
+            <path d="M2.4 11.6 6 8.2l2.4 2.2 2.6-3 2.6 3"/></svg>`,
     // Ein Blatt mit Kreuz -- und fuer "Alle schliessen" ein Stapel davon.
     schliessen: `<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">
             <path d="M3.5 1.5h5l4 4v9h-9z"/><path d="M8.5 1.5v4h4"/><path d="m6.2 8.7 3.6 3.6M9.8 8.7l-3.6 3.6"/></svg>`,
@@ -1822,6 +1857,7 @@ export function initUI({ scene, model, builder }) {
       { icon: DATEI_ICONS.alleSchliessen, label: t("btn_doc_close_all"), run: () => closeAllTabs() },
       { icon: DATEI_ICONS.import, label: t("btn_import"), run: () => $("file-import").click() },
       { icon: DATEI_ICONS.export, label: t("btn_export_qdf"), run: () => exportActiveTab() },
+      { icon: DATEI_ICONS.bild, label: t("btn_export_image"), run: () => speichereBild() },
     ];
   }
 
@@ -2812,6 +2848,19 @@ export function initUI({ scene, model, builder }) {
       asmRow(body, r.name, null, r.count, bomIcon("reinforcements", r.id),
         { kind: "reinforcement", id: r.id });
     }
+  }
+
+  // --- Seiten-Zoom aus ---------------------------------------------------
+  // Gezoomt wird im Bild, nicht an der Seite: Strg+Rad und die Kneifgeste
+  // haben sonst neben dem Canvas die ganze Oberflaeche vergroessert, und man
+  // kam nur ueber die Browser-Einstellung wieder zurueck. Das Rad OHNE Strg
+  // bleibt unangetastet -- damit scrollen Seitenleiste und Listen weiter.
+  window.addEventListener("wheel", (e) => {
+    if (e.ctrlKey || e.metaKey) e.preventDefault();
+  }, { passive: false });
+  // Safari kennt kein pinch-zoom ueber `wheel`, sondern eigene Gesten.
+  for (const art of ["gesturestart", "gesturechange", "gestureend"]) {
+    document.addEventListener(art, (e) => e.preventDefault(), { passive: false });
   }
 
   // --- Tastatur ----------------------------------------------------------

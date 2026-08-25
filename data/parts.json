@@ -186,7 +186,7 @@
       "kind": "special",
       "price": 2.49,
       "buildable": false,
-      "note": "eine Hälfte des Gelenks · je Flexikupplung stehen zwei davon in der Datei · sie sitzt auf dem mittleren Segment des Bolzens, höchstens zwei je Bolzen und immer mindestens 45 Grad auseinander (die Kränze sind verzahnt)",
+      "note": "eine Hälfte des Gelenks · je Flexikupplung stehen zwei davon in der Datei · sie sitzt auf dem mittleren Segment des Bolzens, höchstens zwei je Bolzen und immer mindestens 90 Grad auseinander (die Kränze rasten in 45-Grad-Schritten, für weniger als 90 Grad sind die Riemen zu breit)",
       "url": "https://quadroshop.com/products/flexi-connector-hinge"
     },
     {

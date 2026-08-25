@@ -318,10 +318,19 @@ const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], 
 export const BOLT_PART = "flexi_bolt";
 export const HINGE_PART = "flexi_hinge";
 // Die Kraenze der beiden Scharniere sind verzahnt: sie rasten in 45-Grad-
-// Schritten und koennen deshalb nie in dieselbe Richtung zeigen.
+// Schritten. Naeher als 90 Grad koennen zwei Scharniere aber nicht
+// zusammenstehen -- dafuer sind ihre Riemen zu breit; im Bestand stehen sie an
+// allen 83 Gelenken 135 Grad auseinander.
 export const HINGE_STEP = 45;
+export const HINGE_MIN_GAP = 90;
 export const MAX_HINGES = 2;
 export const BOLT_SEGMENT = 5;              // Laenge eines Bolzensegments (cm)
+
+/** Abstand zweier Stellungen auf dem Kranz, immer 0..180 Grad. */
+export function hingeGap(a, b) {
+  const d = Math.abs((((a - b) % 360) + 360) % 360);
+  return Math.min(d, 360 - d);
+}
 
 /** Ist dieser Knoten ein Flexikupplungs-Bolzen? */
 export function isBoltPart(part) {
@@ -1691,13 +1700,15 @@ export class BuildModel {
 
   /**
    * Die naechste freie Stellung fuer ein Scharnier an diesem Bolzen -- in
-   * 45-Grad-Schritten, und nie die, in der schon eines steht (die Kraenze sind
-   * verzahnt, zwei Scharniere koennen nicht in dieselbe Richtung zeigen).
+   * 45-Grad-Schritten und mindestens 90 Grad neben jedem, das schon steht.
+   * Naeher passen die Riemen nicht aneinander vorbei.
    */
   freeHingeAngle(node) {
     if (!isBoltPart(node && node.part)) return null;
-    const belegt = new Set((node.hinges || []).map((g) => ((g % 360) + 360) % 360));
-    for (let g = 0; g < 360; g += HINGE_STEP) if (!belegt.has(g)) return g;
+    const steht = (node.hinges || []).map((g) => ((g % 360) + 360) % 360);
+    for (let g = 0; g < 360; g += HINGE_STEP) {
+      if (steht.every((h) => hingeGap(g, h) >= HINGE_MIN_GAP)) return g;
+    }
     return null;
   }
 
@@ -1734,21 +1745,22 @@ export class BuildModel {
   }
 
   /**
-   * Scharnier um 45 Grad um die Bolzenachse weiterdrehen. Die Stellung des
-   * anderen Scharniers wird uebersprungen -- zwischen beiden bleibt immer
-   * mindestens ein Rastschritt. Haengt an diesem Arm ein Rohr, bleibt es
-   * stehen: sonst risse die Drehung das Rohr vom Stutzen.
+   * Scharnier um 45 Grad um die Bolzenachse weiterdrehen. Stellungen, die dem
+   * anderen Scharnier naeher als 90 Grad kaemen, werden dabei uebersprungen --
+   * der Klick geht also weiter, bis die naechste erlaubte Rastung kommt.
+   * Haengt an diesem Arm ein Rohr, bleibt es stehen: sonst risse die Drehung
+   * das Rohr vom Stutzen.
    */
   turnHinge(nodeId, index = 0) {
     const n = this.nodes.get(nodeId);
     if (!isBoltPart(n && n.part) || !n.hinges || index >= n.hinges.length) return false;
     if (this._armHasTube(n, hingeDir(n, n.hinges[index]))) return false;
-    const andere = new Set(n.hinges.filter((_, i) => i !== index)
-      .map((g) => ((g % 360) + 360) % 360));
+    const andere = n.hinges.filter((_, i) => i !== index)
+      .map((g) => ((g % 360) + 360) % 360);
     let g = n.hinges[index];
     for (let i = 0; i < 360 / HINGE_STEP; i++) {
       g = (g + HINGE_STEP) % 360;
-      if (!andere.has(g)) { n.hinges[index] = g; return true; }
+      if (andere.every((h) => hingeGap(g, h) >= HINGE_MIN_GAP)) { n.hinges[index] = g; return true; }
     }
     return false;
   }

@@ -2420,10 +2420,18 @@ export class SceneManager {
       if (scharnier) {
         // Lokales +X = Bolzenachse, lokales -Y = Arm. Daraus die Basis; die
         // dritte Achse ergibt sich aus den beiden.
+        //
+        // Das ZWEITE Scharnier steht um seine eigene Armachse gewendet auf dem
+        // Bolzen (also 180 Grad, von vorn auf den Stutzen gesehen): seine
+        // beiden Riemen greifen sonst in dieselben Zaehne wie die des ersten
+        // und liegen uebereinander. Die Datei fuehrt diese Wendung NICHT -- in
+        // allen 83 Gelenken des Bestands tragen beide Scharniere dieselbe
+        // X-Richtung --, sie gehoert deshalb nur ins Bild, nicht in den Export.
+        const achse = i % 2 ? ex.clone().negate() : ex;
         const ey = arm.clone().negate();
-        const ez = new THREE.Vector3().crossVectors(ex, ey);
+        const ez = new THREE.Vector3().crossVectors(achse, ey);
         this._batchAdd(this._meshGeometry("fit:flexi-connector3", scharnier), mat,
-          new THREE.Matrix4().makeBasis(ex, ey, ez).setPosition(pos),
+          new THREE.Matrix4().makeBasis(achse, ey, ez).setPosition(pos),
           "node", n.id, pick, { hinge: i });
       } else {
         const seg = Math.max(8, this._q().tube);
@@ -4815,6 +4823,33 @@ export class SceneManager {
     this.scene.add(grid);
     this._grid = grid;
     this._needsRender = true;
+  }
+
+  /**
+   * Das Bild der Szene als PNG-Datenstrom -- fuer "Als Bild speichern".
+   *
+   * Weggelassen wird alles, was zur Bedienung gehoert und nicht zum Modell:
+   * Bodenraster, Bau-Punkte und Beschriftungen; der Ansichtswuerfel faellt weg,
+   * weil hier NUR die Hauptszene gezeichnet wird (er kommt sonst erst danach
+   * ueber `_renderViewCube`). Alles darum herum -- Himmel, Wiese, Baeume --
+   * bleibt so stehen, wie es auf dem Schirm zu sehen ist.
+   *
+   * Gerendert wird eigens fuer diesen Aufruf und der Puffer SOFORT ausgelesen:
+   * `preserveDrawingBuffer` ist aus, nach dem naechsten Bild waere er leer.
+   */
+  snapshot() {
+    const versteckt = [this._grid, this.handleGroup, this.labelGroup]
+      .filter(Boolean).map((o) => [o, o.visible]);
+    for (const [o] of versteckt) o.visible = false;
+    let url = null;
+    try {
+      this.renderer.render(this.scene, this.camera);
+      url = this.renderer.domElement.toDataURL("image/png");
+    } finally {
+      for (const [o, sichtbar] of versteckt) o.visible = sichtbar;
+      this._needsRender = true;      // das naechste Bild zeigt wieder alles
+    }
+    return url;
   }
 
   /**

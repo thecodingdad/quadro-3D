@@ -88,9 +88,14 @@ body {
   /* Touch/iPad: kein Gummiband-Scrollen, keine Doppeltipp-Zoom-Verzoegerung */
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
-  touch-action: manipulation;
+  /* Kein Seiten-Zoom: gezoomt wird im 3D-Bild. `manipulation` laesst die
+     Kneifgeste durch, und Chrome ueberhoert `user-scalable=no` -- mit
+     pan-x/pan-y bleibt Scrollen erlaubt, Kneifen und Doppeltipp nicht. */
+  touch-action: pan-x pan-y;
 }
-/* Bedienelemente reagieren ohne 300ms-Verzoegerung */
+/* Bedienelemente reagieren ohne 300ms-Verzoegerung (Zoom bleibt trotzdem aus:
+   `manipulation` schaltet nur den Doppeltipp-Zoom ab, Kneifen faengt der
+   Seiten-Riegel in ui.js ab) */
 .btn, .swatch, .lang-select, select, label { touch-action: manipulation; }
 /* Nirgends versehentlich Text markieren: beim Ziehen im Bild, beim Doppelklick
    auf einen Tab oder beim Wischen in einer Liste blieb sonst staendig etwas
