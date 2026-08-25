@@ -264,7 +264,7 @@ body.compact-brand .brand-icon { width: 20px; height: 20px; }
   gap: 2px;
   padding: 6px;
   min-width: 180px;
-  max-height: min(60vh, 420px);
+  max-height: 60vh;
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--line);
