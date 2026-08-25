@@ -2527,10 +2527,14 @@ export class BuildModel {
    * 3 x 75 cm), sonst mit 35ern -- so baut es auch die Herstellersoftware in
    * ihren Beispielmodellen ("Pool groß": Langseite 2 x 75, Breitseite 3 x 35).
    *
-   * `tubeFor(spannweite)` liefert das Rohr zu einem Kupplungsabstand; der
-   * Katalog gehoert nicht hierher (siehe Trennung in CLAUDE.md).
+   * `tubeFor(spannweite)` liefert das Rohr zu einem Kupplungsabstand, `color`
+   * die Farbe je Rohr (Zeichenkette oder Funktion); der Katalog gehoert nicht
+   * hierher (siehe Trennung in CLAUDE.md).
    */
   poolFragment(spec, { color = "blue", tubeFor } = {}) {
+    // `color` darf eine Funktion sein: das Baellebad wird Rohr fuer Rohr
+    // eingefaerbt, so bunt wie das echte Teil.
+    const farbe = typeof color === "function" ? color : () => color;
     if (!spec || typeof tubeFor !== "function") return null;
     const { w, d, h } = spec;
     // Seite in Abschnitte teilen: 80 cm, wo es aufgeht, sonst 40 cm.
@@ -2560,7 +2564,7 @@ export class BuildModel {
     const rohr = (a, b, span) => {
       const teil = tubeFor(span);
       if (!teil) return;
-      tubes.push({ id: `pt${lauf++}`, a, b, tubeId: teil.id, color, length: teil.length_cm });
+      tubes.push({ id: `pt${lauf++}`, a, b, tubeId: teil.id, color: farbe(), length: teil.length_cm });
     };
     // Die beiden Ringe -- unten und oben um das ganze Becken.
     for (let i = 0; i < rund.length; i++) {
@@ -2576,7 +2580,7 @@ export class BuildModel {
     const fittings = [{
       id: "pf0", kind: spec.kind, x: round(w / 2), y: h, z: 0,
       // Die Folie gibt es nur in Blau -- die Baufarbe gilt nur fuer den Rahmen.
-      quat: [0, 0, 0, 1], color: fixedFittingColor(spec.kind) || color, w, h, d,
+      quat: [0, 0, 0, 1], color: fixedFittingColor(spec.kind) || farbe(), w, h, d,
     }];
     return { anchor: [0, 0, 0], nodes, tubes, panels: [], textiles: [], clamps: [], slides: [], fittings };
   }

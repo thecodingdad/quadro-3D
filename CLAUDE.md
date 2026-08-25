@@ -585,6 +585,8 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   Rahmen **und** Folie als **Fragment** – dasselbe Format, das `extractSelection` beim Kopieren
   erzeugt. `builder.startPool(linerId)` reicht es an `startPaste()` weiter; damit gelten
   Rasterung, Kollisionsprüfung, „nur in der Ebene" und Escape ohne eine Zeile eigenen Codes.
+  `color` darf dabei eine **Funktion** sein – der Rahmen bekommt Rohr für Rohr eine zufällige
+  Farbe (die Baufarbe gilt für ihn nicht), die Folie ist immer blau.
   Die vier Größen stehen in `POOL_SETS` (Herstellermaß: Innenmaß der Folie = Rahmen + 2,5 cm):
   XS 80×80, S 80×120, L 120×160, XXL 120×240, Wandhöhe 20 bzw. 40. Eine Seite wird mit 75ern
   geteilt, wo ihre Länge durch 80 aufgeht (XXL = 3 × 75), sonst mit 35ern. Den Katalog kennt

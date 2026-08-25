@@ -368,8 +368,12 @@ export class Builder {
     if (!spec) return false;
     const cs = geometry().connectorSize;
     const frag = this.model.poolFragment(spec, {
-      // Die Baufarbe gilt fuer den Rahmen; die Folie gibt es nur in Blau.
-      color: this.colorFor("tube"),
+      // Der Rahmen wird bunt: je Rohr eine zufaellige Farbe, so wie das
+      // Baellebad auch geliefert wird. Die Folie gibt es nur in Blau.
+      color: () => {
+        const farben = tubeColors().map((c) => c.id);
+        return farben[Math.floor(Math.random() * farben.length)] || "blue";
+      },
       // Zu einer Spannweite das passende Rohr: die Kupplung steuert `cs` bei.
       tubeFor: (span) => getTube(this._tubeIdForSpan(span, cs)),
     });
