@@ -5,7 +5,7 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs, BLACK_FITTINGS,
-  isBoltPart, boltAxis, hingeDir, POOL_KINDS } from "./model.js";
+  isBoltPart, boltAxis, hingeDir, POOL_KINDS, fixedFittingColor } from "./model.js";
 import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
@@ -134,6 +134,9 @@ const SLIDE_END_FLAT = 47.5 - SLIDE_END_LIP_R;
 // Platten und Netze auch.
 const FLAT_FITTINGS = new Set(["lattice2", "textil-round2", "roof-large2"]);
 // Staerke der Baellebad-Folie: nur so dick, dass sie sichtbar ist.
+// Der Nullpunkt des kleinen Beckens liegt 20 cm neben der Mitte seiner
+// Frontwand (abgegriffenes Modell, lokale X-Achse) -- wie in qdfimport.js.
+const POOL_SMALL_OFFSET = 20;
 const POOL_SKIN = 2;
 // Sie haengt innen im Rahmen -- eine halbe Rohrbreite von den Rohrachsen weg.
 const POOL_INSET = 2.5;
@@ -1319,7 +1322,11 @@ export class SceneManager {
     // Radlager und Schwimmrad gibt es nur in Schwarz -- weder die Baufarbe noch
     // die Farbe aus der Datei faerbt sie um. In den Herstellerdateien tragen
     // beide durchgehend das schwarze Material (125 bzw. 76 Vorkommen).
-    const hex = BLACK_FITTINGS.has(f.kind) ? connectorColor().hex
+    // Teile mit fester Farbe: Radlager, Schwimmrad und Rohrkappe sind schwarz,
+    // die Poolfolie ist blau -- die Baufarbe gilt fuer sie nicht.
+    const fest = fixedFittingColor(f.kind);
+    const hex = fest === "black" ? connectorColor().hex
+      : fest ? colorHex(fest)
       : f.color ? colorHex(f.color) : 0x2b2b2b;
     let geo = null, mat = null;
     const cs = geometry().connectorSize;
@@ -1349,6 +1356,13 @@ export class SceneManager {
       // so, unsere Aufrichtung war ein Behelf fuer die gezeichnete Form.
       if (f.kind === "bag2") {
         mesh.position.addScaledVector(new THREE.Vector3(0, 0, 1).applyQuaternion(q), -BAG_OFFSET);
+      }
+      // Das KLEINE Baellebad hat seinen Nullpunkt nicht in der Mitte der
+      // Frontwand: sein Modell reicht von -22,5 bis +62,5 cm in lokal X. Wir
+      // fuehren die Mitte -- also um diese 20 cm zurueckschieben, sonst steht
+      // das Becken neben seinem Rahmen (dieselbe Rechnung wie im Export).
+      if (f.kind === "pool-small2") {
+        mesh.position.addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(q), -POOL_SMALL_OFFSET);
       }
       const teile = [mesh];
       const wasser = f.kind === "pool2" || f.kind === "pool-small2"

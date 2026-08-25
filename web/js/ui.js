@@ -1573,6 +1573,17 @@ export function initUI({ scene, model, builder }) {
       // Menue, die uebrigen unter ihrer QDF-Art.
       // Die Poolfolien stehen im Katalog beim Zubehoer, die uebrigen
       // Sonderfaelle bei den Kupplungen -- beide unter ihrer Katalog-Kennung.
+      // Im Menue heisst das Bauteil "Pool" -- gesetzt wird ja das ganze
+      // Becken. In Stueckliste und Bestand bleibt es die "Poolfolie", denn
+      // dort geht es um das Teil, das man kauft.
+      if (POOL_SETS[k]) {
+        const folie = getPartById(k);
+        return folie ? {
+          ...folie, id: k, qdf: k,
+          name: folie.name.replace(/^Poolfolie/, "Pool"),
+          name_en: (folie.name_en || "").replace(/^Pool liner/, "Pool"),
+        } : null;
+      }
       const def = POOL_SETS[k] ? getPartById(k)
         : (k === CLAMP_ENTRY || k === CLIP_ENTRY || HOLE_MASKS[k]
           || k === "flexi_bolt" || k === "flexi_hinge")

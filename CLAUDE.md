@@ -430,6 +430,10 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     **+Y** (an den Modellen gemessen). Import und Export rechnen das ineinander um
     (`clampQuat` in `qdfexport.js`), Speicherstände von vorher schiebt die Migration auf
     **Format 2** zurecht.
+  - **Teile mit FESTER Farbe** stehen in `fixedFittingColor()` (`model.js`): die **Poolfolie**
+    gibt es nur in **Blau** (so steht sie auch in allen 43 Vorkommen des Bestands, Material 8),
+    Radlager, Schwimmrad und Rohrkappe nur in Schwarz. `scene.js`, `qdfexport.js` und
+    `setColorOf` fragen dort nach – die Baufarbe gilt für sie nicht.
   - **Radlager (`bearing2`), Schwimmrad (`floating-wheel2`) und Rohrkappe (`tube-cap2`) gibt es
     nur in Schwarz** – weder die Baufarbe noch die aus der Datei färbt sie um (`BLACK_FITTINGS`
     in `model.js`; `scene.js`, `qdfexport.js` und `setColorOf` holen sich die Liste von dort). Radlager und Schwimmrad tragen in den
@@ -594,6 +598,8 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   Export rechnen das um, aber nur für die echten 80er, denn der 40 cm breite Rahmen der alten
   XS-Fassung hat seinen Punkt mittig. Und das abgegriffene Modell hat **eine feste Größe**:
   passt sie nicht zu `w`/`d`, zeichnet `scene.js` das Becken wieder aus Wänden und Boden.
+  Denselben 20-cm-Versatz braucht auch das **Zeichnen** des abgegriffenen Modells – ohne ihn
+  stand das kleine Becken neben seinem Rahmen.
 - **Offene Menüs wandern mit der Maus:** Jeder Knopf, der ein Popup aufklappt, trägt
   `data-popup="1"` (Helfer `popupKnopf()` in `ui.js`). Ist eines offen, löst ein `pointerover`
   mit `pointerType === "mouse"` einfach den **Klick** des überfahrenen Knopfes aus – die Logik

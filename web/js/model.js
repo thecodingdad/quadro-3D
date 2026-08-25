@@ -217,6 +217,15 @@ function bearingQuat(ausrichtung, rohr) {
  */
 export const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2", "tube-cap2"]);
 
+// Teile mit FESTER Farbe -- weder die Baufarbe noch die aus der Datei faerbt
+// sie um. Die Poolfolie gibt es nur in Blau; Radlager, Schwimmrad und
+// Rohrkappe nur in Schwarz (siehe BLACK_FITTINGS).
+export function fixedFittingColor(kind) {
+  if (BLACK_FITTINGS.has(kind)) return "black";
+  if (POOL_KINDS.has(kind)) return "blue";
+  return null;
+}
+
 /**
  * Lochzapfenkupplungen: Katalog-Kennung -> Arm-Maske im LOKALEN System des
  * Teils, genau wie sie in der QDF-Zeile steht. Die Bits 0x01 und 0x02 (+X/-X)
@@ -2350,7 +2359,7 @@ export class BuildModel {
     // Rohre und werden nicht eingefaerbt.
     if (kind === "tube" && (el.arm || el.link)) return false;
     // Schwarze Teile bleiben schwarz.
-    if (kind === "fitting" && BLACK_FITTINGS.has(el.kind)) return false;
+    if (kind === "fitting" && fixedFittingColor(el.kind)) return false;
     el.color = color;
     return true;
   }
@@ -2521,7 +2530,7 @@ export class BuildModel {
    * `tubeFor(spannweite)` liefert das Rohr zu einem Kupplungsabstand; der
    * Katalog gehoert nicht hierher (siehe Trennung in CLAUDE.md).
    */
-  poolFragment(spec, { color = "blue", linerColor = null, tubeFor } = {}) {
+  poolFragment(spec, { color = "blue", tubeFor } = {}) {
     if (!spec || typeof tubeFor !== "function") return null;
     const { w, d, h } = spec;
     // Seite in Abschnitte teilen: 80 cm, wo es aufgeht, sonst 40 cm.
@@ -2566,7 +2575,8 @@ export class BuildModel {
     // Mitte der vorderen Breitseite; von dort geht es `d` in die Tiefe.
     const fittings = [{
       id: "pf0", kind: spec.kind, x: round(w / 2), y: h, z: 0,
-      quat: [0, 0, 0, 1], color: linerColor || color, w, h, d,
+      // Die Folie gibt es nur in Blau -- die Baufarbe gilt nur fuer den Rahmen.
+      quat: [0, 0, 0, 1], color: fixedFittingColor(spec.kind) || color, w, h, d,
     }];
     return { anchor: [0, 0, 0], nodes, tubes, panels: [], textiles: [], clamps: [], slides: [], fittings };
   }

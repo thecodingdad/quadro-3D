@@ -23,7 +23,7 @@
 
 import { geometry, getPanel, getTube } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
-import { isHolePart, HOLE_MASKS, BLACK_FITTINGS, isBoltPart, boltAxis, hingeDir } from "./model.js";
+import { isHolePart, HOLE_MASKS, BLACK_FITTINGS, isBoltPart, boltAxis, hingeDir, fixedFittingColor } from "./model.js";
 
 // Farbtabelle wie in den Dateien der Herstellersoftware: erst der Satz fuer
 // Rohre und Kupplungen (kind 1), dann derselbe Satz fuer Platten (kind 2). Die
@@ -636,8 +636,13 @@ export function buildQDF(model) {
     // naechsten Laden ein.
     // Radlager und Schwimmrad gibt es nur schwarz -- so stehen sie auch in den
     // Herstellerdateien (Material 1, 125 bzw. 76 Vorkommen).
-    const mat = BLACK_FITTINGS.has(f.kind) ? TUBE_MAT.black
-      : f.color ? (stoff ? panelMat(f.color) : tubeMat(f.color)) : 0;
+    // Teile mit fester Farbe schreiben genau diese: Radlager, Schwimmrad und
+    // Rohrkappe schwarz, die Poolfolie blau (so steht sie auch in allen 43
+    // Vorkommen der Herstellerdateien).
+    const fest = fixedFittingColor(f.kind);
+    const farbe = fest || f.color;
+    const mat = fest === "black" ? TUBE_MAT.black
+      : farbe ? (stoff ? panelMat(farbe) : tubeMat(farbe)) : 0;
     // Der Spielsack wird an dem Rohr gespeichert, an dem er haengt -- unsere
     // Mitte liegt 20 cm weiter in der lokalen +Z-Richtung, also zurueckrechnen.
     let fx = f.x, fy = f.y, fz = f.z;
