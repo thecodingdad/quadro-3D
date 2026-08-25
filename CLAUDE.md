@@ -591,9 +591,11 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   XS 80×80, S 80×120, L 120×160, XXL 120×240, Wandhöhe 20 bzw. 40. In der **Länge** zählt jedes 75er, das hineingeht, sobald die Seite länger als 80 cm ist
   (S = 75 + 35, L = 2 x 75, XXL = 3 x 75; das quadratische XS besteht rundherum aus 35ern), und
   die beiden Längsseiten laufen **versetzt** – 75 + 35 links, 35 + 75 rechts,
-  damit die Stöße nicht gegenüberliegen. Quer dazu stehen immer 35er – auch auf der
-  80 cm breiten Seite, die rechnerisch in ein 75er passen würde (Beispiel des Herstellers
-  „Pool groß": Langseite 2 x 75, Breitseite 3 x 35). Den Katalog kennt
+  damit die Stöße nicht gegenüberliegen. Quer dazu stehen 35er – auch auf der 80 cm
+  breiten Seite, die rechnerisch in ein 75er passen würde (Beispiel des Herstellers
+  „Pool groß": Langseite 2 x 75, Breitseite 3 x 35). Wo ein Bausatz davon abweicht, steht
+  es in `POOL_SETS`: beim S-Pool ist die **hintere** Breitseite ein einzelnes 75er
+  (`querHinten`), vorn stehen zwei 35er. Den Katalog kennt
   `model.js` nicht – das Rohr zu einer Spannweite liefert der Aufrufer über `tubeFor()`.
 - **Das QDF-Format kennt nur ZWEI Becken:** `pool-small2` (80 × 120 × 20) und `pool2`
   (120 × 160 × 40) – die Maße stehen nicht in der Datei, sie stecken im Modell. Die Tiefe

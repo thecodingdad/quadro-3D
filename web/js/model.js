@@ -317,6 +317,8 @@ const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], 
 // `w` ist die Breite der Frontwand, `d` die Tiefe, `h` die Wandhoehe -- so
 // steht es auch im Anbauteil. Die Masse stammen vom Hersteller; das Innenmass
 // der Folie ist das Rahmenmass + 2,5 cm, das Aussenmass + 5 cm (Rohrbreite):
+// `querHinten` gibt die hintere Breitseite eigens vor, wo der Bausatz von der
+// Regel abweicht: beim S-Pool ist sie EIN 75er, waehrend vorn zwei 35er stehen.
 //   XS   82,5 x  82,5 x 25  ->  80 x  80, Wandhoehe 20
 //   S   122,5 x  82,5 x 25  ->  80 x 120, Wandhoehe 20
 //   L   162,5 x 122,5 x 45  -> 120 x 160, Wandhoehe 40
@@ -326,7 +328,7 @@ const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], 
 // davon nur in der Tiefe, die die Datei ohnehin aus dem Rahmen ableitet.
 export const POOL_SETS = {
   pool_liner_xs:  { liner: "pool_liner_xs",  kind: "pool-small2", w: 80,  d: 80,  h: 20 },
-  pool_liner_s:   { liner: "pool_liner_s",   kind: "pool-small2", w: 80,  d: 120, h: 20 },
+  pool_liner_s:   { liner: "pool_liner_s",   kind: "pool-small2", w: 80,  d: 120, h: 20, querHinten: [80] },
   pool_liner_l:   { liner: "pool_liner_l",   kind: "pool2",       w: 120, d: 160, h: 40 },
   pool_liner_xxl: { liner: "pool_liner_xxl", kind: "pool2",       w: 120, d: 240, h: 40 },
 };
@@ -2550,14 +2552,22 @@ export class BuildModel {
       if (s < L) out.push([s, L]);
       return out;
     };
-    // Die Breitseite bekommt IMMER 35er -- auch die 80 cm breite Seite, die
-    // rechnerisch in ein 75er passen wuerde.
+    // Die Breitseiten bekommen 35er -- auch die 80 cm breite Seite, die
+    // rechnerisch in ein 75er passen wuerde. EINE Ausnahme steht im Bausatz:
+    // beim S-Pool ist die hintere Breitseite ein einziges 75er (`querHinten`).
     const xTeile = abschnitte(w, [40]);
+    const xHinten = spec.querHinten
+      ? spec.querHinten.map((len, i, alle) => {
+        const s = alle.slice(0, i).reduce((sum, v) => sum + v, 0);
+        return [s, s + len];
+      })
+      : xTeile;
     // Ein 75er kommt nur in eine Seite, die LAENGER als 80 cm ist: das
     // quadratische XS-Becken misst rundherum 80 und besteht rundherum aus
     // 35ern, je zwei pro Seite.
     const zTeile = abschnitte(d, d > 80 ? [80, 40] : [40]);
     const xPos = [0, ...xTeile.map(([, b]) => b)];
+    const xPosHinten = [0, ...xHinten.map(([, b]) => b)];
     // Die beiden Laengsseiten laufen VERSETZT gegeneinander: auf der einen
     // kommt erst das lange Rohr, auf der anderen erst das kurze. So liegen die
     // Stoesse nicht auf einer Linie gegenueber -- beim S-Pool also 75 + 35
@@ -2569,7 +2579,7 @@ export class BuildModel {
     const rund = [];
     for (const x of xPos) rund.push([x, 0]);
     for (const z of zRechts.slice(1)) rund.push([w, z]);
-    for (const x of xPos.slice(0, -1).reverse()) rund.push([x, d]);
+    for (const x of xPosHinten.slice(0, -1).reverse()) rund.push([x, d]);
     for (const z of zLinks.slice(1, -1).reverse()) rund.push([0, z]);
 
     const nodes = [], tubes = [];
