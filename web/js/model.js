@@ -2554,13 +2554,18 @@ export class BuildModel {
     const xTeile = abschnitte(w, w % 80 === 0 ? [80] : [40]);
     const zTeile = abschnitte(d, [80, 40]);
     const xPos = [0, ...xTeile.map(([, b]) => b)];
-    const zPos = [0, ...zTeile.map(([, b]) => b)];
+    const zRechts = [0, ...zTeile.map(([, b]) => b)];
+    // Die zweite Laengsseite laeuft VERSETZT: dort kommt erst das kurze Rohr
+    // und dann das lange. So liegen die Stoesse nicht auf einer Linie
+    // gegenueber -- beim S-Pool also 75 + 35 auf der einen, 35 + 75 auf der
+    // anderen Seite. Bei gleich langen Abschnitten aendert das nichts.
+    const zLinks = zRechts.map((z) => d - z).reverse();
     // Umlaufende Punkte des Rechtecks, im Kreis herum und ohne Doppelte.
     const rund = [];
     for (const x of xPos) rund.push([x, 0]);
-    for (const z of zPos.slice(1)) rund.push([w, z]);
+    for (const z of zRechts.slice(1)) rund.push([w, z]);
     for (const x of xPos.slice(0, -1).reverse()) rund.push([x, d]);
-    for (const z of zPos.slice(1, -1).reverse()) rund.push([0, z]);
+    for (const z of zLinks.slice(1, -1).reverse()) rund.push([0, z]);
 
     const nodes = [], tubes = [];
     const idOf = (i, oben) => `pn${i}${oben ? "o" : "u"}`;
