@@ -2538,10 +2538,9 @@ export class BuildModel {
     if (!spec || typeof tubeFor !== "function") return null;
     const { w, d, h } = spec;
     // Seite in Abschnitte teilen. In der LAENGE zaehlt jedes 75er-Rohr, das
-    // hineingeht: der S-Pool ist 75 + 35, der L 2 x 75, der XXL 3 x 75. Die
-    // Breitseite bekommt 35er, solange sie nicht glatt durch 80 geht -- so
-    // baut es auch die Herstellersoftware (Beispiel "Pool groß": Langseite
-    // 2 x 75, Breitseite 3 x 35).
+    // hineingeht: der S-Pool ist 75 + 35, der L 2 x 75, der XXL 3 x 75. Quer
+    // dazu stehen 35er -- so baut es auch die Herstellersoftware (Beispiel
+    // "Pool groß": Langseite 2 x 75, Breitseite 3 x 35).
     const abschnitte = (L, schritte) => {
       const out = [];
       let s = 0;
@@ -2551,7 +2550,9 @@ export class BuildModel {
       if (s < L) out.push([s, L]);
       return out;
     };
-    const xTeile = abschnitte(w, w % 80 === 0 ? [80] : [40]);
+    // Die Breitseite bekommt IMMER 35er -- auch die 80 cm breite Seite, die
+    // rechnerisch in ein 75er passen wuerde.
+    const xTeile = abschnitte(w, [40]);
     const zTeile = abschnitte(d, [80, 40]);
     const xPos = [0, ...xTeile.map(([, b]) => b)];
     // Die beiden Laengsseiten laufen VERSETZT gegeneinander: auf der einen

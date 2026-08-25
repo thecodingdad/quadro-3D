@@ -590,9 +590,9 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   Die vier Größen stehen in `POOL_SETS` (Herstellermaß: Innenmaß der Folie = Rahmen + 2,5 cm):
   XS 80×80, S 80×120, L 120×160, XXL 120×240, Wandhöhe 20 bzw. 40. In der **Länge** zählt jedes 75er, das hineingeht (S = 75 + 35, L = 2 x 75, XXL = 3 x 75), und
   die beiden Längsseiten laufen **versetzt** – 75 + 35 links, 35 + 75 rechts,
-  damit die Stöße nicht gegenüberliegen. Die Breitseite bekommt 35er, solange sie nicht glatt
-  durch 80 geht – so baut es auch die Herstellersoftware (Beispiel „Pool groß": Langseite
-  2 x 75, Breitseite 3 x 35). Den Katalog kennt
+  damit die Stöße nicht gegenüberliegen. Quer dazu stehen immer 35er – auch auf der
+  80 cm breiten Seite, die rechnerisch in ein 75er passen würde (Beispiel des Herstellers
+  „Pool groß": Langseite 2 x 75, Breitseite 3 x 35). Den Katalog kennt
   `model.js` nicht – das Rohr zu einer Spannweite liefert der Aufrufer über `tubeFor()`.
 - **Das QDF-Format kennt nur ZWEI Becken:** `pool-small2` (80 × 120 × 20) und `pool2`
   (120 × 160 × 40) – die Maße stehen nicht in der Datei, sie stecken im Modell. Die Tiefe
