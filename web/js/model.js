@@ -2537,14 +2537,22 @@ export class BuildModel {
     const farbe = typeof color === "function" ? color : () => color;
     if (!spec || typeof tubeFor !== "function") return null;
     const { w, d, h } = spec;
-    // Seite in Abschnitte teilen: 80 cm, wo es aufgeht, sonst 40 cm.
-    const teile = (L) => {
-      const schritt = L % 80 === 0 ? 80 : 40;
+    // Seite in Abschnitte teilen. In der LAENGE zaehlt jedes 75er-Rohr, das
+    // hineingeht: der S-Pool ist 75 + 35, der L 2 x 75, der XXL 3 x 75. Die
+    // Breitseite bekommt 35er, solange sie nicht glatt durch 80 geht -- so
+    // baut es auch die Herstellersoftware (Beispiel "Pool groß": Langseite
+    // 2 x 75, Breitseite 3 x 35).
+    const abschnitte = (L, schritte) => {
       const out = [];
-      for (let s = 0; s < L; s += schritt) out.push([s, Math.min(s + schritt, L)]);
+      let s = 0;
+      for (const schritt of schritte) {
+        while (L - s >= schritt) { out.push([s, s + schritt]); s += schritt; }
+      }
+      if (s < L) out.push([s, L]);
       return out;
     };
-    const xTeile = teile(w), zTeile = teile(d);
+    const xTeile = abschnitte(w, w % 80 === 0 ? [80] : [40]);
+    const zTeile = abschnitte(d, [80, 40]);
     const xPos = [0, ...xTeile.map(([, b]) => b)];
     const zPos = [0, ...zTeile.map(([, b]) => b)];
     // Umlaufende Punkte des Rechtecks, im Kreis herum und ohne Doppelte.
