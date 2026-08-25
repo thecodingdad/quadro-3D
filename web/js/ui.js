@@ -1579,6 +1579,9 @@ export function initUI({ scene, model, builder }) {
     btn.innerHTML = icon() + `<span></span>`;
     btn.lastChild.textContent = t(key);
     btn.title = t(key);
+    // Die Raeder gehoeren noch zu den Rutschen, danach beginnt die Gruppe der
+    // Verbindungen -- der Trenner steht deshalb MITTEN in dieser Reihe.
+    if (key === "grp_joints") $("fitting-buttons").appendChild(el("span", "divider"));
     $("fitting-buttons").appendChild(btn);
     fittingGroupBtns.push({ btn, kinds, key });
   }
