@@ -2131,7 +2131,8 @@ export class BuildModel {
       if (!a || !b) continue;
       if (Math.abs(a.x - b.x) > 0.5 || Math.abs(a.z - b.z) > 0.5) continue; // nicht senkrecht
       if (Math.abs(a.y - b.y) < 0.5) continue;
-      posts.push({ x: a.x, z: a.z, low: Math.min(a.y, b.y), high: Math.max(a.y, b.y) });
+      posts.push({ x: a.x, z: a.z, low: Math.min(a.y, b.y), high: Math.max(a.y, b.y),
+        len: t.length, lowId: a.y <= b.y ? a.id : b.id });
     }
     for (let i = 0; i < posts.length; i++) {
       for (let j = i + 1; j < posts.length; j++) {
@@ -2140,6 +2141,11 @@ export class BuildModel {
         const dx = q.x - p.x, dz = q.z - p.z;
         const d = Math.hypot(dx, dz);
         if (Math.abs(d - width) > tol) continue;              // falscher Abstand
+        // Modular- und Bogenrutsche werden am Einstieg VERSCHRAUBT: dafuer
+        // braucht es beidseits ein 15er Rohr (dort sitzen die Loecher) und
+        // darunter ein 35er zwischen den beiden. Die Integralrutsche haengt
+        // nur ein und ist deshalb an keine Rohrlaenge gebunden.
+        if (kette && !this._slideEntryOk(p, q)) continue;
         // Feste Bauhoehe: unterhalb von SLIDE_DROP ueber dem Boden wuerde der
         // Fuss in den Boden laufen. Nach oben ist alles erlaubt -- die Rutsche
         // endet dann auf einer Plattform statt auf dem Boden.
@@ -2184,6 +2190,18 @@ export class BuildModel {
       }
     }
     return out;
+  }
+
+  /**
+   * Taugt dieses Rohrpaar als Einstieg fuer eine geschraubte Rutsche? Beide
+   * senkrechten Rohre muessen 15 cm lang sein -- nur die haben an der
+   * richtigen Stelle Loecher --, und unten muss ein 35er zwischen ihnen
+   * liegen, an dem die Rutsche aufsitzt.
+   */
+  _slideEntryOk(p, q) {
+    if (Math.abs((p.len || 0) - 15) > 0.5 || Math.abs((q.len || 0) - 15) > 0.5) return false;
+    const quer = this.tubeBetween(p.lowId, q.lowId);
+    return !!quer && !quer.arm && !quer.link && Math.abs((quer.length || 0) - 35) < 0.5;
   }
 
   /**

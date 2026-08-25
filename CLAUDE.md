@@ -558,6 +558,13 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   `Raycaster.setFromCamera` beginnt dort aber genau in der Kameraebene und trifft nur nach
   vorn – `scene._setMouse()` zieht seinen Ursprung deshalb um `camera.near` zurück. Ohne das
   waren Teile sichtbar, aber nicht wählbar, und erst ein Wechsel der Projektion half.
+- **Der Einstieg einer geschraubten Rutsche:** Modular- und Bogenrutsche werden am Einstieg
+  verschraubt und brauchen dort beidseits ein **15-cm-Rohr** (nur das hat die Löcher an der
+  richtigen Stelle) und darunter ein **35er zwischen den beiden** (`_slideEntryOk` in
+  `model.js`, geprüft in `slideMounts` für alle Ketten-Teile). Die **Integralrutsche** hängt
+  nur ein und ist deshalb an keine Rohrlänge gebunden. Gegengeprüft am Bestand: von 87
+  Kettenköpfen der Herstellermodelle erfüllen 86 diese Regel – der eine Ausreißer wäre auch
+  nach den älteren Regeln (freie Bahn, Auflage, Fallhöhe) gesetzt worden.
 - **Rutschen im Aufbauplan:** Ein Rutschenteil gehört nicht in die Ebene, auf der es *endet*,
   sondern in den Schritt, der seinen **Einstieg** baut. `buildplan.slideChainHeads()` fasst dafür
   jede Kette zusammen (Ausgang eines Teils über `model.slideExit()` → dort sitzt das nächste) und
