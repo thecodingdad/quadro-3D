@@ -588,7 +588,8 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   `color` darf dabei eine **Funktion** sein – der Rahmen bekommt Rohr für Rohr eine zufällige
   Farbe (die Baufarbe gilt für ihn nicht), die Folie ist immer blau.
   Die vier Größen stehen in `POOL_SETS` (Herstellermaß: Innenmaß der Folie = Rahmen + 2,5 cm):
-  XS 80×80, S 80×120, L 120×160, XXL 120×240, Wandhöhe 20 bzw. 40. In der **Länge** zählt jedes 75er, das hineingeht (S = 75 + 35, L = 2 x 75, XXL = 3 x 75), und
+  XS 80×80, S 80×120, L 120×160, XXL 120×240, Wandhöhe 20 bzw. 40. In der **Länge** zählt jedes 75er, das hineingeht, sobald die Seite länger als 80 cm ist
+  (S = 75 + 35, L = 2 x 75, XXL = 3 x 75; das quadratische XS besteht rundherum aus 35ern), und
   die beiden Längsseiten laufen **versetzt** – 75 + 35 links, 35 + 75 rechts,
   damit die Stöße nicht gegenüberliegen. Quer dazu stehen immer 35er – auch auf der
   80 cm breiten Seite, die rechnerisch in ein 75er passen würde (Beispiel des Herstellers

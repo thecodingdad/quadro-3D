@@ -2553,7 +2553,10 @@ export class BuildModel {
     // Die Breitseite bekommt IMMER 35er -- auch die 80 cm breite Seite, die
     // rechnerisch in ein 75er passen wuerde.
     const xTeile = abschnitte(w, [40]);
-    const zTeile = abschnitte(d, [80, 40]);
+    // Ein 75er kommt nur in eine Seite, die LAENGER als 80 cm ist: das
+    // quadratische XS-Becken misst rundherum 80 und besteht rundherum aus
+    // 35ern, je zwei pro Seite.
+    const zTeile = abschnitte(d, d > 80 ? [80, 40] : [40]);
     const xPos = [0, ...xTeile.map(([, b]) => b)];
     // Die beiden Laengsseiten laufen VERSETZT gegeneinander: auf der einen
     // kommt erst das lange Rohr, auf der anderen erst das kurze. So liegen die
