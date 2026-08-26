@@ -761,6 +761,13 @@ export function computeBOM(model) {
 }
 
 // Bestand: benoetigte Mengen je Rohrlaenge (Farbe egal) und je Kupplungstyp.
+// Teile, die NICHT ueber die Machbarkeit entscheiden. Schrauben zaehlt kaum
+// jemand (Sonderregel weiter unten), und alles aus Textilien/Netzen -- Tuch,
+// Netz, Rundwand, Spielsack, Dachtextil -- ist Zubehoer: es fehlt vielleicht,
+// aber das Modell steht trotzdem. Die Zeilen bleiben in der Liste und faerben
+// sich rot, nur der Haken bleibt gruen.
+export const SOFT_PARTS = new Set(["textile", "lattice", "textile_round", "bag", "roof_large"]);
+
 export function neededParts(bom) {
   const tubes = new Map();   // tubeId -> count
   for (const r of bom.tubes) tubes.set(r.tubeId, (tubes.get(r.tubeId) || 0) + r.count);
@@ -822,8 +829,9 @@ export function compareInventory(bom, inv) {
     const def = getPartById(id) || { name: id };
     const owned = (inv.fittings && inv.fittings[id]) || 0;
     const ok = owned >= count;
-    if (!ok) feasible = false;
-    rows.push({ group: "fittings", key: id, name: partName(def), need: count, owned, ok });
+    const soft = SOFT_PARTS.has(id);
+    if (!ok && !soft) feasible = false;
+    rows.push({ group: "fittings", key: id, name: partName(def), need: count, owned, ok, soft });
   }
   for (const [id, count] of need.reinforcements) {
     const def = reinforcementPart() || { name: id };

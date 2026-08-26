@@ -7,14 +7,20 @@
 
 import { parseQDF } from "./qdfimport.js";
 import { BuildModel } from "./model.js";
-import { computeBOM, neededParts } from "./bom.js";
+import { computeBOM, neededParts, SOFT_PARTS } from "./bom.js";
 import { buildableTubes, panels as catalogPanels, geometry } from "./catalog.js";
 
 // Toleranz beim QDF-Import. Gleicher Wert wie im Datei-Import der Oberflaeche:
 // die Originaldateien rasten nicht immer exakt auf den halben Zentimeter ein.
 const QDF_MERGE_EPS = 2;
 
-const GROUPS = ["tubes", "connectors", "panels", "reinforcements"];
+// Wonach sich entscheidet, ob ein Modell aus dem eigenen Bestand entsteht.
+// Anbauteile gehoeren dazu -- eine Rutsche oder ein Baellebad fehlt genauso wie
+// ein Rohr. Draussen bleiben Schrauben (eigene Gruppe) und alles aus
+// Textilien/Netzen (`SOFT_PARTS`).
+const GROUPS = ["tubes", "connectors", "panels", "reinforcements", "fittings"];
+// Kennzahlen-Fassung: aeltere Eintraege fuehren die Anbauteile noch nicht.
+export const META_VERSION = 2;
 
 /** QDF-Text in ein Modell-JSON uebersetzen. Liefert null, wenn nichts drin ist. */
 export function parseDesign(qdfText) {
@@ -55,7 +61,9 @@ export function designEntry(id, filename, qdfText) {
   const need = neededParts(bom);
   const b = model.bounds(geometry().connectorSize / 2);
   const parts = {};
-  for (const g of GROUPS) parts[g] = Object.fromEntries(need[g]);
+  for (const g of GROUPS) {
+    parts[g] = Object.fromEntries([...need[g]].filter(([id]) => !SOFT_PARTS.has(id)));
+  }
 
   return {
     id,
@@ -63,6 +71,7 @@ export function designEntry(id, filename, qdfText) {
     file: String(filename),
     qdf: qdfText,
     meta: {
+      v: META_VERSION,
       nodes: model.nodes.size,
       connectors: bom.totals.connectors,
       tubes: bom.totals.tubes,

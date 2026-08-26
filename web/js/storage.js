@@ -124,6 +124,22 @@ export function libDrop(id) {
   return libTx("readwrite", (store) => store.delete(id));
 }
 
+/**
+ * EINEN Eintrag entfernen -- wie `libClear`, nur fuer eine Zeile. Mit Sync
+ * bleibt ein Grabstein liegen, bis der Server die Loeschung uebernommen hat;
+ * ohne den kam der Eintrag beim naechsten Abgleich einfach wieder herunter
+ * (`syncLibrary` haelt ein rein lokales Fehlen fuer "anderswo geloescht").
+ */
+export function libRemove(id) {
+  if (!syncMode) return libDrop(id);
+  return libGet(id).then((entry) => {
+    if (!entry) return null;
+    if (!entry.rev) return libDrop(id);        // war nie auf dem Server
+    return libTx("readwrite",
+      (store) => store.put({ ...entry, qdf: null, deletedAt: Date.now(), dirty: true }));
+  });
+}
+
 /** Nachgeladenen QDF-Text im Cache ablegen. */
 export function libSetQdf(id, qdf, rev) {
   return libGet(id).then((entry) => {

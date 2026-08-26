@@ -10,7 +10,7 @@ import { RANDOM_COLOR, MOVE_STEPS } from "./builder.js";
 import * as storage from "./storage.js";
 import * as docs from "./docs.js";
 import * as sync from "./sync.js";
-import { designEntry, parseDesign, checkAgainstInventory, missingCount } from "./library.js";
+import { designEntry, parseDesign, checkAgainstInventory, missingCount, META_VERSION } from "./library.js";
 import { buildQDF } from "./qdfexport.js";
 import { t, getLang, setLang, applyTranslations } from "./i18n.js";
 
@@ -2198,7 +2198,36 @@ export function initUI({ scene, model, builder }) {
       libEntries = [];
     }
     libLoaded = true;
+    await frischeKennzahlen();
     renderLibrary();
+  }
+
+  /**
+   * Kennzahlen aelterer Bibliothek-Eintraege nachrechnen: bis Fassung 2 fuehrten
+   * sie keine Anbauteile, eine fehlende Rutsche fiel deshalb nicht auf. Gerechnet
+   * wird nur, wo der QDF-Text im Browser liegt -- was nur auf dem Server steht,
+   * wird beim naechsten Oeffnen ohnehin neu ausgewertet.
+   */
+  async function frischeKennzahlen(liste = libEntries) {
+    const neu = [];
+    for (const e of liste) {
+      if (!e || !e.qdf || (e.meta && e.meta.v >= META_VERSION)) continue;
+      const frisch = designEntry(e.id, e.file || e.name, e.qdf);
+      if (!frisch) continue;
+      const gemerkt = libEntries.find((x) => x.id === e.id) || e;
+      gemerkt.meta = { ...frisch.meta };
+      // Der QDF-Text bleibt, wo er war: mit Server steht er dort, hier lag er
+      // nur zum Rechnen vor.
+      neu.push({ ...gemerkt, meta: { ...frisch.meta } });
+    }
+    if (!neu.length) return;
+    try {
+      await storage.libPut(neu);
+      sync.nudge();
+    } catch (err) {
+      console.warn("Kennzahlen:", err);
+    }
+    if (currentPanel === "library") renderLibrary();
   }
 
   // Dateien einlesen. Laeuft in Haeppchen, damit die Oberflaeche bei einem
@@ -2271,9 +2300,13 @@ export function initUI({ scene, model, builder }) {
     const q = $("lib-search").value.trim().toLowerCase();
     const onlyFeasible = $("lib-only-feasible").checked;
     const rows = [];
+    const bestandFlach = flacherBestand();
     for (const e of libEntries) {
       if (q && !e.name.toLowerCase().includes(q)) continue;
-      const check = checkAgainstInventory(e.meta, inventory);
+      // Flacher Bestand: die Farbtoepfe ("T35|blue") zaehlen zusammen, sonst
+      // fand die Pruefung nie etwas, sobald der Bestand farbgetrennt gefuehrt
+      // wird. Die Stueckliste rechnet schon immer so.
+      const check = checkAgainstInventory(e.meta, bestandFlach);
       if (onlyFeasible && !check.ok) continue;
       rows.push({ entry: e, check });
     }
@@ -2372,7 +2405,7 @@ export function initUI({ scene, model, builder }) {
         if (!(await askConfirm(t("confirm_delete_lib", entry.name),
           { title: t("dlg_delete_title"), ok: t("dlg_delete_ok"), danger: true }))) return;
         try {
-          await storage.libDrop(entry.id);
+          await storage.libRemove(entry.id);
           sync.nudge();
         } catch (err) {
           console.warn("Bibliothek:", err);
@@ -2410,7 +2443,9 @@ export function initUI({ scene, model, builder }) {
         connectors: bom.totals.connectors, tubes: bom.totals.tubes, panels: bom.totals.panels,
         size: b2 ? b2.size.map((v) => Math.round(v)) : [0, 0, 0],
         ok: cmp.feasible,
-        fehlt: cmp.rows.reduce((s2, r) => s2 + Math.max(0, r.need - r.owned), 0),
+        // Weiche Zeilen (Schrauben, Textilien) blockieren nicht und zaehlen
+        // deshalb auch nicht in die Zahl der fehlenden Teile.
+        fehlt: cmp.rows.reduce((s2, r) => s2 + (r.soft ? 0 : Math.max(0, r.need - r.owned)), 0),
       };
     } catch (e) { console.warn("Kennzahlen:", e); return null; }
   }
@@ -2556,6 +2591,9 @@ export function initUI({ scene, model, builder }) {
     }
     const data = parseDesign(qdf);
     if (!data) { flash(t("lib_load_failed"), "error"); return; }
+    // Jetzt liegt der Text vor: aeltere Kennzahlen gleich nachrechnen, damit
+    // der Haken in der Liste auch die Anbauteile beruecksichtigt.
+    await frischeKennzahlen([{ ...entry, qdf }]);
     // Die Sammlung bleibt, wie sie ist: geöffnet wird eine KOPIE in einem
     // eigenen Tab, die noch zu keiner Datei gehört.
     openTab({ name: entry.name, data, preview });
