@@ -8,7 +8,11 @@
 // Der Worker liegt im Wurzelverzeichnis, damit sein Geltungsbereich sowohl
 // `web/` (App) als auch `data/` (Teilekatalog) umfasst.
 
-const CACHE = "quadro-v1";
+// Der Cache traegt die Fassung der App: nur ein NEUER Name raeumt beim
+// Aktivieren den alten Vorrat weg (siehe `activate` unten). Bliebe er stehen,
+// liefe eine installierte App nach einem Release mit ihren alten ES-Modulen
+// weiter. Gepflegt wird die Zeile von `tools/bump-version.py`.
+const CACHE = "quadro-v1.0.0";
 
 // Alles, was die App zum Starten braucht. Pfade relativ zu dieser Datei, damit
 // es auch unter GitHub Pages in einem Unterordner passt.

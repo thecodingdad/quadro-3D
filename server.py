@@ -44,7 +44,20 @@ DATA = Path(os.environ.get("QUADRO_DATA") or (ROOT / "data-store")).resolve()
 # waere ein "../" in der Kennung ein Weg aus dem Datenverzeichnis.
 SAFE_ID = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
+# Fassung der Schnittstelle -- zaehlt fuer sich, unabhaengig von der Fassung
+# der App (SemVer, Datei `VERSION`). Fehlt die Datei (blosse Kopie einzelner
+# Dateien), laeuft der Server trotzdem an und meldet "0.0.0".
 API_VERSION = 1
+
+
+def read_app_version():
+    try:
+        return (ROOT / "VERSION").read_text(encoding="utf-8").strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
+
+
+APP_VERSION = read_app_version()
 
 
 def now_ms():
@@ -276,7 +289,7 @@ def check_id(doc_id):
 
 
 async def health(request):
-    return json_response({"ok": True, "api": API_VERSION, "name": "quadro-3d"})
+    return json_response({"ok": True, "api": API_VERSION, "app": APP_VERSION, "name": "quadro-3d"})
 
 
 async def docs_list(request):
@@ -447,7 +460,7 @@ def build_app():
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.environ.get("QUADRO_PORT") or 8000)
     print("=" * 56)
-    print("  QUADRO 3D (mit Backend)")
+    print(f"  QUADRO 3D {APP_VERSION} (mit Backend)")
     print(f"  App:    http://127.0.0.1:{port}/web/index.html")
     print(f"  API:    http://127.0.0.1:{port}/api/health")
     print(f"  Daten:  {DATA}")

@@ -86,6 +86,7 @@ const de = {
   quality_low: 'Niedrig',
   quality_medium: 'Mittel',
   quality_high: 'Hoch',
+  settings_version: 'Version',
   // Abgleich mit dem optionalen Backend
   sync_state_connecting: 'Verbinde …',
   sync_state_online: (wann) => `Verbunden, zuletzt abgeglichen ${wann}.`,
@@ -570,6 +571,7 @@ const en = {
   quality_low: 'Low',
   quality_medium: 'Medium',
   quality_high: 'High',
+  settings_version: 'Version',
   // Sync with the optional backend
   sync_state_connecting: 'Connecting …',
   sync_state_online: (wann) => `Connected, last synced ${wann}.`,

@@ -59,6 +59,38 @@ frei von Three.js und DOM
 und dadurch in Node isoliert testbar/ausführbar. **Diese Trennung beim Erweitern halten** –
 Three.js ausschließlich in `scene.js`, DOM ausschließlich in `ui.js`/`scene.js`/`storage.js`.
 
+## Version & Release
+
+Die Fassung der App folgt **SemVer** und steht an **drei** Stellen, die
+`tools/bump-version.py` gemeinsam pflegt – von Hand geändert laufen sie auseinander und der
+Workflow bricht ab:
+
+| Ort | wofür |
+|---|---|
+| `VERSION` | Einzelquelle; `server.py` liest sie und meldet sie unter `/api/health` als `app` |
+| `web/js/config.js` (`APP_VERSION`) | Anzeige im Einstellungs-Menü (`#app-version`) |
+| `sw.js` (`const CACHE = "quadro-v…"`) | Cache-Name; nur ein **neuer** Name räumt den alten Vorrat weg |
+
+```bash
+python3 tools/bump-version.py 1.1.0    # ohne Argument: zeigt den Stand
+git commit -am "Release 1.1.0"
+git tag v1.1.0 && git push --follow-tags
+```
+
+Der Tag löst `.github/workflows/release.yml` aus: Prüfen (Katalog-JSON, `node --check`, Tag ==
+Version), dann das Docker-Image für **amd64 + arm64** nach **GHCR und Docker Hub**
+(`quadro-3d`, Marken `1.1.0`, `1.1`, `1`, `latest`), dann das **Release mit automatisch
+erzeugten Notes**. Eine Vorabfassung (`v1.1.0-rc.1`) bekommt **kein** `latest` und gilt als
+Prerelease.
+
+Was **nicht** an SemVer hängt und für sich zählt: `FORMAT_VERSION` (Speicherformat der Modelle,
+`config.js`), `META_VERSION` (Kennzahlen der Bibliothek, `library.js`) und `API_VERSION`
+(`server.py`). Umgekehrt gilt: bricht ein gespeicherter Stand, ist das ein **Major**.
+
+Einmalig von Hand nötig: das **GHCR-Paket auf „public" stellen** (sonst kann niemand ziehen) und
+für Docker Hub die Secrets `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` hinterlegen – fehlen sie, läuft
+alles ohne Docker Hub durch.
+
 ## Architektur
 
 | Datei | Aufgabe |
@@ -85,6 +117,8 @@ Three.js ausschließlich in `scene.js`, DOM ausschließlich in `ui.js`/`scene.js
 | `sw.js` | Service Worker: Netz zuerst, Cache als Rückfall – macht die App offline lauffähig |
 | `tools/make-icons.py` | Erzeugt die Symbole in `icons/` (nur von Hand, kein Build-Step) |
 | `tools/obj2mesh.py` | Wandelt die abgegriffenen OBJ-Modelle in `data/models/*.json` (nur von Hand, kein Build-Step) |
+| `tools/bump-version.py` | Setzt die Fassung in `VERSION`, `config.js` und `sw.js` (nur von Hand, kein Build-Step) |
+| `.github/workflows/release.yml` | Tag `vX.Y.Z` → Prüfung, Docker-Image (GHCR + Docker Hub), Release |
 
 **Datenfluss:** Jede Modelländerung → `builder.refresh()` → `scene.renderModel()` + Handles neu →
 `builder.onChange()` → (in `main.js`) `ui.update()` + `ui.touchActiveTab()` (markiert den Tab,

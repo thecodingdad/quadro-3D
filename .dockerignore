@@ -1,5 +1,6 @@
 .git/
 .gitignore
+.github/
 tmp/
 data-store/
 docs/screenshots/

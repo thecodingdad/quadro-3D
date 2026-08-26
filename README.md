@@ -102,10 +102,24 @@ python serve.py            # http://127.0.0.1:8000/web/index.html
 ### Optional: gemeinsamer Speicher (Server)
 
 Wer an mehreren Rechnern plant, kann die gespeicherten Modelle, den eigenen Bestand und die
-QDF-Sammlung auf einen kleinen Server legen. Am einfachsten mit Docker:
+QDF-Sammlung auf einen kleinen Server legen. Am einfachsten mit dem fertigen Docker-Image – ohne
+Klonen:
 
 ```bash
-docker compose up --build      # App: http://localhost:8000/web/index.html
+docker run -d -p 8000:8000 -v quadro-data:/data ghcr.io/thecodingdad/quadro-3d:1
+# App: http://localhost:8000/web/index.html
+```
+
+Dasselbe mit Compose: die [`compose.yml`](compose.yml) neben sich legen und `docker compose up -d`.
+Die Marke `:1` folgt jedem Minor und Patch der 1er-Reihe; wer eine feste Fassung will, nimmt
+`:1.0.0`. Es gibt sie für **amd64 und arm64** (Raspberry Pi, ARM-NAS), auch als
+`thecodingdad/quadro-3d` auf Docker Hub. Bei einem **Bind-Mount** statt eines Volumes einmal
+`chown 1000:1000` auf das Verzeichnis – der Container läuft nicht als root.
+
+Aus dem Quelltext bauen (Entwicklung):
+
+```bash
+docker compose -f compose.dev.yml up --build
 ```
 
 Oder direkt mit Python (`pip install -r requirements.txt`):
@@ -228,10 +242,23 @@ python serve.py            # http://127.0.0.1:8000/web/index.html
 ### Optional: shared storage (server)
 
 If you plan on more than one machine, the saved models, your own stock and the QDF collection can
-live on a small server. Easiest with Docker:
+live on a small server. Easiest with the ready-made Docker image – no cloning:
 
 ```bash
-docker compose up --build      # app: http://localhost:8000/web/index.html
+docker run -d -p 8000:8000 -v quadro-data:/data ghcr.io/thecodingdad/quadro-3d:1
+# app: http://localhost:8000/web/index.html
+```
+
+The same with Compose: put [`compose.yml`](compose.yml) next to you and run `docker compose up -d`.
+The tag `:1` follows every minor and patch of the 1.x line; pin `:1.0.0` for a fixed version. It
+comes for **amd64 and arm64** (Raspberry Pi, ARM NAS), and also as `thecodingdad/quadro-3d` on
+Docker Hub. With a **bind mount** instead of a volume, `chown 1000:1000` the directory once – the
+container does not run as root.
+
+Building from source (development):
+
+```bash
+docker compose -f compose.dev.yml up --build
 ```
 
 Or straight with Python (`pip install -r requirements.txt`):

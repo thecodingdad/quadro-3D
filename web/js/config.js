@@ -1,5 +1,13 @@
 // Globale Konstanten fuer QUADRO 3D.
 
+// Fassung der App (SemVer). Sie steht an DREI Stellen -- hier, in der Datei
+// `VERSION` und im Cache-Namen von `sw.js` -- und wird ausschliesslich von
+// `tools/bump-version.py` gepflegt; von Hand geaendert laufen die drei
+// auseinander und der Release-Workflow bricht ab.
+// Nicht zu verwechseln mit FORMAT_VERSION weiter unten: das ist das
+// Speicherformat der Modelle und zaehlt fuer sich.
+export const APP_VERSION = "1.0.0";
+
 // Die 6 Achsen-Richtungen eines Wuerfel-Knotens (Three.js: y = oben).
 export const DIRECTIONS = [
   { name: "+X", vec: [1, 0, 0] },

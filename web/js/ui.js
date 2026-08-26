@@ -7,6 +7,7 @@ import { computeBOM, compareInventory, connectorsForNode } from "./bom.js";
 import { computeBuildPlan, BUILD_ORDERS } from "./buildplan.js";
 import { parseQDF } from "./qdfimport.js";
 import { QUALITY_LEVELS } from "./scene.js";
+import { APP_VERSION } from "./config.js";
 import { RANDOM_COLOR, MOVE_STEPS } from "./builder.js";
 import * as storage from "./storage.js";
 import * as docs from "./docs.js";
@@ -653,6 +654,10 @@ export function initUI({ scene, model, builder }) {
       if (settingsMenu && !settingsMenu.contains(e.target)) toggleSettingsMenu(false);
     });
   }
+
+  // Fassung der App. Nur die Nummer steht hier -- die Beschriftung daneben
+  // haengt an `data-i18n` und wird vom Sprachwechsel selbst erwischt.
+  if ($("app-version")) $("app-version").textContent = APP_VERSION;
 
   // --- Installieren (PWA) ------------------------------------------------
   // Der Browser meldet selbst, wenn die App installierbar ist. Vorher hat ein

@@ -1,0 +1,21 @@
+# Build QUADRO 3D from source -- the way to go while developing.
+#
+#   docker compose -f compose.dev.yml up --build
+#
+# Otherwise identical to compose.yml (same volume `quadro-data`), just `build:`
+# instead of `image:`.
+
+services:
+  quadro:
+    build:
+      context: .
+      args:
+        VERSION: dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - quadro-data:/data
+    restart: unless-stopped
+
+volumes:
+  quadro-data: {}

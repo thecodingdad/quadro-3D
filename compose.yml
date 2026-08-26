@@ -1,13 +1,19 @@
-# QUADRO 3D samt Backend.
+# QUADRO 3D with backend.
 #
-#   docker compose up --build     App unter http://localhost:8000/web/index.html
+#   docker compose up -d          app at http://localhost:8000/web/index.html
 #
-# Die gespeicherten Modelle und die QDF-Sammlung liegen im Volume `quadro-data`
-# als gewoehnliche Dateien -- eine Sicherung ist ein simples Kopieren.
+# `:1` follows every minor and patch of the 1.x line; pin `:1.0.0` for a fixed
+# version. To build from source, use compose.dev.yml.
+#
+# Saved models and the QDF collection live in the volume `quadro-data` as plain
+# files -- a backup is a plain copy.
+#
+# NOTE: the server has neither login nor TLS. It belongs on your own network,
+# not openly on the internet (see README).
 
 services:
   quadro:
-    build: .
+    image: ghcr.io/thecodingdad/quadro-3d:1
     ports:
       - "8000:8000"
     volumes:
