@@ -477,7 +477,16 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     "flexi_bolt"`, seine Lage steht in `partQuat` (lokal +X = Bolzenachse, vom Rohr weg) und
     die Stellungen der Scharniere als Winkel in `hinges` (0 = lokal −Y). Gesetzt wird über
     `boltMounts()`/`addBolt()` – nur auf eine **Dummy-Kupplung** (Rohrende mit genau einem
-    Rohr), dort ersetzt der Bolzen die Kupplung – und `hingeMounts()`/`addHinge()`. Ein Klick
+    Rohr), dort ersetzt der Bolzen die Kupplung – und `hingeMounts()`/`addHinge()`.
+    **Wie tief er steckt, ist einstellbar** (`boltDeep`, `turnBoltDepth`): ein Segment im Rohr –
+    dann sitzen die Scharniere auf dem mittleren Segment und das äußere bleibt als Stutzen frei –
+    oder zwei, dann tragen die Scharniere das **äußere** Segment und es schaut nichts mehr heraus
+    (`boltArmDirs` lässt den freien Stutzen dann weg). Die Scharniere liegen immer auf dem
+    Gelenkpunkt, der Bolzen rutscht (`boltShift`). In der Datei steht die Tiefe als **Feld 4 der
+    bolt2-Zeile** (1 = ein Segment, 0 = zwei), und ihre +X-Achse zeigt beim tiefen Sitz ins Rohr,
+    unsere immer heraus – Import und Export drehen sie deshalb um. Im Bestand stecken 52 der 63
+    Bolzen zwei Segmente tief; ohne diese Unterscheidung stand am Ball Cage an jedem äußeren
+    Gelenk ein leeres Segment in der Luft. Ein Klick
     auf ein Scharnier dreht es um 45° weiter (`turnHinge`), einer auf den Bolzen schaltet seine
     Einstecktiefe um; die Kränze rasten zwar in 45°-
     Schritten, zwei Scharniere dürfen aber nie **näher als 90°** zusammenstehen
