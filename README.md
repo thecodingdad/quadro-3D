@@ -39,12 +39,10 @@ Gebaut wird frei im Raum aus Kupplungen, Rohren und Platten. Dabei entstehen neb
 Keine Installation, kein Konto, keine Cloud: alles läuft im Browser, die Entwürfe bleiben auf
 dem eigenen Rechner.
 
-| Am Schreibtisch | Am Telefon |
+| Dekstop | Mobil |
 |---|---|
 | <img src="docs/screenshots/desktop.png" alt="Editor mit Modell, Werkzeugleiste und Stückliste" width="560"> | <img src="docs/screenshots/mobile.png" alt="Dieselbe App im Hochformat: Bild oben, Bauteile darunter" width="200"> |
 
-Dieselbe App: am großen Schirm mit Seitenleiste, am Telefon im Hochformat mit Bauteilzeile unter
-dem Bild.
 
 ### Was drin ist
 
@@ -168,11 +166,10 @@ You build freely in space from connectors, tubes and panels, and get along the w
 No installation, no account, no cloud: everything runs in the browser and your designs stay on
 your own machine.
 
-| At the desk | On the phone |
+| Desktop | Mobile |
 |---|---|
 | <img src="docs/screenshots/desktop.png" alt="Editor with model, toolbar and parts list" width="560"> | <img src="docs/screenshots/mobile.png" alt="The same app in portrait: view on top, parts below" width="200"> |
 
-The same app: sidebar on a wide screen, part row below the view in portrait.
 
 ### What's inside
 
