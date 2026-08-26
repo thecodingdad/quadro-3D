@@ -92,6 +92,7 @@ const POOL_DEPTHS = new Set([40, 80, 120, 160, 240]);
 // grossen Becken sitzt er mittig.
 const POOL_SMALL_OFFSET = 20;
 
+
 // Farbnamen aus material3 auf unsere Farb-IDs abbilden.
 const COLOR_BY_NAME = {
   red: "red", green: "green", blue: "blue", yellow: "yellow",
@@ -1112,20 +1113,24 @@ export function parseQDF(text, opts = {}) {
     const pz = b.z - (mittig ? 0 : ex[2] * 5);
     const nd = nodes.find((n) => !n.part && Math.hypot(n.x - px, n.y - py, n.z - pz) < 2);
     if (!nd) continue;              // ohne Knoten bleibt die Zeile, wie sie war
-    // Die Achse zeigt vom gehaltenen Rohr WEG -- auf dieser Seite steht der
-    // freie Stutzen. Steckt auf beiden oder auf keiner Seite ein Rohr, bleibt
-    // es bei der Richtung aus der Datei.
-    let vorne = 0, hinten = 0;
-    for (const t of tubes) {
-      const o = t.a === nd.id ? nodes.find((n) => n.id === t.b)
-        : t.b === nd.id ? nodes.find((n) => n.id === t.a) : null;
-      if (!o) continue;
-      const d = einsVec([o.x - nd.x, o.y - nd.y, o.z - nd.z]);
-      const s = d[0] * ex[0] + d[1] * ex[1] + d[2] * ex[2];
-      if (s > 0.9) vorne++;
-      else if (s < -0.9) hinten++;
+    // Steckt der Bolzen ein Segment TIEFER (Feld 4 = 0), dann zeigt die Achse
+    // der Datei ins Rohr hinein -- unsere zeigt immer heraus, also umdrehen.
+    // Sitzt er mittig, ist die Richtung frei: dann zeigt sie wie beim selbst
+    // gesetzten vom gehaltenen Rohr weg.
+    if (!mittig) ex = [-ex[0], -ex[1], -ex[2]];
+    if (mittig) {
+      let vorne = 0, hinten = 0;
+      for (const t of tubes) {
+        const o = t.a === nd.id ? nodes.find((n) => n.id === t.b)
+          : t.b === nd.id ? nodes.find((n) => n.id === t.a) : null;
+        if (!o) continue;
+        const d = einsVec([o.x - nd.x, o.y - nd.y, o.z - nd.z]);
+        const s = d[0] * ex[0] + d[1] * ex[1] + d[2] * ex[2];
+        if (s > 0.9) vorne++;
+        else if (s < -0.9) hinten++;
+      }
+      if (vorne && !hinten) ex = [-ex[0], -ex[1], -ex[2]];
     }
-    if (vorne && !hinten) ex = [-ex[0], -ex[1], -ex[2]];
     const hoch = Math.abs(ex[1]) > 0.9 ? [0, 0, 1] : [0, 1, 0];
     const sk = hoch[0] * ex[0] + hoch[1] * ex[1] + hoch[2] * ex[2];
     const ey = einsVec([hoch[0] - ex[0] * sk, hoch[1] - ex[1] * sk, hoch[2] - ex[2] * sk]);
@@ -1133,6 +1138,11 @@ export function parseQDF(text, opts = {}) {
       ex[0] * ey[1] - ex[1] * ey[0]];
     nd.part = BOLT_PART;
     nd.partQuat = quatFromBasis(ex, ey, ez).map((v) => Math.round(v * 1e4) / 1e4);
+    // Wie tief der Bolzen im Rohr steckt: mittig (Feld 4 = 1) ein Segment,
+    // sonst zwei -- dann traegt das AEUSSERE Segment die Scharniere und es
+    // schaut nichts mehr heraus. Ohne das stand am Rand des Ball Cage ein
+    // leeres Segment in der Luft.
+    if (!mittig) nd.boltDeep = 2;
     nd.hinges = [];
     flexiWeg.add(b.id);
     for (const h of fittings) {
@@ -1195,6 +1205,7 @@ export function parseQDF(text, opts = {}) {
       if (n.part) o.part = n.part; // festes Katalogteil (Klemm-Kupplung)
       if (n.partMask) o.partMask = n.partMask; // Arm-Maske der Lochzapfenkupplung
       if (n.hinges && n.hinges.length) o.hinges = n.hinges.slice(); // Stellungen der Flexi-Scharniere
+      if (n.boltDeep) o.boltDeep = n.boltDeep; // Bolzen steckt zwei Segmente tief
       if (n.clampOn) o.clampOn = n.clampOn; // umschlossenes Rohr + Stelle darauf
       if (n.stub) o.stub = n.stub; // Richtung des offenen Anschlusses
       if (n.bearingOn) o.bearingOn = n.bearingOn; // getragen von dieser Lagerkupplung

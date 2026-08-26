@@ -5,7 +5,7 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs, BLACK_FITTINGS,
-  isBoltPart, boltAxis, hingeDir, POOL_KINDS, fixedFittingColor } from "./model.js";
+  isBoltPart, boltAxis, boltShift, hingeDir, POOL_KINDS, fixedFittingColor } from "./model.js";
 import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
@@ -2421,16 +2421,20 @@ export class SceneManager {
       ? new THREE.Quaternion(n.partQuat[0], n.partQuat[1], n.partQuat[2], n.partQuat[3]).normalize()
       : new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), ex);
     const g = geometry();
+    // Der Bolzen steckt ein Segment tief oder zwei. Zwei Segmente tief rutscht
+    // seine Mitte um eines weiter ins Rohr -- dann traegt das aeussere Segment
+    // die Scharniere und es schaut kein leeres mehr heraus.
+    const mitte = pos.clone().addScaledVector(ex, boltShift(n));
     if (bolzen) {
       this._batchAdd(this._meshGeometry("fit:bolt2", bolzen), mat,
-        new THREE.Matrix4().compose(pos, q, ONE), "node", n.id, pick);
+        new THREE.Matrix4().compose(mitte, q, ONE), "node", n.id, pick);
     } else {
       // Rueckfall ohne Modelldatei: ein Stab von drei Segmenten Laenge.
       const seg = Math.max(8, this._q().tube);
       const stab = new THREE.Mesh(this._cachedGeo(`bolt${seg}`,
         () => new THREE.CylinderGeometry(g.armRadius, g.armRadius, g.connectorSize * 3, seg)), mat);
       stab.quaternion.setFromUnitVectors(UP, ex);
-      stab.position.copy(pos);
+      stab.position.copy(mitte);
       stab.userData = { kind: "node", id: n.id };
       this.buildGroup.add(stab);
       if (pick) pick.push(stab);

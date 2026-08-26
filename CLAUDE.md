@@ -478,7 +478,8 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     die Stellungen der Scharniere als Winkel in `hinges` (0 = lokal −Y). Gesetzt wird über
     `boltMounts()`/`addBolt()` – nur auf eine **Dummy-Kupplung** (Rohrende mit genau einem
     Rohr), dort ersetzt der Bolzen die Kupplung – und `hingeMounts()`/`addHinge()`. Ein Klick
-    auf ein Scharnier dreht es um 45° weiter (`turnHinge`); die Kränze rasten zwar in 45°-
+    auf ein Scharnier dreht es um 45° weiter (`turnHinge`), einer auf den Bolzen schaltet seine
+    Einstecktiefe um; die Kränze rasten zwar in 45°-
     Schritten, zwei Scharniere dürfen aber nie **näher als 90°** zusammenstehen
     (`HINGE_MIN_GAP`) – dafür sind ihre Riemen zu breit, und im Bestand stehen sie an allen 83
     Gelenken 135° auseinander. Verbotene Rastungen überspringt der Klick. Ein Arm mit Rohr

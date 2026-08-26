@@ -309,6 +309,10 @@ const de = {
   btn_export_image: 'Als Bild speichern',
   flash_image_saved: 'Bild gespeichert.',
   flash_pool_ready: 'Bällebad hängt am Zeiger – Klick setzt es ab, Esc bricht ab.',
+  notice_bolt_depth: (n) => n === 2
+    ? 'Bolzen steckt zwei Segmente tief – die Scharniere sitzen auf dem äußeren Segment.'
+    : 'Bolzen steckt ein Segment tief – die Scharniere sitzen auf dem mittleren Segment, das äußere bleibt frei.',
+  notice_bolt_has_tube: 'Am äußeren Segment hängt ein Rohr – tiefer geht der Bolzen erst ohne.',
   image_failed: 'Das Bild konnte nicht erzeugt werden.',
   btn_export_all: 'Alle herunterladen…',
   btn_export_all_title: 'Alle Modelle als QDF in einen Ordner schreiben',
@@ -352,7 +356,7 @@ const de = {
   status_fitting_wheel: 'Multirad: auf ein Radlager an einer Kupplung – oder frei auf ein Rohr, der Punkt folgt dabei dem Zeiger.',
   status_fitting_cap: 'Kappe: nur auf ein freies Rohrende. Sie steckt dort ANSTELLE der Kupplung, deshalb gibt es Punkte nur an Enden ohne Winkel- oder Lagerkupplung.',
   status_fitting_hole: 'Lochzapfenkupplung: auf einen freien Stutzen einer Kupplung. Ein Klick auf die gesetzte dreht sie um 90° um ihr Loch – solange kein Rohr an ihren Armen hängt.',
-  status_fitting_bolt: 'Flexikupplung Bolzen: auf ein freies Rohrende – er ersetzt dort die Kupplung. Zwei seiner drei Segmente schauen danach heraus: eines nimmt ein Rohr auf, auf dem mittleren sitzen die Scharniere.',
+  status_fitting_bolt: 'Flexikupplung Bolzen: auf ein freies Rohrende – er ersetzt dort die Kupplung. Zwei seiner drei Segmente schauen heraus: eines nimmt ein Rohr auf, auf dem mittleren sitzen die Scharniere. Ein Klick auf den gesetzten Bolzen schiebt ihn ein Segment tiefer ins Rohr – dann tragen die Scharniere das äußere Segment.',
   status_fitting_hinge: 'Flexikupplung Scharnier: auf das mittlere Segment eines Bolzens, höchstens zwei je Bolzen. Ein Klick auf das gesetzte dreht es um 45° weiter – solange kein Rohr daran hängt; die beiden Scharniere bleiben dabei mindestens 90° auseinander.',
   status_fitting_bearing: 'Lagerkupplung: auf ein Rohr klicken (der Punkt folgt dem Zeiger) – oder auf einen freien Stutzen, dann kommt das Rohr später ins Maul. Erneuter Klick dreht das Maul um 90°.',
   status_fitting_rail: 'Zwischen zwei Rohren: erst ein Rohr anklicken, dann eines der hervorgehobenen Gegenrohre.',
@@ -788,6 +792,10 @@ const en = {
   btn_export_image: 'Save as image',
   flash_image_saved: 'Image saved.',
   flash_pool_ready: 'Pool follows the pointer – click to place it, Esc cancels.',
+  notice_bolt_depth: (n) => n === 2
+    ? 'Bolt sits two segments deep – the hinges are on the outer segment.'
+    : 'Bolt sits one segment deep – the hinges are on the middle segment, the outer one stays free.',
+  notice_bolt_has_tube: 'A tube hangs on the outer segment – the bolt only goes deeper without it.',
   image_failed: 'The image could not be created.',
   btn_export_all: 'Download all…',
   btn_export_all_title: 'Write every model as QDF into a folder',
@@ -829,7 +837,7 @@ const en = {
   status_fitting_wheel: 'Multi wheel: onto a wheel bearing at a connector – or anywhere on a tube, where the dot follows the pointer.',
   status_fitting_cap: 'Cap: only onto a free tube end. It sits there INSTEAD of the connector, so there are no dots at ends carrying an angle or bearing connector.',
   status_fitting_hole: 'Pin connector: onto a free stub of a connector. Clicking the placed one turns it by 90° around its hole – as long as no tube hangs on its arms.',
-  status_fitting_bolt: 'Flexi connector bolt: onto a free tube end – it replaces the connector there. Two of its three segments then stick out: one takes a tube, the middle one carries the hinges.',
+  status_fitting_bolt: 'Flexi connector bolt: onto a free tube end – it replaces the connector there. Two of its three segments stick out: one takes a tube, the middle one carries the hinges. Clicking the placed bolt pushes it one segment deeper into the tube – then the outer segment carries the hinges.',
   status_fitting_hinge: 'Flexi connector hinge: onto the middle segment of a bolt, at most two per bolt. Clicking the placed one turns it by 45° – as long as no tube hangs on it; the two hinges always stay at least 90° apart.',
   status_fitting_bearing: 'Bearing connector: click a tube (the dot follows the pointer) – or a free stub, then the tube goes into its mouth later. Clicking again turns the mouth by 90°.',
   status_fitting_rail: 'Between two tubes: click one tube, then one of the highlighted counterparts.',

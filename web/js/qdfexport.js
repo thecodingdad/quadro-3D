@@ -23,7 +23,7 @@
 
 import { geometry, getPanel, getTube } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
-import { isHolePart, HOLE_MASKS, BLACK_FITTINGS, isBoltPart, boltAxis, hingeDir, fixedFittingColor } from "./model.js";
+import { isHolePart, HOLE_MASKS, BLACK_FITTINGS, isBoltPart, boltAxis, boltDepth, hingeDir, fixedFittingColor } from "./model.js";
 
 // Farbtabelle wie in den Dateien der Herstellersoftware: erst der Satz fuer
 // Rohre und Kupplungen (kind 1), dann derselbe Satz fuer Platten (kind 2). Die
@@ -327,14 +327,22 @@ export function buildQDF(model) {
     // es an dieser Stelle nicht.
     if (isBoltPart(n.part)) {
       const ex = boltAxis(n);
-      const qb = n.partQuat && n.partQuat.length === 4
-        ? encodeQuat([n.partQuat[3], n.partQuat[0], n.partQuat[1], n.partQuat[2]])
-        : encodeQuat(quatFromX(ex));
+      const tief = boltDepth(n) === 2;
+      // Zwei Segmente tief: die Datei fuehrt den Punkt der BOLZENMITTE und
+      // legt den Gelenkpunkt 50 mm entlang ihrer +X-Achse davor -- ihre Achse
+      // zeigt also ins Rohr, unsere heraus. Also umdrehen und den Punkt
+      // mitschieben, sonst steht das Gelenk beim naechsten Laden daneben.
+      const fx = tief ? [-ex[0], -ex[1], -ex[2]] : ex;
+      const qb = tief
+        ? encodeQuat(quatFromX(fx))
+        : (n.partQuat && n.partQuat.length === 4
+          ? encodeQuat([n.partQuat[3], n.partQuat[0], n.partQuat[1], n.partQuat[2]])
+          : encodeQuat(quatFromX(ex)));
       // Feld 3 ist die Bolzenlaenge (150 in jeder Zeile des Bestands), Feld 4
-      // sagt, wo die Scharniere sitzen: 1 = auf dem mittleren Segment (der
-      // Bolzen steht dann mittig auf dem Punkt), 0 = 50 mm daneben. Wir setzen
-      // sie immer auf die Mitte, also 1.
-      lines.push(`bolt2{${CONNECTOR_MAT}, ${tuple(qb, n.x, n.y, n.z)}, 1, 150., 1, 0}`);
+      // sagt, wie tief er steckt: 1 = mittig auf dem Gelenkpunkt (ein Segment
+      // im Rohr), 0 = eines weiter hinein.
+      const v = tief ? 5 : 0;
+      lines.push(`bolt2{${CONNECTOR_MAT}, ${tuple(qb, n.x + fx[0] * v, n.y + fx[1] * v, n.z + fx[2] * v)}, 1, 150., ${tief ? 0 : 1}, 0}`);
       stats.fittings++;
       for (const grad of n.hinges || []) {
         const arm = hingeDir(n, grad);

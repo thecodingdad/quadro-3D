@@ -7,7 +7,7 @@ import { infeasibleConnectors, inferConnectorType } from "./bom.js";
 import { t } from "./i18n.js";
 import { round2, panelNormal, modelMiddle, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
 import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, holeClampDirsAt, HOLE_MASKS,
-  BOLT_PART, HINGE_PART, isBoltPart, boltArmDirs, hingeDir, POOL_SETS } from "./model.js";
+  BOLT_PART, HINGE_PART, isBoltPart, boltArmDirs, boltDepth, hingeDir, POOL_SETS } from "./model.js";
 
 // Kupplungen, die auf einem Rohr sitzen statt im Raster: QDF-Art -> Katalogteil.
 // Teile, die sich um ein Rohr klemmen lassen. Die Lochzapfenkupplung gehört
@@ -734,9 +734,30 @@ export class Builder {
     this.model.removeFitting(id);
   }
 
+  /**
+   * Sind genau die Rohre gewaehlt, die beim Klick auf EIN Verstaerkungsprofil
+   * zusammenkamen? Dann meint die Auswahl das Profil, nicht die Rohre.
+   */
+  _profilGewaehlt() {
+    const p = this._profilAuswahl;
+    return !!p && p.size === this.selection.size
+      && [...this.selection.keys()].every((x) => p.has(x));
+  }
+
   /** Loescht alle ausgewaehlten Teile. Kupplungen zuletzt (nehmen Rohre mit). */
   deleteSelection() {
     if (!this.selection.size) return 0;
+    // Ein gewaehltes Verstaerkungsprofil: nur das Profil kommt heraus, die
+    // Rohre bleiben stehen. Sie sind ja nicht angeklickt worden -- sie tragen
+    // es nur.
+    if (this._profilGewaehlt()) {
+      const rohre = [...this.selection.keys()];
+      this.recordHistory(() => { this.model.removeReinforcement(rohre[0]); });
+      this.selection.clear();
+      this._profilAuswahl = null;
+      this.refresh();
+      return rohre.length;
+    }
     const entries = [...this.selection];
     // Kupplungen, an denen das Geloeschte haengt: sie koennten danach ohne
     // jeden Anschluss dastehen und werden dann mit weggeraeumt.
@@ -1055,9 +1076,7 @@ export class Builder {
     // Ein Verstaerkungsprofil ist mehr als seine Rohre: es steckt in einem oder
     // zwei davon, und beim Klick darauf sind sie alle gewaehlt. Dann gilt sein
     // Name -- sonst stuende dort "Rohr 35" oder (bei zwei Rohren) gar nichts.
-    const profil = this._profilAuswahl && this._profilAuswahl.size === this.selection.size
-      && [...this.selection.keys()].every((x) => this._profilAuswahl.has(x))
-      ? [...this.selection.keys()][0] : null;
+    const profil = this._profilGewaehlt() ? [...this.selection.keys()][0] : null;
     const soloId = (this.mode === "select" || this.mode === "assembly")
       ? (profil != null ? profil : (this.selection.size === 1 ? [...this.selection.keys()][0] : null))
       : null;
@@ -2590,6 +2609,19 @@ export class Builder {
         let gedreht = false;
         this.recordHistory(() => { gedreht = this.model.turnHinge(n.id, pick.data.hinge); });
         if (!gedreht) this.onNotice(t("notice_fitting_fixed"), "warn");
+        this.refresh();
+        return;
+      }
+    }
+    // Klick auf den BOLZEN: er rutscht ein Segment tiefer ins Rohr und beim
+    // naechsten Klick wieder heraus.
+    if (pick && pick.data.kind === "node" && pick.data.hinge == null) {
+      const n = this.model.nodes.get(pick.data.id);
+      if (n && isBoltPart(n.part)) {
+        let ok = false;
+        this.recordHistory(() => { ok = this.model.turnBoltDepth(n.id); });
+        if (ok) this.onNotice(t("notice_bolt_depth", boltDepth(n)));
+        else this.onNotice(t("notice_bolt_has_tube"), "warn");
         this.refresh();
         return;
       }

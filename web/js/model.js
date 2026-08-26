@@ -354,6 +354,12 @@ export const HINGE_STEP = 45;
 export const HINGE_MIN_GAP = 90;
 export const MAX_HINGES = 2;
 export const BOLT_SEGMENT = 5;              // Laenge eines Bolzensegments (cm)
+// Wie tief der Bolzen im Rohr steckt -- ein Segment oder zwei. Bei EINEM sitzen
+// die Scharniere auf dem mittleren Segment und das dritte steht frei fuer ein
+// weiteres Teil; bei ZWEIEN traegt das aeussere Segment die Scharniere und es
+// bleibt nichts uebrig. Beides gibt es in der Herstellersoftware, in der Datei
+// steht es als Feld 4 der bolt2-Zeile (1 = mittig, 0 = ein Segment tiefer).
+export const BOLT_DEPTHS = [1, 2];
 
 /** Abstand zweier Stellungen auf dem Kranz, immer 0..180 Grad. */
 export function hingeGap(a, b) {
@@ -364,6 +370,19 @@ export function hingeGap(a, b) {
 /** Ist dieser Knoten ein Flexikupplungs-Bolzen? */
 export function isBoltPart(part) {
   return part === BOLT_PART;
+}
+
+/** Wie viele Segmente des Bolzens stecken im Rohr? (1 oder 2) */
+export function boltDepth(node) {
+  return node && node.boltDeep === 2 ? 2 : 1;
+}
+
+/**
+ * Versatz der Bolzenmitte gegenueber dem Gelenkpunkt, in cm entlang seiner
+ * +X-Achse. Steckt er zwei Segmente tief, rutscht er eines weiter ins Rohr.
+ */
+export function boltShift(node) {
+  return (boltDepth(node) - 1) * -BOLT_SEGMENT;
 }
 
 /** Bolzenachse in Weltkoordinaten -- das lokale +X seiner Lage. */
@@ -400,11 +419,11 @@ export function hingeDirs(node) {
 export function boltArmDirs(node) {
   if (!isBoltPart(node && node.part)) return [];
   const ex = boltAxis(node);
-  return [
-    [round4(ex[0]), round4(ex[1]), round4(ex[2])],
-    [round4(-ex[0]), round4(-ex[1]), round4(-ex[2])],
-    ...hingeDirs(node),
-  ];
+  const out = [[round4(-ex[0]), round4(-ex[1]), round4(-ex[2])]];
+  // Der freie Stutzen gibt es nur, solange der Bolzen EIN Segment tief steckt --
+  // zwei Segmente tief schaut nichts mehr heraus, woran etwas passt.
+  if (boltDepth(node) === 1) out.unshift([round4(ex[0]), round4(ex[1]), round4(ex[2])]);
+  return [...out, ...hingeDirs(node)];
 }
 
 // Name der naechsten Achsrichtung -- reicht, um belegte Arme zu erkennen.
@@ -1774,6 +1793,21 @@ export class BuildModel {
   }
 
   /**
+   * Bolzen eine Stufe tiefer ins Rohr schieben und wieder zurueck: ein Segment
+   * oder zwei. Mit zwei Segmenten traegt das aeussere Segment die Scharniere
+   * und der freie Stutzen faellt weg -- steckt dort ein Rohr, bleibt es beim
+   * flacheren Sitz.
+   */
+  turnBoltDepth(nodeId) {
+    const n = this.nodes.get(nodeId);
+    if (!isBoltPart(n && n.part)) return false;
+    const tief = boltDepth(n) === 1 ? 2 : 1;
+    if (tief === 2 && this._armHasTube(n, boltAxis(n))) return false;
+    if (tief === 2) n.boltDeep = 2; else delete n.boltDeep;
+    return true;
+  }
+
+  /**
    * Scharnier um 45 Grad um die Bolzenachse weiterdrehen. Stellungen, die dem
    * anderen Scharnier naeher als 90 Grad kaemen, werden dabei uebersprungen --
    * der Klick geht also weiter, bis die naechste erlaubte Rastung kommt.
@@ -2721,6 +2755,8 @@ export class BuildModel {
         ownConnector: !!n.ownConnector, c45file: !!n.c45file,
         unused: !!n.unused, partQuat: n.partQuat || null,
         partMask: n.partMask || null,
+        hinges: Array.isArray(n.hinges) ? n.hinges.slice() : null,
+        boltDeep: n.boltDeep || 0,
       });
     }
     for (const t of frag.tubes || []) {
@@ -3642,6 +3678,7 @@ export class BuildModel {
         if (n.partQuat) o.partQuat = n.partQuat; // Ausrichtung der Klemm-Kupplung aus der Datei
         if (n.partMask) o.partMask = n.partMask; // Arm-Maske der Lochzapfenkupplung
         if (n.hinges && n.hinges.length) o.hinges = n.hinges.slice(); // Stellungen der Flexi-Scharniere
+        if (n.boltDeep) o.boltDeep = n.boltDeep; // Bolzen steckt zwei Segmente tief
         if (n.c45body) o.c45body = true; // Adapter-Koerper am Arm-Ende der C45
         if (n.c45axis) o.c45axis = n.c45axis; // kardinale Huelsenachse des Adapters
         if (n.c45quat) o.c45quat = n.c45quat; // eigene Lage der Winkelkupplung (Three x,y,z,w)
@@ -3736,7 +3773,8 @@ export class BuildModel {
         bearingOn: n.bearingOn || null,
         ownConnector: !!n.ownConnector, c45file: !!n.c45file, unused: !!n.unused,
         partQuat: n.partQuat || null, partMask: n.partMask || null,
-        hinges: Array.isArray(n.hinges) ? n.hinges.slice() : null });
+        hinges: Array.isArray(n.hinges) ? n.hinges.slice() : null,
+        boltDeep: n.boltDeep || 0 });
       maxSeq = Math.max(maxSeq, parseSeq(n.id));
     }
     for (const t of data.tubes || []) {
