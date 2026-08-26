@@ -198,6 +198,13 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   (`tubeDirsAt` in `scene.js`). Der Import hängt das Rohr an sie um
   (beim Einlesen der Rohre gab es sie noch nicht, ihr Ende war auf die Kupplung daneben
   geschnappt), und `neighborDirs` zählt sie als belegten Arm der tragenden Kupplung.
+  **Umgehängt wird an der echten Lage aus der Datei** (`haengeRohreUm`, `geom`): liegt ein
+  Rohrende näher am Zapfen als an dem Knoten, an dem es gerade hängt, gehört es dorthin. Der
+  frühere Vergleich gegen die Armachse griff dort nicht, wo auch das FERNE Ende an einer
+  Lochzapfenkupplung sitzt – es war selbst um eine Kupplungslänge verschnappt und lag damit
+  5 cm neben der Achse (Ball Cage: das 52er zwischen zwei Zapfen). Am Bestand hängen dadurch
+  48 von 55 Zapfen ihr Rohr, vorher 11, und die tragende Kupplung ist wieder eine
+  Flächenkupplung 3-armig statt einer schiefen Raumkupplung.
 - **Bällebad = EIN Teil:** Es ist ein **Anbauteil** (`kind: "pool2"`/`"pool-small2"`), kein
   Satz Platten – wie der Spielsack: eine Auswahl, ein Löschen, eine QDF-Zeile. Der Bezugspunkt
   ist die Oberkante der Frontwand (so steht es in der Datei), dazu `w` (Breite), `h` (Wandhöhe)

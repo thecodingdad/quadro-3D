@@ -1065,27 +1065,40 @@ export function parseQDF(text, opts = {}) {
     // Zapfen noch nicht, also ist sein Ende auf die naechstgelegene Kupplung
     // (5 cm daneben) geschnappt -- das wird hier umgehaengt. Sonst zaehlte die
     // Kupplung einen Arm zu viel und das Rohr saesse schief.
-    const HOLE_SNAP = 8;   // cm: die Muendung liegt eine Kupplungslaenge daneben
+    // Das Rohr steckt IM Zapfen, nicht in der Kupplung daneben -- entschieden
+    // wird an seiner echten Lage aus der Datei. Der frueher benutzte Vergleich
+    // gegen die Armachse griff dort nicht, wo auch das FERNE Ende an einer
+    // Lochzapfenkupplung sitzt: es war selbst um eine Kupplungslaenge
+    // verschnappt und lag damit 5 cm neben der Achse (Ball Cage, das 52er
+    // zwischen zwei Zapfen).
+    haengeRohreUm(nd);
+  }
+
+  /**
+   * Rohre, die in Wahrheit an DIESEM Teil haengen, von der Kupplung daneben
+   * umhaengen. Entschieden wird an der ECHTEN Lage aus der Datei (`geom`):
+   * liegt das Rohrende naeher am Teil als an dem Knoten, an dem es gerade
+   * haengt, gehoert es dorthin. Beim Einlesen der Rohre gab es das Teil noch
+   * nicht, ihr Ende schnappte deshalb auf die naechste Kupplung.
+   */
+  function haengeRohreUm(ziel, radius = 8) {
     for (const t of tubes) {
-      if (t.arm || t.link || t.bow) continue;
-      for (const end of ["a", "b"]) {
-        const e = clampNodes.get(t[end]);
-        const o = clampNodes.get(t[end === "a" ? "b" : "a"]);
-        if (!e || !o || e === nd) continue;
-        if (Math.hypot(e.x - nd.x, e.y - nd.y, e.z - nd.z) > HOLE_SNAP) continue;
-        const dx = o.x - nd.x, dy = o.y - nd.y, dz = o.z - nd.z;
-        // Gegen ALLE ihre Arme pruefen -- die zwei- und die dreiarmige Fassung
-        // nehmen mehr als ein Rohr auf. Verglichen wird der ABSTAND des fernen
-        // Endes von der Armachse, nicht nur der Winkel: das Rohr der tragenden
-        // Kupplung laeuft aus Sicht der Klemme fast in dieselbe Richtung (nur
-        // 7 Grad daneben), liegt aber eine Kupplungslaenge neben der Achse.
-        const trifft = holeArmDirs(nd).some((a) => {
-          const s = dx * a[0] + dy * a[1] + dz * a[2];
-          if (s <= 0) return false;            // laeuft nach hinten
-          return Math.hypot(dx - a[0] * s, dy - a[1] * s, dz - a[2] * s) < 2;
-        });
-        if (!trifft) continue;                 // laeuft woanders hin
-        t[end] = nd.id;
+      if (t.arm || t.link) continue;
+      const g = t.geom;
+      if (!g || !g.p0 || !g.dir) continue;
+      const spanne = (g.len || 0) + (g.pad || 0) + conn;
+      const enden = {
+        a: g.p0,
+        b: [g.p0[0] + g.dir[0] * spanne, g.p0[1] + g.dir[1] * spanne, g.p0[2] + g.dir[2] * spanne],
+      };
+      for (const ende of ["a", "b"]) {
+        if (t[ende] === ziel.id) continue;
+        const dran = nodes.find((n) => n.id === t[ende]);
+        if (!dran || Math.hypot(dran.x - ziel.x, dran.y - ziel.y, dran.z - ziel.z) > radius) continue;
+        const e = enden[ende];
+        const zumZiel = Math.hypot(e[0] - ziel.x, e[1] - ziel.y, e[2] - ziel.z);
+        const zumKnoten = Math.hypot(e[0] - dran.x, e[1] - dran.y, e[2] - dran.z);
+        if (zumZiel < zumKnoten) t[ende] = ziel.id;
       }
     }
   }
@@ -1132,29 +1145,10 @@ export function parseQDF(text, opts = {}) {
         if (zu[0] * ex[0] + zu[1] * ex[1] + zu[2] * ex[2] > 0) ex = [-ex[0], -ex[1], -ex[2]];
         nd = nodeAt(round(px), round(py), round(pz));
         aufTraeger = true;
-        // Rohre, die in Wahrheit am BOLZEN haengen, umhaengen: beim Einlesen
-        // der Rohre gab es ihn noch nicht, ihr Ende schnappte deshalb auf die
-        // Kupplung eine Laenge daneben. Entschieden wird an der ECHTEN Lage aus
-        // der Datei (`geom`) -- liegt das Rohrende naeher am Gelenk als an der
-        // Kupplung, gehoert es dorthin. Ohne das saessen zwei Teile auf einem
-        // Stutzen, die Spannweiten waeren 5 cm zu gross und die Rohre liefen
-        // schief (0/-1/0,06 statt 0/-1/0).
-        for (const t of tubes) {
-          const g = t.geom;
-          if (!g || !g.p0 || !g.dir) continue;
-          const spanne = (g.len || 0) + (g.pad || 0) + conn;
-          const enden = {
-            a: g.p0,
-            b: [g.p0[0] + g.dir[0] * spanne, g.p0[1] + g.dir[1] * spanne, g.p0[2] + g.dir[2] * spanne],
-          };
-          for (const ende of ["a", "b"]) {
-            if (t[ende] !== traeger.id) continue;
-            const e = enden[ende];
-            const zumGelenk = Math.hypot(e[0] - px, e[1] - py, e[2] - pz);
-            const zumTraeger = Math.hypot(e[0] - traeger.x, e[1] - traeger.y, e[2] - traeger.z);
-            if (zumGelenk < zumTraeger) t[ende] = nd.id;
-          }
-        }
+        // Rohre, die in Wahrheit am BOLZEN haengen, umhaengen -- sonst saessen
+        // zwei Teile auf einem Stutzen, die Spannweiten waeren 5 cm zu gross
+        // und die Rohre liefen schief (0/-1/0,06 statt 0/-1/0).
+        haengeRohreUm(nd);
       }
     }
     if (!nd) continue;              // ohne Knoten bleibt die Zeile, wie sie war
