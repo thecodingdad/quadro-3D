@@ -78,7 +78,7 @@ Three.js ausschließlich in `scene.js`, DOM ausschließlich in `ui.js`/`scene.js
 | `web/js/sync.js` | Abgleich mit dem optionalen Backend: Suche (`probe`), WebSocket-Ereignisse, `reconcile`, Konflikte |
 | `server.py` | Optionales Backend (aiohttp): statische App + `/api/` + Ereignis-Kanal, Ablage als Dateien |
 | `web/js/ui.js` | Toolbar, Datei-Tabs, Seitenleiste (Stückliste & Bestand / Modelle / Aufbau), Tastatur |
-| `web/js/qdfimport.js` | Parser für QDF-Dateien der Original-QUADRO-3D-Software (Format: `QDF-FORMAT.md`) |
+| `web/js/qdfimport.js` | Parser für QDF-Dateien der Original-QUADRO-3D-Software (Format: `docs/QDF-FORMAT.md`) |
 | `web/js/qdfexport.js` | Schreibt ein Modell als QDF (Gegenstück zu `qdfimport.js`) |
 | `web/js/library.js` | Modell-Bibliothek: QDF-Sammlung einlesen, Kennzahlen, Bestandsabgleich |
 | `manifest.webmanifest` | PWA-Manifest (Wurzel, damit `scope` auch `data/` umfasst) |
@@ -264,7 +264,7 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   sind Farben ohne Bezug zum Schema: Produktfarben (Farbrad) und Kacheln, die immer dunkel sind
   (Statuszeile, Beschriftungen über der Szene). Wer eine Rolle braucht, die es noch nicht gibt,
   legt eine Variable an und trägt sie in **beiden** Blöcken ein.
-- **Neues über das QDF-Format** gehört in `QDF-FORMAT.md` – dort steht jedes Element mit allen
+- **Neues über das QDF-Format** gehört in `docs/QDF-FORMAT.md` – dort steht jedes Element mit allen
   Feldern und der Angabe, wie sicher wir uns sind (sicher / vermutet / unbekannt). Die
   Fundstellen-Kommentare im Code bleiben, aber die Beschreibung des Formats hat genau einen Ort;
   wer ein Feld entschlüsselt, trägt es dort ein und streicht es aus „Was wir nicht wissen".
@@ -522,7 +522,7 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     dabei vom **Grundmaterial**, nicht vom Material des Bolzens – sonst erbt das Scharnier
     dessen Hervorhebung (beim Wählen des Bolzens leuchteten die Scharniere mit) oder dessen
     Abblendung (die Hervorhebung wurde durchscheinend). Wo der Punkt liegt, sagt **Feld 4 der bolt2-Zeile**
-    (1 = mittig, 0 = 50 mm entlang −X) – siehe QDF-FORMAT.md.
+    (1 = mittig, 0 = 50 mm entlang −X) – siehe docs/QDF-FORMAT.md.
   - **Die Lagerkupplung** (`bearing-connector4`, Katalog `bearing`) klemmt um ein Rohr und
     **trägt eine Kupplung**. Die steht in der Datei als eigene `connector3`, 10 cm entgegen der
     +X-Achse der Klemme (gemessen: alle 47 eindeutigen Fälle). Ein eigener Durchlauf im Import
@@ -558,7 +558,7 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     (`part = "flexi"`) – das Modell käme doppelt und über den Würfel.
   - **`clip2` ist abgegriffen**, brauchte aber einen Trick: in Feld 4 muss **0** stehen. Mit der
     `3` der einzigen Korpuszeile lädt die Datei und die Software zeichnet nichts (siehe
-    `QDF-FORMAT.md` §5.3).
+    `docs/QDF-FORMAT.md` §5.3).
   Geladen wird erst, wenn ein Modell die Teile enthält, und danach zeichnet `onMeshesReady()`
   (in `main.js` auf `builder.refresh()`) einmal neu.
 - **Kantenglättung je Qualitätsstufe:** `antialias` schaltet die MSAA des Browsers – die kennt nur

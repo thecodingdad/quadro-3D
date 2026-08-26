@@ -183,7 +183,7 @@ function clampQuat(dir, off, clip) {
  *          -X 34, -Z 35); bei 45 Grad steht dort 16, 17 oder 18. Welche Regel
  *          das genau ist, wissen wir NICHT -- gezeichnet wird das Teil aus der
  *          Drehung, deshalb genuegt ein Wert, der im Bestand vorkommt (17).
- * Beide Felder sind damit VERMUTET, siehe QDF-FORMAT.md.
+ * Beide Felder sind damit VERMUTET, siehe docs/QDF-FORMAT.md.
  */
 function hingeFields(achse, arm) {
   const unten = arm[1] < -0.9;
