@@ -813,5 +813,6 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   programmatisch (für Tests aus der Konsole).
 - `scene.js` cached Materialien/Geometrien bewusst (GPU-Leaks); neue Materialien nach diesem
   Muster anlegen und in `_disposeGroup`/`_disposeLabels` mit aufräumen.
-- `docs/screenshots/` hält die Bilder für das README; die alten zeigen noch den Namen
-  „Quadro Builder" und sind deshalb gerade nicht eingebunden.
+- `docs/screenshots/` hält die Bilder für das README: `demo.gif` (kurzer Mitschnitt, im Kopf),
+  `desktop.png` und `mobile.png` (in beiden Sprachabschnitten nebeneinander). Neue Bilder
+  ersetzen die alten an derselben Stelle – die Namen stehen dreimal im README.
