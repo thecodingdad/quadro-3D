@@ -3204,9 +3204,11 @@ export function initUI({ scene, model, builder }) {
         row.appendChild(link);
       }
     } else {
-      // Anzeigen: entweder "vorhanden/benötigt" oder nur die Anzahl.
-      row.appendChild(el("span", "bom-count", inv ? `${inv.owned}/${inv.need}` : `${count}×`));
-      if (inv) row.title = t("inv_have", inv.owned, inv.need);
+      // Anzeigen: entweder "benötigt/vorhanden" oder nur die Anzahl. Die
+      // gebrauchte Zahl steht vorn -- sie ist die Frage, der Bestand die
+      // Antwort darauf.
+      row.appendChild(el("span", "bom-count", inv ? `${inv.need}/${inv.owned}` : `${count}×`));
+      if (inv) row.title = t("inv_have", inv.need, inv.owned);
     }
     if (bomShowPrice) row.appendChild(el("span", "bom-sub", subtotal == null ? "" : eur(subtotal)));
     if (marke && !bomEditMode) {
