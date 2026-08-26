@@ -501,14 +501,20 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     Beim Import wird jedes Gelenk zusammengefasst (84 von 84 Bolzen des Bestands): entweder
     steht an seinem Punkt schon ein Knoten, **oder der Bolzen steckt auf dem STUTZEN einer
     Kupplung** – eine Kupplungslänge daneben, wie die Lochzapfenkupplung. Dann entsteht der
-    Knoten dort, und ein Rohr, das vom Träger aus in die Bolzenrichtung lief, wird auf ihn
-    umgehängt (sonst säßen zwei Teile auf einem Stutzen und die Spannweite wäre 85 statt
-    80 cm). Der belegte Stutzen zählt über `holeClampDirsAt` als Arm der tragenden Kupplung.
+    Knoten dort, und jedes Rohr, dessen **echte Lage** (`geom`) näher am Gelenk liegt als an
+    der Kupplung, wird auf ihn umgehängt – sonst säßen zwei Teile auf einem Stutzen, die
+    Spannweiten wären 5 cm zu groß und die Rohre liefen schief. Verliert die Kupplung dabei
+    alle Rohre, ist sie `unused` und wird nicht mehr gezeichnet: sie steckt im Bolzen. Über
+    den ganzen Bestand sinkt die Zahl der Rohre mit unpassender Spannweite dadurch von 164
+    auf 147. Der belegte Stutzen zählt über `holeClampDirsAt` als Arm der tragenden Kupplung.
     So sitzen die mittleren Gelenke des Ball Cage – vorher stand dort ein Bolzen als loses
     Anbauteil neben einer Kupplung.
     **Bolzen und Scharniere lassen sich einzeln wählen**: ein Scharnier trägt die Kennung
     `hingeKey(nodeId, i)` (`"n12#0"`), Auswahl, Hervorhebung aus der Stückliste und Löschen
-    (`removeHinge`) laufen darüber; seine Beschriftung sitzt am Knoten. Wo der Punkt liegt, sagt **Feld 4 der bolt2-Zeile**
+    (`removeHinge`) laufen darüber; seine Beschriftung sitzt am Knoten. Ihr Material kommt
+    dabei vom **Grundmaterial**, nicht vom Material des Bolzens – sonst erbt das Scharnier
+    dessen Hervorhebung (beim Wählen des Bolzens leuchteten die Scharniere mit) oder dessen
+    Abblendung (die Hervorhebung wurde durchscheinend). Wo der Punkt liegt, sagt **Feld 4 der bolt2-Zeile**
     (1 = mittig, 0 = 50 mm entlang −X) – siehe QDF-FORMAT.md.
   - **Die Lagerkupplung** (`bearing-connector4`, Katalog `bearing`) klemmt um ein Rohr und
     **trägt eine Kupplung**. Die steht in der Datei als eigene `connector3`, 10 cm entgegen der

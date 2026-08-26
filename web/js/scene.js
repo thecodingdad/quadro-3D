@@ -2460,7 +2460,11 @@ export class SceneManager {
         const ey = arm.clone().negate();
         const ez = new THREE.Vector3().crossVectors(achse, ey);
         this._batchAdd(this._meshGeometry("fit:flexi-connector3", scharnier),
-          matFor(hingeKey(n.id, i), mat),
+          // WICHTIG: vom Grundmaterial ausgehen, nicht vom Material des
+          // Bolzens -- sonst erbt das Scharnier dessen Hervorhebung (mit dem
+          // Bolzen leuchteten die Scharniere mit) oder dessen Abblendung (dann
+          // war die Hervorhebung durchscheinend).
+          matFor(hingeKey(n.id, i), grund),
           new THREE.Matrix4().makeBasis(achse, ey, ez).setPosition(pos),
           "node", n.id, pick, { hinge: i });
       } else {
@@ -2468,7 +2472,7 @@ export class SceneManager {
         const len = g.connectorSize * 1.5;
         const stab = new THREE.Mesh(this._cachedGeo(`hingeArm${seg}`,
           () => new THREE.CylinderGeometry(g.armRadius, g.armRadius, len, seg)),
-          matFor(hingeKey(n.id, i), mat));
+          matFor(hingeKey(n.id, i), grund));
         stab.quaternion.setFromUnitVectors(UP, arm);
         stab.position.copy(pos).addScaledVector(arm, len / 2);
         stab.userData = { kind: "node", id: n.id, hinge: i };

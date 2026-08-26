@@ -1132,19 +1132,27 @@ export function parseQDF(text, opts = {}) {
         if (zu[0] * ex[0] + zu[1] * ex[1] + zu[2] * ex[2] > 0) ex = [-ex[0], -ex[1], -ex[2]];
         nd = nodeAt(round(px), round(py), round(pz));
         aufTraeger = true;
-        // Ein Rohr, das vom Traeger aus in die Bolzenrichtung laeuft, haengt in
-        // Wahrheit am BOLZEN -- beim Einlesen der Rohre gab es ihn noch nicht,
-        // ihr Ende schnappte deshalb auf die Kupplung daneben. Ohne das
-        // Umhaengen sitzen zwei Teile auf demselben Stutzen und die Spannweite
-        // ist um eine Kupplungslaenge zu gross (85 statt 80 cm).
+        // Rohre, die in Wahrheit am BOLZEN haengen, umhaengen: beim Einlesen
+        // der Rohre gab es ihn noch nicht, ihr Ende schnappte deshalb auf die
+        // Kupplung eine Laenge daneben. Entschieden wird an der ECHTEN Lage aus
+        // der Datei (`geom`) -- liegt das Rohrende naeher am Gelenk als an der
+        // Kupplung, gehoert es dorthin. Ohne das saessen zwei Teile auf einem
+        // Stutzen, die Spannweiten waeren 5 cm zu gross und die Rohre liefen
+        // schief (0/-1/0,06 statt 0/-1/0).
         for (const t of tubes) {
+          const g = t.geom;
+          if (!g || !g.p0 || !g.dir) continue;
+          const spanne = (g.len || 0) + (g.pad || 0) + conn;
+          const enden = {
+            a: g.p0,
+            b: [g.p0[0] + g.dir[0] * spanne, g.p0[1] + g.dir[1] * spanne, g.p0[2] + g.dir[2] * spanne],
+          };
           for (const ende of ["a", "b"]) {
             if (t[ende] !== traeger.id) continue;
-            const anderer = nodes.find((n) => n.id === t[ende === "a" ? "b" : "a"]);
-            if (!anderer) continue;
-            const d = einsVec([anderer.x - traeger.x, anderer.y - traeger.y, anderer.z - traeger.z]);
-            if (d[0] * ex[0] + d[1] * ex[1] + d[2] * ex[2] < 0.99) continue;
-            t[ende] = nd.id;
+            const e = enden[ende];
+            const zumGelenk = Math.hypot(e[0] - px, e[1] - py, e[2] - pz);
+            const zumTraeger = Math.hypot(e[0] - traeger.x, e[1] - traeger.y, e[2] - traeger.z);
+            if (zumGelenk < zumTraeger) t[ende] = nd.id;
           }
         }
       }
