@@ -7,7 +7,8 @@ import { infeasibleConnectors, inferConnectorType } from "./bom.js";
 import { t } from "./i18n.js";
 import { round2, panelNormal, modelMiddle, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
 import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, holeClampDirsAt, HOLE_MASKS,
-  BOLT_PART, HINGE_PART, isBoltPart, boltArmDirs, boltDepth, hingeDir, POOL_SETS } from "./model.js";
+  BOLT_PART, HINGE_PART, isBoltPart, boltArmDirs, boltDepth, hingeDir, hingeKey, splitHingeKey,
+  POOL_SETS } from "./model.js";
 
 // Kupplungen, die auf einem Rohr sitzen statt im Raster: QDF-Art -> Katalogteil.
 // Teile, die sich um ein Rohr klemmen lassen. Die Lochzapfenkupplung gehört
@@ -770,6 +771,10 @@ export class Builder {
         else if (kind === "slide") this.model.removeSlide(id);
         else if (kind === "clamp") this.model.removeClamp(id);
         else if (kind === "fitting") this._removeFittingWithRider(id);
+        else if (kind === "hinge") {
+          const teil = splitHingeKey(id);
+          if (teil) this.model.removeHinge(teil.nodeId, teil.index);
+        }
       }
       for (const [id, kind] of entries) if (kind === "node") this.model.removeNode(id);
       for (const [id] of entries) nachbarn.delete(id);
@@ -1010,6 +1015,10 @@ export class Builder {
    */
   _partLabel(id, kind) {
     const m = this.model;
+    if (kind === "hinge") {
+      const def = getConnector(HINGE_PART);
+      return def ? partName(def) : null;
+    }
     if (kind === "tube") {
       const t = m.tubes.get(id);
       const def = t && getTube(t.tubeId);
@@ -1083,9 +1092,13 @@ export class Builder {
     const withLabels = soloId != null;
     const labelFor = withLabels ? (node) => connectorLabelInfo(this.model, node) : null;
     const slideNameFor = withLabels ? (sl) => slideKindLabel(sl.kind) : null;
-    const labelIds = soloId != null ? new Set([soloId]) : null;
+    // Ein Scharnier haengt am Bolzen-Knoten und hat keine eigene Stelle im
+    // Bild -- seine Beschriftung sitzt deshalb am Knoten.
+    const scharnier = soloId != null ? splitHingeKey(soloId) : null;
+    const labelAn = scharnier ? scharnier.nodeId : soloId;
+    const labelIds = labelAn != null ? new Set([labelAn]) : null;
     const soloLabel = soloId != null
-      ? { id: soloId, text: profil != null
+      ? { id: labelAn, text: profil != null
         ? (reinforcementPart() ? partName(reinforcementPart()) : null)
         : this._partLabel(soloId, this.selection.get(soloId)) } : null;
     // Vorschlaege, welche Rohre ein Verstaerkungsprofil gebrauchen koennten --
@@ -2994,6 +3007,23 @@ export class Builder {
       return;
     }
     const { kind, id } = pick.data;
+    // Ein Scharnier der Flexikupplung ist ein eigenes Teil, obwohl es am
+    // Bolzen-Knoten haengt: es waehlt sich unter seiner eigenen Kennung.
+    if (kind === "node" && pick.data.hinge != null) {
+      const key = hingeKey(id, pick.data.hinge);
+      if (add) {
+        if (this.selection.has(key)) this.selection.delete(key);
+        else this.selection.set(key, "hinge");
+      } else if (this.selection.size === 1 && this.selection.has(key)) {
+        this.selection.clear();
+      } else {
+        this.selection.clear();
+        this.selection.set(key, "hinge");
+      }
+      this._profilAuswahl = null;
+      this.refresh();
+      return;
+    }
     // Klick auf ein Verstaerkungsprofil: es gehoert zum ganzen Lauf, also
     // kommen alle seine Rohre in die Auswahl -- ein 80er Profil steckt in zwei
     // 35ern, da waere ein einzelnes Rohr nur die halbe Wahrheit.

@@ -1,7 +1,8 @@
 // Verkabelt die Bedienoberflaeche (Toolbar, Tastatur, Stueckliste, Bestand).
 
 import { buildableTubes, buildableCurvedTubes, buildablePanels, tubeColors, geometry, allTubes, allConnectors, panels, reinforcements, screws, slideKindName, partName, partForFitting, accessories, getPartById, poolLinerFor, getTube, getPanel } from "./catalog.js";
-import { PLACEABLE_FITTINGS, POOL_KINDS, HOLE_MASKS, ROTATABLE_FITTINGS, SLIDE_PARTS, POOL_SETS } from "./model.js";
+import { PLACEABLE_FITTINGS, POOL_KINDS, HOLE_MASKS, ROTATABLE_FITTINGS, SLIDE_PARTS, POOL_SETS,
+  HINGE_PART, isBoltPart, hingeKey } from "./model.js";
 import { computeBOM, compareInventory, connectorsForNode } from "./bom.js";
 import { computeBuildPlan, BUILD_ORDERS } from "./buildplan.js";
 import { parseQDF } from "./qdfimport.js";
@@ -3327,6 +3328,13 @@ export function initUI({ scene, model, builder }) {
     } else if (hl.kind === "connectors") {
       for (const n of model.nodes.values()) {
         if (n.unused) continue;
+        // Die Flexikupplung besteht aus zwei Teilen an EINEM Knoten -- die
+        // Zeile "Scharnier" hebt deshalb die Scharniere hervor, die Zeile
+        // "Bolzen" den Bolzen.
+        if (hl.id === HINGE_PART && isBoltPart(n.part)) {
+          (n.hinges || []).forEach((_, i) => ids.add(hingeKey(n.id, i)));
+          continue;
+        }
         for (const typ of connectorsForNode(model, n)) if (typ === hl.id) { ids.add(n.id); break; }
       }
     } else if (hl.kind === "fittings") {

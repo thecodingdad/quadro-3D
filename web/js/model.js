@@ -288,7 +288,10 @@ export function holeArmDirs(node) {
 export function holeClampDirsAt(model, node, cs = 5) {
   const out = [];
   for (const h of model.nodes.values()) {
-    if (!isHolePart(h.part) || h.id === node.id) continue;
+    // Auch ein Flexikupplungs-Bolzen kann auf einem Stutzen stecken statt am
+    // Rohrende: dann ist der Stutzen genauso belegt (so sitzen die mittleren
+    // Gelenke des Ball Cage auf ihrer Kupplung).
+    if ((!isHolePart(h.part) && !isBoltPart(h.part)) || h.id === node.id) continue;
     const d = [h.x - node.x, h.y - node.y, h.z - node.z];
     const L = Math.hypot(d[0], d[1], d[2]);
     if (L < 0.5 || L > cs * 1.2) continue;
@@ -360,6 +363,22 @@ export const BOLT_SEGMENT = 5;              // Laenge eines Bolzensegments (cm)
 // bleibt nichts uebrig. Beides gibt es in der Herstellersoftware, in der Datei
 // steht es als Feld 4 der bolt2-Zeile (1 = mittig, 0 = ein Segment tiefer).
 export const BOLT_DEPTHS = [1, 2];
+
+/**
+ * Kennung EINES Scharniers fuer Auswahl und Hervorhebung: sie haengen als
+ * Winkel am Bolzen-Knoten und haben deshalb keine eigene Id.
+ */
+export function hingeKey(nodeId, index) {
+  return `${nodeId}#${index}`;
+}
+
+/** Zerlegt so eine Kennung wieder; liefert null, wenn es keine ist. */
+export function splitHingeKey(key) {
+  const i = String(key).indexOf("#");
+  if (i < 0) return null;
+  const index = Number(key.slice(i + 1));
+  return Number.isInteger(index) ? { nodeId: key.slice(0, i), index } : null;
+}
 
 /** Abstand zweier Stellungen auf dem Kranz, immer 0..180 Grad. */
 export function hingeGap(a, b) {
@@ -1790,6 +1809,14 @@ export class BuildModel {
     if (grad == null) return null;
     n.hinges.push(grad);
     return n;
+  }
+
+  /** EIN Scharnier vom Bolzen nehmen. */
+  removeHinge(nodeId, index) {
+    const n = this.nodes.get(nodeId);
+    if (!isBoltPart(n && n.part) || !n.hinges || index >= n.hinges.length) return false;
+    n.hinges.splice(index, 1);
+    return true;
   }
 
   /**

@@ -1111,14 +1111,53 @@ export function parseQDF(text, opts = {}) {
     const px = b.x - (mittig ? 0 : ex[0] * 5);
     const py = b.y - (mittig ? 0 : ex[1] * 5);
     const pz = b.z - (mittig ? 0 : ex[2] * 5);
-    const nd = nodes.find((n) => !n.part && Math.hypot(n.x - px, n.y - py, n.z - pz) < 2);
+    let nd = nodes.find((n) => !n.part && Math.hypot(n.x - px, n.y - py, n.z - pz) < 2);
+    let aufTraeger = false;
+    // Kein Knoten am Gelenkpunkt? Dann steckt der Bolzen nicht anstelle einer
+    // Kupplung, sondern auf DEREN STUTZEN -- eine Kupplungslaenge daneben, wie
+    // die Lochzapfenkupplung. So sitzen die mittleren Gelenke des Ball Cage.
+    // Der Knoten dafuer entsteht hier; die Kupplung selbst bleibt stehen.
+    if (!nd) {
+      const traeger = nodes.find((n) => {
+        if (n.part || n.c45body) return false;
+        const d = [n.x - px, n.y - py, n.z - pz];
+        const L = Math.hypot(d[0], d[1], d[2]);
+        if (Math.abs(L - conn) > 1) return false;                 // eine Kupplungslaenge
+        // ... und zwar auf der Bolzenachse, nicht irgendwo daneben.
+        return Math.abs(d[0] * ex[0] + d[1] * ex[1] + d[2] * ex[2]) > conn * 0.8;
+      });
+      if (traeger) {
+        // Unsere Achse zeigt IMMER vom Traeger weg.
+        const zu = einsVec([traeger.x - px, traeger.y - py, traeger.z - pz]);
+        if (zu[0] * ex[0] + zu[1] * ex[1] + zu[2] * ex[2] > 0) ex = [-ex[0], -ex[1], -ex[2]];
+        nd = nodeAt(round(px), round(py), round(pz));
+        aufTraeger = true;
+        // Ein Rohr, das vom Traeger aus in die Bolzenrichtung laeuft, haengt in
+        // Wahrheit am BOLZEN -- beim Einlesen der Rohre gab es ihn noch nicht,
+        // ihr Ende schnappte deshalb auf die Kupplung daneben. Ohne das
+        // Umhaengen sitzen zwei Teile auf demselben Stutzen und die Spannweite
+        // ist um eine Kupplungslaenge zu gross (85 statt 80 cm).
+        for (const t of tubes) {
+          for (const ende of ["a", "b"]) {
+            if (t[ende] !== traeger.id) continue;
+            const anderer = nodes.find((n) => n.id === t[ende === "a" ? "b" : "a"]);
+            if (!anderer) continue;
+            const d = einsVec([anderer.x - traeger.x, anderer.y - traeger.y, anderer.z - traeger.z]);
+            if (d[0] * ex[0] + d[1] * ex[1] + d[2] * ex[2] < 0.99) continue;
+            t[ende] = nd.id;
+          }
+        }
+      }
+    }
     if (!nd) continue;              // ohne Knoten bleibt die Zeile, wie sie war
     // Steckt der Bolzen ein Segment TIEFER (Feld 4 = 0), dann zeigt die Achse
     // der Datei ins Rohr hinein -- unsere zeigt immer heraus, also umdrehen.
     // Sitzt er mittig, ist die Richtung frei: dann zeigt sie wie beim selbst
     // gesetzten vom gehaltenen Rohr weg.
     if (!mittig) ex = [-ex[0], -ex[1], -ex[2]];
-    if (mittig) {
+    // Steckt der Bolzen auf einem Stutzen, zeigt die Achse schon vom Traeger
+    // weg -- dann bleibt sie so. Sonst gilt: weg vom gehaltenen Rohr.
+    if (mittig && !aufTraeger) {
       let vorne = 0, hinten = 0;
       for (const t of tubes) {
         const o = t.a === nd.id ? nodes.find((n) => n.id === t.b)

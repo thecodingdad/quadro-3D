@@ -5,7 +5,7 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs, BLACK_FITTINGS,
-  isBoltPart, boltAxis, boltShift, hingeDir, POOL_KINDS, fixedFittingColor } from "./model.js";
+  isBoltPart, boltAxis, boltShift, hingeDir, hingeKey, POOL_KINDS, fixedFittingColor } from "./model.js";
 import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
@@ -2410,7 +2410,10 @@ export class SceneManager {
    * Jedes Scharnier bekommt seinen Index an den Treffer (`hinge`) -- nur so
    * weiss der Klick, welches der beiden gedreht werden soll.
    */
-  _addFlexiJoint(model, n, mat, st) {
+  _addFlexiJoint(model, n, grund, st, matFor = (id, m) => m) {
+    // Bolzen und Scharniere lassen sich EINZELN waehlen und hervorheben --
+    // jedes Scharnier hat dafuer eine eigene Kennung (`hingeKey`).
+    const mat = matFor(n.id, grund);
     const pos = new THREE.Vector3(n.x, n.y, n.z);
     const pick = st !== "future" ? this.pickNodes : null;
     const achse = boltAxis(n);
@@ -2456,14 +2459,16 @@ export class SceneManager {
         const achse = i % 2 ? ex.clone().negate() : ex;
         const ey = arm.clone().negate();
         const ez = new THREE.Vector3().crossVectors(achse, ey);
-        this._batchAdd(this._meshGeometry("fit:flexi-connector3", scharnier), mat,
+        this._batchAdd(this._meshGeometry("fit:flexi-connector3", scharnier),
+          matFor(hingeKey(n.id, i), mat),
           new THREE.Matrix4().makeBasis(achse, ey, ez).setPosition(pos),
           "node", n.id, pick, { hinge: i });
       } else {
         const seg = Math.max(8, this._q().tube);
         const len = g.connectorSize * 1.5;
         const stab = new THREE.Mesh(this._cachedGeo(`hingeArm${seg}`,
-          () => new THREE.CylinderGeometry(g.armRadius, g.armRadius, len, seg)), mat);
+          () => new THREE.CylinderGeometry(g.armRadius, g.armRadius, len, seg)),
+          matFor(hingeKey(n.id, i), mat));
         stab.quaternion.setFromUnitVectors(UP, arm);
         stab.position.copy(pos).addScaledVector(arm, len / 2);
         stab.userData = { kind: "node", id: n.id, hinge: i };
@@ -2822,8 +2827,11 @@ export class SceneManager {
     // Die Lochzapfenkupplung greift mit ihrem Ring ueber einen Stutzen der
     // Kupplung -- der gehoert also gezeichnet, obwohl dort kein Rohr steckt.
     // Ihr Knoten liegt eine Kupplungslaenge daneben, das gibt die Richtung.
+    // Dasselbe gilt fuer einen Flexikupplungs-Bolzen, der auf einem Stutzen
+    // steckt statt am Rohrende -- ohne den Stutzen haengt er neben der Kupplung
+    // in der Luft (mittlere Gelenke des Ball Cage).
     for (const p of model.nodes.values()) {
-      if (!isHolePart(p.part)) continue;
+      if (!isHolePart(p.part) && !isBoltPart(p.part)) continue;
       let near = null, nd = geometry().connectorSize * 1.4;
       for (const n of model.nodes.values()) {
         if (n === p || n.part) continue;
@@ -3003,7 +3011,7 @@ export class SceneManager {
       // braucht keinen Wuerfel; die Lagerkupplung traegt eine ganze Kupplung --
       // die wird unten zusaetzlich gezeichnet.
       if (n.stub && isHolePart(n.part)) this._addPinConnector(model, n, matFor(n.id, mat), st);
-      else if (isBoltPart(n.part)) this._addFlexiJoint(model, n, matFor(n.id, mat), st);
+      else if (isBoltPart(n.part)) this._addFlexiJoint(model, n, mat, st, matFor);
       else if (n.stub && n.part) this._addTubeClamp(model, n, matFor(n.id, mat), st);
       // Wo eine Radkappe sitzt, gibt es keine Kupplung mehr -- die Kappe
       // schliesst das Rohrende selbst ab. Der Flexikupplungs-Bolzen ersetzt sie

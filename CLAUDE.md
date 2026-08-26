@@ -498,9 +498,17 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     dieselbe X-Richtung), sie gehört deshalb nicht in den Export. Die
     Anschlussrichtungen (`boltArmDirs`) sind seine beiden Stutzen plus je Scharnier dessen
     Arm – der Builder holt sie über `_armDirsOf`, damit Ankerpunkte und Belegung stimmen.
-    Beim Import wird das Gelenk zusammengefasst, sobald an seinem Punkt ein Knoten steht
-    (63 der 84 Bolzen des Bestands); die übrigen bleiben Anbauteile mit ihrem Rohtext und
-    gehen unverändert wieder hinaus. Wo der Punkt liegt, sagt **Feld 4 der bolt2-Zeile**
+    Beim Import wird jedes Gelenk zusammengefasst (84 von 84 Bolzen des Bestands): entweder
+    steht an seinem Punkt schon ein Knoten, **oder der Bolzen steckt auf dem STUTZEN einer
+    Kupplung** – eine Kupplungslänge daneben, wie die Lochzapfenkupplung. Dann entsteht der
+    Knoten dort, und ein Rohr, das vom Träger aus in die Bolzenrichtung lief, wird auf ihn
+    umgehängt (sonst säßen zwei Teile auf einem Stutzen und die Spannweite wäre 85 statt
+    80 cm). Der belegte Stutzen zählt über `holeClampDirsAt` als Arm der tragenden Kupplung.
+    So sitzen die mittleren Gelenke des Ball Cage – vorher stand dort ein Bolzen als loses
+    Anbauteil neben einer Kupplung.
+    **Bolzen und Scharniere lassen sich einzeln wählen**: ein Scharnier trägt die Kennung
+    `hingeKey(nodeId, i)` (`"n12#0"`), Auswahl, Hervorhebung aus der Stückliste und Löschen
+    (`removeHinge`) laufen darüber; seine Beschriftung sitzt am Knoten. Wo der Punkt liegt, sagt **Feld 4 der bolt2-Zeile**
     (1 = mittig, 0 = 50 mm entlang −X) – siehe QDF-FORMAT.md.
   - **Die Lagerkupplung** (`bearing-connector4`, Katalog `bearing`) klemmt um ein Rohr und
     **trägt eine Kupplung**. Die steht in der Datei als eigene `connector3`, 10 cm entgegen der

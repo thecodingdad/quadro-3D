@@ -59,7 +59,9 @@ function neighborDirs(model, node) {
   // T-Kupplung des Ball Cage nur zwei Arme.
   const cs = geometry().connectorSize;
   for (const h of model.nodes.values()) {
-    if (!isHolePart(h.part) || h.id === node.id) continue;
+    // Dasselbe gilt fuer einen Flexikupplungs-Bolzen, der auf einem Stutzen
+    // steckt statt am Rohrende (mittlere Gelenke des Ball Cage).
+    if ((!isHolePart(h.part) && !isBoltPart(h.part)) || h.id === node.id) continue;
     const dx = h.x - node.x, dy = h.y - node.y, dz = h.z - node.z;
     const len = Math.hypot(dx, dy, dz);
     if (len < 0.5 || len > cs * 1.2) continue;
