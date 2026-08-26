@@ -155,6 +155,14 @@ two are added, and in 3 cases when the second number is ignored. For panels
 the same test gives all four corners on connectors for 74 of 96 panels with
 the addition, and 25 without. **✔**
 
+The addition is **entered by hand** — the original software has a field for it.
+It papers over a distance for which no part exists: the ball cage roof needs
+79.85 cm between two connectors, the longest tube is 75, so the file carries
+`750.` plus an addition of `48.5` mm. The PART stays the catalogue tube (the
+parts list counts a 75 cm tube); what grows is the drawn body, and only there.
+Such a joint cannot be built in either editor — this app draws it, it does not
+offer it. **✔**
+
 ### 3.5 Editing-step fields at the end of a line
 
 Some lines carry one or two extra integers after their regular fields:

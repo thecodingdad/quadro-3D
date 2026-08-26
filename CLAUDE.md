@@ -601,8 +601,10 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   weiter auseinander, als Rohr + Kupplung ergeben – im Ball Cage etwa 84,85 cm bei einem 75er
   (Zuschlag 4,85). Das **Teil** bleibt das Katalogrohr (die Stückliste führt 75 cm), gezeichnet
   wird aber `len + pad`: sonst endet die Dachschräge 4,85 cm vor ihrer Kupplung und sieht zu
-  kurz aus. Selbst bauen lässt sich so eine Verbindung nicht – auch in der Herstellersoftware
-  nicht; die Beispieldateien enthalten sie trotzdem.
+  kurz aus. Der Zuschlag wird in der Herstellersoftware **von Hand eingetragen** – er
+  überbrückt eine Strecke, für die es kein Teil gibt (das Dach des Ball Cage bräuchte 79,85 cm,
+  das längste Rohr misst 75). **Bauen** lässt sich so eine Verbindung in keinem der beiden
+  Editoren; diese App zeichnet sie, bietet sie aber nicht an.
 - **Rutschen im Aufbauplan:** Ein Rutschenteil gehört nicht in die Ebene, auf der es *endet*,
   sondern in den Schritt, der seinen **Einstieg** baut. `buildplan.slideChainHeads()` fasst dafür
   jede Kette zusammen (Ausgang eines Teils über `model.slideExit()` → dort sitzt das nächste) und
