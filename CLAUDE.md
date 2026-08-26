@@ -596,6 +596,13 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   nur ein und ist deshalb an keine Rohrlänge gebunden. Gegengeprüft am Bestand: von 87
   Kettenköpfen der Herstellermodelle erfüllen 86 diese Regel – der eine Ausreißer wäre auch
   nach den älteren Regeln (freie Bahn, Auflage, Fallhöhe) gesetzt worden.
+- **Der Zuschlag am Rohrmass gehoert ins BILD, nicht ins Teil.** Die Datei fuehrt hinter jedem
+  Mass eine zweite Zahl (`padOf`, meist 0). Wo sie nicht 0 ist, stehen die beiden Kupplungen
+  weiter auseinander, als Rohr + Kupplung ergeben – im Ball Cage etwa 84,85 cm bei einem 75er
+  (Zuschlag 4,85). Das **Teil** bleibt das Katalogrohr (die Stückliste führt 75 cm), gezeichnet
+  wird aber `len + pad`: sonst endet die Dachschräge 4,85 cm vor ihrer Kupplung und sieht zu
+  kurz aus. Selbst bauen lässt sich so eine Verbindung nicht – auch in der Herstellersoftware
+  nicht; die Beispieldateien enthalten sie trotzdem.
 - **Rutschen im Aufbauplan:** Ein Rutschenteil gehört nicht in die Ebene, auf der es *endet*,
   sondern in den Schritt, der seinen **Einstieg** baut. `buildplan.slideChainHeads()` fasst dafür
   jede Kette zusammen (Ausgang eines Teils über `model.slideExit()` → dort sitzt das nächste) und

@@ -3183,7 +3183,12 @@ export class SceneManager {
       // In den Herstellerdateien treffen rund 5 % der Rohre ihre Kupplung nicht
       // genau -- gezeichnet wird das echte Rohr, nicht die Verbindungslinie.
       if (t.geom && !t.bow && t.geom.p0 && t.geom.dir) {
-        const g = t.geom, span = g.len + cs;
+        // Der ZUSCHLAG gehoert dazu: auf einer 45-Grad-Schraege steckt das Rohr
+        // tiefer in der Kupplung, die Datei fuehrt den Rest als eigenes Feld
+        // (75er-Schraege im Ball Cage: 75 + 4,85 + 5 = 84,85 cm). Ohne ihn
+        // endete das Rohr 4,85 cm vor seiner Kupplung -- die Dachschraegen
+        // sahen zu kurz aus.
+        const g = t.geom, span = g.len + (g.pad || 0) + cs;
         va.set(g.p0[0], g.p0[1], g.p0[2]);
         vb.set(g.p0[0] + g.dir[0] * span, g.p0[1] + g.dir[1] * span, g.p0[2] + g.dir[2] * span);
       }
@@ -3241,7 +3246,14 @@ export class SceneManager {
       // wird aus der Distanz statt aus der Katalog-Laenge: im Schraegen-Raster
       // (importierte Diagonalen, ~41,5 statt 40) klaffte sonst eine Luecke.
       // Die Luecke zur Kupplung fuellen die Arm-Stutzen (siehe oben).
-      const drawLen = Math.max(1, len - cs);
+      // Eingelesenes Rohr: Mass UND Zuschlag zeichnen. Das TEIL bleibt das
+      // Katalogrohr (die Stueckliste fuehrt weiter 35 cm), aber in der Datei
+      // stehen manche Verbindungen weiter auseinander, als Rohr + Kupplung
+      // ergeben -- den Rest fuehrt sie als Zuschlag, und die Herstellersoftware
+      // zeichnet ihn mit. Ohne ihn endete die Dachschraege des Ball Cage
+      // 2,4 cm vor ihrer Kupplung.
+      const drawLen = t.geom && !t.bow && t.geom.len
+        ? Math.max(1, t.geom.len + (t.geom.pad || 0)) : Math.max(1, len - cs);
       const isReinforceActive = reinforce && t.reinforced;
       const effectiveRadius = isReinforceActive ? tubeRadius * 1.08 : tubeRadius;
       const geo = this._tubeGeometry(tubeRadius, drawLen, qual.tube);
