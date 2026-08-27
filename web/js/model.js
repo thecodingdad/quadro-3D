@@ -212,10 +212,13 @@ function bearingQuat(ausrichtung, rohr) {
 /**
  * Teile, die es nur in Schwarz gibt: weder die Baufarbe noch die aus der Datei
  * faerbt sie um. In den Herstellerdateien tragen Radlager und Schwimmrad
- * durchgehend das schwarze Material (125 bzw. 76 Vorkommen); die Rohrkappe gibt
+ * durchgehend das schwarze Material (125 bzw. 76 Vorkommen), das offene
+ * Verbinderende ebenso (alle 69 Vorkommen in 31 Dateien); die Rohrkappe gibt
  * es ebenfalls nur schwarz.
  */
-export const BLACK_FITTINGS = new Set(["bearing2", "floating-wheel2", "tube-cap2"]);
+export const BLACK_FITTINGS = new Set([
+  "bearing2", "floating-wheel2", "tube-cap2", "open-connector2",
+]);
 
 // Teile mit FESTER Farbe -- weder die Baufarbe noch die aus der Datei faerbt
 // sie um. Die Poolfolie gibt es nur in Blau; Radlager, Schwimmrad und
