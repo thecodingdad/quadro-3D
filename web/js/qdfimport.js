@@ -26,7 +26,7 @@
 // Bewusst ohne Three.js/DOM, damit per Node testbar und Backend-tauglich.
 
 import { round2 as round, panelNormal, modelMiddle, quatFromBasis } from "./util.js";
-import { FORMAT_VERSION } from "./config.js";
+import { FORMAT_VERSION, C45_SLEEVE_LEN, C45_ARM_LEN } from "./config.js";
 import { holePartForMask, holeArmDirs, BOLT_PART, MAX_HINGES, HINGE_STEP } from "./model.js";
 
 // Alle benannten Richtungen (kardinal + 45°-diagonal) fuer Arm-Erkennung.
@@ -374,6 +374,50 @@ export function parseQDF(text, opts = {}) {
     return body;
   }
 
+  // --- Winkelkupplung IM Rohr ----------------------------------------------
+  // Sie muss nicht auf einem Stutzen sitzen: ihr 45-Grad-Fortsatz passt ebenso
+  // in ein Rohrende. Dann steht dort KEINE connector3, sondern eine
+  // connector45_2 eine Huelse plus einen Arm daneben -- und das Rohrende ist
+  // der Adapter-Koerper.
+  //
+  // Erkannt wird das an der EXAKTEN Lage, nicht an blosser Naehe:
+  //   Ende = Ecke + Huelsenachse * C45_SLEEVE_LEN + Rohrrichtung * C45_ARM_LEN
+  // Am Bestand gemessen trifft das 8 Rohrenden in 3 Herstellerdateien (genau
+  // die Faelle mit einer connector45_2 ohne eigene Kupplung); eine blosse
+  // Abstandspruefung deutete dagegen 150 gerade Rohrenden um.
+  const SLEEVE_TOL = 1;   // cm
+  function sleeveCornerFor(x, y, z, insRohr) {
+    for (const nd of connectorNodes) {
+      if (!nd._c45corner || !nd._c45axis) continue;
+      const a = nd._c45axis;
+      const dx = nd.x + a[0] * C45_SLEEVE_LEN + insRohr[0] * C45_ARM_LEN - x;
+      const dy = nd.y + a[1] * C45_SLEEVE_LEN + insRohr[1] * C45_ARM_LEN - y;
+      const dz = nd.z + a[2] * C45_SLEEVE_LEN + insRohr[2] * C45_ARM_LEN - z;
+      if (dx * dx + dy * dy + dz * dz <= SLEEVE_TOL * SLEEVE_TOL) return nd;
+    }
+    return null;
+  }
+  /**
+   * Ende eines GERADEN Rohrs. Sitzt dort eine Kupplung, bleibt alles wie
+   * gehabt; passt stattdessen die Huelsen-Rechnung, entsteht der Adapter-
+   * Koerper samt Arm-Kante zur Eck-Kupplung.
+   */
+  function sleeveEndNode(x, y, z, insRohr) {
+    const vorhanden = snapToConnector(round(x), round(y), round(z), false);
+    if (vorhanden) return vorhanden;
+    const corner = sleeveCornerFor(x, y, z, insRohr);
+    if (!corner) return snapToConnector(round(x), round(y), round(z));
+    const body = nodeAt(round(x), round(y), round(z));
+    body.c45 = true;
+    body.c45body = true;
+    body.c45axis = corner._c45axis;
+    if (!connectorNodes.includes(body)) connectorNodes.push(body);
+    if (corner.id !== body.id && !tubeExists(tubes, corner.id, body.id)) {
+      tubes.push({ id: "m" + seq++, a: corner.id, b: body.id, arm: true, color: FALLBACK_COLOR });
+    }
+    return body;
+  }
+
   const lines = text.split(/\r?\n/);
 
   // 1. Durchlauf: Materialien + Kupplungen (Knoten zuerst, damit Rohre andocken).
@@ -409,11 +453,14 @@ export function parseQDF(text, opts = {}) {
         // wir daraus einen Adapter-Koerper ableiten koennen. Ohne diese Notiz
         // fiele sie beim Speichern weg (38 Stueck im Bestand).
         nd.c45file = true;
-        // Kardinale Huelsenachse: Richtung, in der die C45-Huelse auf einen Arm
-        // der Basiskupplung gesteckt ist (= +X-Arm des connector45-Quaternions,
-        // auf die naechste Achse gerundet). Steuert die Adapter-Darstellung.
+        // Huelsenachse: Richtung, in der die C45-Huelse auf einen Arm der
+        // Basiskupplung gesteckt ist (= +X-Arm des connector45-Quaternions).
+        // Gerundet wird auf die naechste BENANNTE Richtung, nicht nur auf eine
+        // Achse: steckt die Winkelkupplung im Rohr statt auf einem Stutzen,
+        // liegt ihre Huelse diagonal, und eine kardinal gerundete Achse zoege
+        // den Adapter beim naechsten Laden schief. Steuert die Darstellung.
         const qc = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
-        nd._c45axis = nearestCardinal(rotateByQuat(qc, [1, 0, 0]));
+        nd._c45axis = nearestNamedDir(rotateByQuat(qc, [1, 0, 0])).vec;
         // EIGENE Lage der Winkelkupplung (Three-Order x,y,z,w). Sie ist NICHT
         // die des Wuerfels: an 559 der 726 Vorkommen im Bestand tragen
         // connector3 und connector45_2 an derselben Stelle verschiedene
@@ -542,9 +589,11 @@ export function parseQDF(text, opts = {}) {
       const ex = sx + dir[0] * span, ey = sy + dir[1] * span, ez = sz + dir[2] * span;
       // 45°-Diagonalrohre docken ueber einen Adapter-Koerper + Arm-Kante an die
       // C45-Eck-Kupplung an; gerade Rohre und echte Rampen schnappen direkt auf
-      // die naechste Kupplung.
-      const a = is45 ? diagonalEndNode(sx, sy, sz) : snapToConnector(round(sx), round(sy), round(sz));
-      const b = is45 ? diagonalEndNode(ex, ey, ez) : snapToConnector(round(ex), round(ey), round(ez));
+      // die naechste Kupplung -- ausser die Winkelkupplung steckt IM Rohr
+      // (sleeveEndNode).
+      const gegen = [-dir[0], -dir[1], -dir[2]];
+      const a = is45 ? diagonalEndNode(sx, sy, sz) : sleeveEndNode(sx, sy, sz, dir);
+      const b = is45 ? diagonalEndNode(ex, ey, ez) : sleeveEndNode(ex, ey, ez, gegen);
       if (a.id === b.id) continue;
       if (tubeExists(tubes, a.id, b.id)) continue;
       const mat = typeof p.rest[0] === "number" ? p.rest[0] : null;

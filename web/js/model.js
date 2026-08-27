@@ -1,7 +1,7 @@
 // Datenmodell des Bauwerks: Graph aus Knoten (Kupplungen) und Kanten (Rohren).
 // Bewusst ohne Three.js-Abhaengigkeit, damit es testbar und Backend-tauglich bleibt.
 
-import { MERGE_EPS, FORMAT_VERSION, DIAGONAL_SNAP_TOL, DIRECTIONS } from "./config.js";
+import { MERGE_EPS, FORMAT_VERSION, DIAGONAL_SNAP_TOL, DIRECTIONS, DIAGONAL_DIRECTIONS } from "./config.js";
 
 // Zellweite des Rasters, mit dem die Kollisionspruefung Nachbarn sucht. Etwas
 // groesser als das laengste Rohr (75 cm + Kupplung): ein Rohr liegt damit in
@@ -3404,6 +3404,153 @@ export class BuildModel {
    * Kupplung (`axis`), ihr Arm zeigt in die Schraege (`dir`). Ein Rohr kommt
    * spaeter dazu -- die Kupplung ist ein eigenes Teil.
    */
+  /**
+   * Richtung des Rohrs an einer DUMMY-Kupplung -- vom Knoten aus INS Rohr
+   * hinein. Liefert null, wenn der Knoten keine ist.
+   *
+   * Eine Dummy-Kupplung ist ein Rohrende, an dem sonst nichts haengt: genau ein
+   * gerades Rohr, kein festes Teil, keine Kappe, kein Adapter. Nur dort laesst
+   * sich die Winkelkupplung direkt ins Rohr stecken (siehe `addC45OnTube`).
+   */
+  c45TubeDir(node) {
+    if (!node || node.part || node.c45body || node.c45 || node.unused) return null;
+    if (this.hasWheelCap(node) || this.hasEndPiece(node)) return null;
+    let nb = null;
+    for (const t of this.tubes.values()) {
+      if (t.link) continue;
+      const otherId = t.a === node.id ? t.b : t.b === node.id ? t.a : null;
+      if (!otherId) continue;
+      if (nb || t.arm) return null;    // zweites Rohr oder Adapter-Huelse: keine Dummy-Kupplung
+      if (t.bow) return null;          // in ein Bogenrohr passt sie nicht
+      nb = this.nodes.get(otherId);
+    }
+    if (!nb) return null;
+    const v = [nb.x - node.x, nb.y - node.y, nb.z - node.z];
+    const L = Math.hypot(v[0], v[1], v[2]);
+    if (L < 1e-6) return null;
+    return [v[0] / L, v[1] / L, v[2] / L];
+  }
+
+  /**
+   * Moegliche Huelsenachsen, wenn die Winkelkupplung direkt in ein Rohr
+   * gesteckt wird. Zur Rohrrichtung steht die Huelse im 45-Grad-Innenwinkel
+   * (Skalarprodukt -0,707) -- das sind die vier Diagonalen der beiden Ebenen
+   * quer zum Rohr. Die erste ist die Vorgabe, die uebrigen erreicht ein Klick
+   * auf die gesetzte Kupplung (`rotateC45Sleeve`).
+   */
+  c45SleeveAxes(dir) {
+    if (!dir) return [];
+    const out = [];
+    // Beide Listen: liegt das Rohr auf einer Achse, ist die Huelse diagonal --
+    // liegt es schraeg (Rohr an einer Winkelkupplung), ist sie kardinal.
+    for (const d of [...DIAGONAL_DIRECTIONS, ...DIRECTIONS]) {
+      const dot = d.vec[0] * dir[0] + d.vec[1] * dir[1] + d.vec[2] * dir[2];
+      if (Math.abs(dot + Math.SQRT1_2) < 0.05) out.push(d.vec.slice());
+    }
+    // Die Huelse haelt sich moeglichst oben: so laeuft der Aufbau nach oben
+    // weiter statt in den Boden.
+    out.sort((a, b) => b[1] - a[1]);
+    return out;
+  }
+
+  /**
+   * Winkelkupplung DIREKT in ein Rohrende stecken: ihr 45-Grad-Fortsatz steckt
+   * im Rohr, die Huelse zeigt 45 Grad davon weg.
+   *
+   * Damit ersetzt sie die Dummy-Kupplung am Rohrende -- der Knoten wird zum
+   * Adapter-Koerper. Am anderen Ende der Huelse entsteht eine neue
+   * Dummy-Kupplung: dort passt nur ein Kupplungs-STUTZEN hinein, kein Rohr.
+   * Sie wird um die Huelsenachse gedreht angelegt, damit ihre eigenen Arme
+   * stimmen und dort alles Weitere gesetzt werden kann.
+   *
+   * Der Aufbau ist derselbe wie beim Schraegbau (`extendC45Diagonal`):
+   * Kupplung -- Huelse -- Adapter-Koerper -- 45-Grad-Arm; nur entsteht hier
+   * nicht das Rohr, sondern die Kupplung neu.
+   */
+  addC45OnTube(nodeId, axis, sleeveLen, armLen) {
+    const body = this.nodes.get(nodeId);
+    if (!body) return null;
+    const dir = this.c45TubeDir(body);
+    if (!dir || !axis) return null;
+    // Die Kupplung sitzt eine Huelsenlaenge und einen Arm zurueck -- genau so,
+    // dass `body` auf ihrem 45-Grad-Arm landet.
+    const bx = body.x - axis[0] * sleeveLen - dir[0] * armLen;
+    const by = body.y - axis[1] * sleeveLen - dir[1] * armLen;
+    const bz = body.z - axis[2] * sleeveLen - dir[2] * armLen;
+    if (this.isBelowGround(by)) return { ground: true };
+    const base = this.addNode(round(bx), round(by), round(bz));
+    // Ihre Wuerfelachsen folgen der Huelse: lokal +X zeigt zum Adapter.
+    base.quat = quatFromXAxis(axis);
+    body.c45 = true;
+    body.c45body = true;
+    body.c45axis = axis.slice();
+    this.addArm(base.id, body.id);
+    this._syncC45Flag(base.id);
+    return { body, base };
+  }
+
+  /**
+   * Eine ins Rohr gesteckte Winkelkupplung um 90 Grad um die ROHRACHSE weiter
+   * drehen -- mit ihr wandert die Dummy-Kupplung an der Huelse.
+   *
+   * `rotateC45` dreht die andere Seite (alles, was am Adapter haengt); hier
+   * steckt der Adapter im Rohr, also dreht sich die Huelsenseite. Traegt die
+   * Kupplung an der Huelse schon etwas anderes, bleibt alles stehen.
+   */
+  rotateC45Sleeve(bodyId) {
+    const body = this.nodes.get(bodyId);
+    if (!body || !body.c45body || !body.c45axis) return false;
+    const dir = this._c45BodyTubeDir(bodyId);
+    if (!dir) return false;
+    let base = null;
+    for (const t of this.tubes.values()) {
+      if (!t.arm) continue;
+      const id = t.a === bodyId ? t.b : t.b === bodyId ? t.a : null;
+      if (id) { base = this.nodes.get(id); break; }
+    }
+    if (!base) return false;
+    // Nur solange an der Huelsen-Kupplung nichts weiter haengt: sonst zoege die
+    // Drehung das halbe Modell mit.
+    for (const t of this.tubes.values()) {
+      if (t.arm) continue;
+      if (t.a === base.id || t.b === base.id) return false;
+    }
+    const dreh = (v) => {
+      // 90 Grad um `dir`: v' = (dir x v) + dir (dir . v)
+      const c = cross3(dir, v);
+      const d = dot3(dir, v);
+      return [c[0] + dir[0] * d, c[1] + dir[1] * d, c[2] + dir[2] * d];
+    };
+    const achse = dreh(body.c45axis);
+    const r = dreh([base.x - body.x, base.y - body.y, base.z - body.z]);
+    const p = { x: body.x + r[0], y: body.y + r[1], z: body.z + r[2] };
+    if (this.isBelowGround(p.y)) return false;
+    base.x = round(p.x); base.y = round(p.y); base.z = round(p.z);
+    const L = Math.hypot(achse[0], achse[1], achse[2]) || 1;
+    const r4 = (v) => Math.round((v / L) * 1e4) / 1e4;
+    body.c45axis = [r4(achse[0]), r4(achse[1]), r4(achse[2])];
+    base.quat = quatFromXAxis(body.c45axis);
+    this._moveTubeGeom(new Set([base.id]));
+    return true;
+  }
+
+  /** Richtung des Rohrs, das im Adapter-Koerper steckt (vom Koerper weg). */
+  _c45BodyTubeDir(bodyId) {
+    const body = this.nodes.get(bodyId);
+    if (!body) return null;
+    for (const t of this.tubes.values()) {
+      if (t.arm || t.link) continue;
+      const id = t.a === bodyId ? t.b : t.b === bodyId ? t.a : null;
+      if (!id) continue;
+      const nb = this.nodes.get(id);
+      if (!nb) continue;
+      const v = [nb.x - body.x, nb.y - body.y, nb.z - body.z];
+      const L = Math.hypot(v[0], v[1], v[2]) || 1;
+      return [v[0] / L, v[1] / L, v[2] / L];
+    }
+    return null;
+  }
+
   addC45Adapter(fromId, axis, dir, sleeveLen, armLen) {
     const from = this.nodes.get(fromId);
     if (!from) return null;

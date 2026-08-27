@@ -357,6 +357,29 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   knickt dabei **zurück** über die Kupplung (Achsanteil entgegen der Hülse) – wer das verwechselt,
   zeichnet sie gespiegelt. Das Rohr kommt danach im Bau-Modus an den Adapterkörper – der bietet genau
   seine eigene Schräge an (`_c45ArmDir`). Einen Schalter „Schräg" gibt es nicht mehr.
+  Drei Dinge kommen hinzu:
+  - **Die Punkte liegen im Achsenkreuz der Kupplung, nicht in dem der Welt.** `_c45MountsFor()`
+    dreht die Diagonalen mit `_nodeFrame()` (aus `node.quat`, sonst Weltachsen) und rechnet auch
+    `_diagSleeveAxis()` lokal; die Belegung prüft `_armOccupied()` geometrisch statt über die
+    Namen aus `_occupiedDirs()` (die gelten nur ungedreht). Vorher standen die Punkte an einer
+    gedrehten Kupplung waagerecht in der Weltebene und die Winkelkupplung landete schief.
+  - **Ein Klick auf eine Kupplung wählt sie** (`_pickFittingNode` aus dem Anbauteil-Modus):
+    danach zeigt nur noch sie ihre Punkte, ein Klick daneben hebt es auf – wie im Bau-Modus.
+  - **Sie passt auch direkt ins Rohr.** An einer **Dummy-Kupplung** (ein Rohr, sonst nichts)
+    sitzt der Punkt **mittig**; `model.addC45OnTube()` macht diesen Knoten zum Adapterkörper –
+    ihr 45°-Fortsatz steckt im Rohr – und legt am anderen Ende der Hülse eine **neue
+    Dummy-Kupplung** an (dort passt nur ein Kupplungs-Stutzen hinein, kein Rohr). Die neue
+    Kupplung ist um die Hülsenachse gedreht (`quat`), damit an ihr alles Weitere gesetzt werden
+    kann. Ein Klick auf die gesetzte Winkelkupplung dreht die **Hülsenseite** um die Rohrachse
+    (`model.rotateC45Sleeve()`), solange an ihr nichts weiter hängt. In der Stückliste zählt sie
+    als Winkelkupplung, die Dummy-Kupplung als kleinste Kupplung des Sortiments – dafür gibt es
+    in `connectorsForNode()` die Regel „nur ein Adapter-Arm, sonst nichts". Beim **Import**
+    erkennt `sleeveEndNode()` diese Bauart an der EXAKTEN Lage
+    (`Ende = Ecke + Hülsenachse · C45_SLEEVE_LEN + Rohrrichtung · C45_ARM_LEN`, 1 cm Toleranz):
+    am Bestand trifft das 8 Rohrenden in 3 Herstellerdateien, eine bloße Abstandsprüfung
+    deutete dagegen 150 gerade Rohrenden um. Die Hülsenachse wird deshalb auf die nächste
+    **benannte** Richtung gerundet (`nearestNamedDir`, kardinal ODER 45°) – kardinal gerundet
+    stünde der Adapter beim nächsten Laden schief.
 - **Neue Bau-Richtung/Logik:** `config.js` + `builder.js` (+ ggf. `scene.js`).
 - **Tastatur:** zentral in `ui.js` (`keydown`). Pfeiltasten sind kamera-relativ über
   `scene.getHorizontalAxes()`. **Strg/Cmd+W ist nicht abfangbar** – Browser schließen damit ihren

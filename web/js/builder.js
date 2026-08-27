@@ -968,12 +968,18 @@ export class Builder {
   // (Gregors Regel), nimmt aber nur einen FREIEN Arm -- sonst kollidiert die
   // Huelse mit einem vorhandenen Rohr. Liefert null, wenn kein gueltiger Arm
   // frei ist (dann darf hier keine Winkelkupplung gesetzt werden).
-  _diagSleeveAxis(node, d) {
+  //
+  // `d` und das Ergebnis liegen im selben Achsenkreuz. `nachWelt` uebersetzt es
+  // fuer die Belegungspruefung in Weltkoordinaten -- an einer gedrehten
+  // Kupplung wird also in IHREM Kreuz gerechnet und nur zum Vergleich mit den
+  // Rohren gedreht. Ohne die Umrechnung gilt die Weltrichtung (ungedrehte
+  // Kupplung).
+  _diagSleeveAxis(node, d, nachWelt = null) {
     const cands = [];
     if (Math.abs(d[0]) > 0.3) cands.push([-Math.sign(d[0]), 0, 0]); // negierte Waagerechte X
     if (Math.abs(d[2]) > 0.3) cands.push([0, 0, -Math.sign(d[2])]); // negierte Waagerechte Z
     if (Math.abs(d[1]) > 0.3) cands.push([0, -Math.sign(d[1]), 0]); // negierte Senkrechte Y
-    for (const c of cands) if (!this._armOccupied(node, c)) return c;
+    for (const c of cands) if (!this._armOccupied(node, nachWelt ? nachWelt(c) : c)) return c;
     return null;
   }
 
@@ -1456,36 +1462,78 @@ export class Builder {
     // Arm einer Kupplung, gruen wie die uebrigen Bau-Punkte. In welche Schraege
     // sie dann zeigt, entscheidet der erste passende Wert -- weiterdrehen laesst
     // sie sich danach mit einem Klick auf sie selbst.
+    //
+    // Wie im Bau-Modus zeigt eine GEWAEHLTE Kupplung nur noch ihre eigenen
+    // Punkte (Klick auf die Kupplung, siehe _clickC45).
     const gap = geometry().connectorSize / 2 + 4;
-    for (const node of this.model.nodes.values()) {
+    const nodes = this.selectedNodeId
+      ? [this.model.nodes.get(this.selectedNodeId)].filter(Boolean)
+      : [...this.model.nodes.values()];
+    for (const node of nodes) {
       if (node.unused || node.c45body || node.part) continue;
-      const belegt = this._occupiedDirs(node);
-      for (const a of DIRECTIONS) {
-        if (this._armOccupied(node, a.vec)) continue;
-        const dir = this._c45DirFor(node, a.vec, belegt);
-        if (!dir) continue;
+      for (const m of this._c45MountsFor(node)) {
         this.scene.addHandle(
-          [node.x + a.vec[0] * gap, node.y + a.vec[1] * gap, node.z + a.vec[2] * gap],
-          { c45mount: true, nodeId: node.id, axis: a.vec, dir }, "dir");
+          [node.x + m.axis[0] * gap, node.y + m.axis[1] * gap, node.z + m.axis[2] * gap],
+          { c45mount: true, nodeId: node.id, axis: m.axis, dir: m.dir }, "dir");
+      }
+      // Die Winkelkupplung laesst sich auch DIREKT ins Rohr stecken: an einer
+      // Dummy-Kupplung (ein Rohr, sonst nichts) sitzt der Punkt deshalb MITTIG
+      // auf ihr. Gesetzt tritt die Winkelkupplung an ihre Stelle, und am
+      // anderen Ende der Huelse entsteht eine neue Dummy-Kupplung.
+      const achsen = this.model.c45SleeveAxes(this.model.c45TubeDir(node));
+      if (achsen.length) {
+        this.scene.addHandle([node.x, node.y, node.z],
+          { c45mount: true, inTube: true, nodeId: node.id, axis: achsen[0] }, "dir");
       }
     }
   }
 
   /**
-   * Welche Schraege gehoert zu einer Winkelkupplung auf diesem Arm? Es gibt
-   * mehrere; genommen wird die erste freie, moeglichst nach oben -- die
-   * uebrigen erreicht man durch Weiterdrehen.
+   * Achsenkreuz einer Kupplung in Weltkoordinaten. Eine gedrehte Kupplung (aus
+   * einer Datei oder vom Schraegbau) traegt ihre Lage in `quat`; ohne die
+   * gelten die Weltachsen.
    */
-  _c45DirFor(node, axis, belegt) {
-    const passt = DIAGONAL_DIRECTIONS.filter((d) => {
-      if (belegt && belegt.has(d.name)) return false;
-      if (this._targetBelowGround(node, d.vec)) return false;
-      const a = this._diagSleeveAxis(node, d.vec);
-      return a && a[0] === axis[0] && a[1] === axis[1] && a[2] === axis[2];
-    });
-    if (!passt.length) return null;
-    const hoch = passt.find((d) => d.vec[1] > 0.3);
-    return (hoch || passt[0]).vec;
+  _nodeFrame(node) {
+    if (node && node.quat && node.quat.length === 4) {
+      return { ex: xAxisOf(node.quat), ey: yAxisOf(node.quat), ez: zAxisOf(node.quat) };
+    }
+    return { ex: [1, 0, 0], ey: [0, 1, 0], ez: [0, 0, 1] };
+  }
+
+  /**
+   * Ankerpunkte fuer die Winkelkupplung an EINER Kupplung: je freiem Arm einer.
+   *
+   * Gerechnet wird im Achsenkreuz DER KUPPLUNG, nicht in dem der Welt: an einer
+   * gedrehten Kupplung (Ende einer Schraege) sitzen Huelse und 45-Grad-Arm
+   * ebenso gedreht. Vorher standen die Punkte waagerecht in der Weltebene, und
+   * die Kupplung landete schief.
+   *
+   * Zu jeder Schraege gehoert eine Huelsenachse (`_diagSleeveAxis`, lokal
+   * gerechnet); mehrere Schraegen teilen sich einen Arm -- angeboten wird die
+   * erste, moeglichst nach oben. Die uebrigen erreicht man durch Weiterdrehen.
+   */
+  _c45MountsFor(node) {
+    const { ex, ey, ez } = this._nodeFrame(node);
+    const nachWelt = (v) => [
+      ex[0] * v[0] + ey[0] * v[1] + ez[0] * v[2],
+      ex[1] * v[0] + ey[1] * v[1] + ez[1] * v[2],
+      ex[2] * v[0] + ey[2] * v[1] + ez[2] * v[2],
+    ];
+    const proArm = new Map();          // Huelsenachse -> { axis, dir }
+    for (const d of DIAGONAL_DIRECTIONS) {
+      const dir = nachWelt(d.vec);
+      if (this._targetBelowGround(node, dir)) continue;
+      // Schraege schon belegt? Geometrisch pruefen -- Namen aus
+      // `_occupiedDirs` gelten nur fuer die ungedrehte Kupplung.
+      if (this._armOccupied(node, dir)) continue;
+      const lokal = this._diagSleeveAxis(node, d.vec, nachWelt);
+      if (!lokal) continue;
+      const axis = nachWelt(lokal);
+      const key = lokal.join(",");
+      const vorher = proArm.get(key);
+      if (!vorher || (dir[1] > 0.3 && !(vorher.dir[1] > 0.3))) proArm.set(key, { axis, dir });
+    }
+    return [...proArm.values()];
   }
 
   /** Steckt in der Winkelkupplung schon ein Rohr? */
@@ -1514,8 +1562,10 @@ export class Builder {
     if (h && h.data && h.data.c45mount) {
       let res;
       this.recordHistory(() => {
-        res = this.model.addC45Adapter(h.data.nodeId, h.data.axis, h.data.dir,
-          C45_SLEEVE_LEN, C45_ARM_LEN);
+        res = h.data.inTube
+          ? this.model.addC45OnTube(h.data.nodeId, h.data.axis, C45_SLEEVE_LEN, C45_ARM_LEN)
+          : this.model.addC45Adapter(h.data.nodeId, h.data.axis, h.data.dir,
+            C45_SLEEVE_LEN, C45_ARM_LEN);
       });
       if (res && res.ground) this.onNotice(t("notice_ground"), "warn");
       else if (res && res.body) this.onNotice(t("notice_placed", partName(getConnector("diagonal"))));
@@ -1528,13 +1578,29 @@ export class Builder {
     // der sie steckt (Huelse und Arm gehoeren beiden) -- beides dreht sie.
     const body = node && (node.c45body ? node : this._c45BodyAt(node.id));
     if (body) {
-      // Steckt schon ein Rohr darin, bleibt sie stehen: mitzudrehen hiesse, das
-      // halbe Modell mitzuziehen -- dafuer gibt es das Drehen der Auswahl.
-      if (this._c45HasTube(body.id)) { this.onNotice(t("notice_c45_has_tube"), "warn"); return; }
+      // Steckt sie IM Rohr, dreht sich die Huelsenseite: die Dummy-Kupplung
+      // wandert um die Rohrachse, das Rohr bleibt stehen.
+      if (this._c45HasTube(body.id)) {
+        let gedreht = false;
+        this.recordHistory(() => { gedreht = this.model.rotateC45Sleeve(body.id); });
+        // Sonst bleibt sie stehen: mitzudrehen hiesse, das halbe Modell
+        // mitzuziehen -- dafuer gibt es das Drehen der Auswahl.
+        this.onNotice(gedreht ? t("notice_c45_turned") : t("notice_c45_has_tube"),
+          gedreht ? "ok" : "warn");
+        if (gedreht) this.refresh();
+        return;
+      }
       let ok = false;
       this.recordHistory(() => { ok = this.model.rotateC45(body.id); });
       this.onNotice(ok ? t("notice_c45_turned") : t("notice_c45_no_turn"), ok ? "ok" : "warn");
       this.refresh();
+      return;
+    }
+    // Klick auf eine Kupplung ohne Winkelkupplung waehlt sie: danach zeigt nur
+    // noch sie ihre Ankerpunkte (wie im Bau- und im Anbauteil-Modus). Ein Klick
+    // daneben hebt die Wahl wieder auf.
+    if ((pick && pick.data.kind === "node") || this.selectedNodeId) {
+      this._pickFittingNode(pick && pick.data.kind === "node" ? pick : null);
       return;
     }
     this.onNotice(t("notice_c45_click_arm"), "info");

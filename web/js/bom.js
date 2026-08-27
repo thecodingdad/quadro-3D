@@ -258,6 +258,19 @@ export function connectorsForNode(model, node) {
   // Anzahl/Lage zu klassifizieren lieferte hier faelschlich eine
   // "Flaechenkupplung 2-armig (90 Grad)".
   if (node.c45body) return ["diagonal"];
+  // Kupplung, an der NUR die Huelse einer Winkelkupplung steckt (Adapter-Arm,
+  // sonst nichts): Steckt die Winkelkupplung im Rohr, sitzt am anderen Ende der
+  // Huelse genau so eine Dummy-Kupplung -- ein Rohr passt dort nicht hinein.
+  // Ohne diese Regel gaelte ihr einzelner Arm als freies Rohrende und die
+  // Kupplung fehlte in der Liste.
+  {
+    let arme = 0, andere = 0;
+    for (const t of model.tubes.values()) {
+      if (t.a !== node.id && t.b !== node.id) continue;
+      if (t.arm) arme++; else if (!t.link) andere++;
+    }
+    if (arme && !andere) return ["straight"];
+  }
   if (!node.c45) {
     const t = connectorTypeForDirs(dirs);
     return t && t !== "end" ? [t] : [];
