@@ -2065,7 +2065,21 @@ export class SceneManager {
   // Snap auf reale Kupplungspositionen) wird als Adapter-Richtung zurueckgegeben.
   _diagonalDirsAt(model, node) {
     const out = [];
+    // Gemessen wird im Achsenkreuz DER KUPPLUNG, nicht in dem der Welt: an
+    // einer gedrehten Kupplung laeuft ein Rohr entlang eines ihrer eigenen
+    // Arme, auch wenn es in der Welt schraeg steht -- eine Winkelkupplung
+    // braucht es dort nicht. Ohne diese Drehung zeichnete die Szene neben eine
+    // gesetzte Winkelkupplung eine zweite, sobald an ihrer Dummy-Kupplung ein
+    // Rohr hing.
+    const gegen = this._nodeCubeQuat(model, node).clone().invert();
+    const lokal = new THREE.Vector3();
     for (const t of model.tubes.values()) {
+      // Nur echte Rohre. Die Arm-Kante zum Adapter-Koerper laeuft selbst schief
+      // (Huelse + 45-Grad-Arm) -- als Diagonale gedeutet zeichnete sie eine
+      // zweite Winkelkupplung ueber die vorhandene. Sichtbar wurde das, sobald
+      // die Huelse diagonal liegt (Winkelkupplung im Rohr): dann faellt die
+      // Kante unter die 0,90-Schwelle.
+      if (t.arm || t.link) continue;
       let other = null;
       if (t.a === node.id) other = model.nodes.get(t.b);
       else if (t.b === node.id) other = model.nodes.get(t.a);
@@ -2073,8 +2087,10 @@ export class SceneManager {
       const dx = other.x - node.x, dy = other.y - node.y, dz = other.z - node.z;
       const L = Math.hypot(dx, dy, dz) || 1;
       const d = [dx / L, dy / L, dz / L];
-      // Achsparallele Rohre (groesste Komponente >= 0.90) brauchen keinen Adapter.
-      const mx = Math.max(Math.abs(d[0]), Math.abs(d[1]), Math.abs(d[2]));
+      // Rohre entlang einer Wuerfelachse (groesste lokale Komponente >= 0.90)
+      // brauchen keinen Adapter.
+      lokal.set(d[0], d[1], d[2]).applyQuaternion(gegen);
+      const mx = Math.max(Math.abs(lokal.x), Math.abs(lokal.y), Math.abs(lokal.z));
       if (mx < 0.90) out.push(d);
     }
     return out;
@@ -2194,7 +2210,15 @@ export class SceneManager {
   // in einer Achsenebene; die Kupplung ist um 45° um die dazu senkrechte Achse
   // gedreht. Liefert diese Achse (THREE.Vector3) oder null (keine Schräge).
   _slopeRotationAxis(model, n) {
-    if (n.c45 || n.c45body) return null;
+    if (n.c45body) return null;
+    // Traegt der Knoten eine Winkelkupplung, ist die Schraege in aller Regel
+    // IHRE Sache: der Wuerfel bleibt dann kardinal, das Diagonalrohr laeuft
+    // ueber den Adapter. Nur wenn jedes Rohr am Knoten erst durch die Drehung
+    // auf eine Wuerfelachse faellt, ist die Kupplung wirklich gedreht -- so
+    // eine Dummy-Kupplung an einem schraegen Rohr, an der zusaetzlich eine
+    // Winkelkupplung steckt. Ohne die Unterscheidung stand sie unverdreht da,
+    // mit Stutzen quer zum eigenen Rohr.
+    if (n.c45 && !this._slopeFitsAllTubes(model, n)) return null;
     for (const t of model.tubes.values()) {
       if (t.arm || t.link) continue;
       const o = t.a === n.id ? model.nodes.get(t.b) : t.b === n.id ? model.nodes.get(t.a) : null;
@@ -2213,6 +2237,43 @@ export class SceneManager {
       return new THREE.Vector3(k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0);
     }
     return null;
+  }
+
+  /**
+   * Faellt JEDES Rohr am Knoten nach der 45-Grad-Drehung auf eine Wuerfelachse?
+   * Dann steht die Kupplung wirklich schraeg. Bleibt auch nur eines quer, ist
+   * sie kardinal und die Schraege gehoert einer Winkelkupplung.
+   */
+  _slopeFitsAllTubes(model, n) {
+    const rohre = [];
+    for (const t of model.tubes.values()) {
+      if (t.arm || t.link) continue;
+      const o = t.a === n.id ? model.nodes.get(t.b) : t.b === n.id ? model.nodes.get(t.a) : null;
+      if (!o) continue;
+      const v = t.bow && t.bowCenter
+        ? [o.x - t.bowCenter[0], o.y - t.bowCenter[1], o.z - t.bowCenter[2]]
+        : [o.x - n.x, o.y - n.y, o.z - n.z];
+      const L = Math.hypot(v[0], v[1], v[2]) || 1;
+      rohre.push([v[0] / L, v[1] / L, v[2] / L]);
+    }
+    if (!rohre.length) return false;
+    // Achse aus dem ersten schraegen Rohr -- dieselbe Regel wie unten.
+    let achse = null;
+    for (const u of rohre) {
+      if (Math.max(Math.abs(u[0]), Math.abs(u[1]), Math.abs(u[2])) >= 0.99) continue;
+      const act = [0, 1, 2].filter((a) => Math.abs(u[a]) > 0.3);
+      if (act.length !== 2) continue;
+      const k = [0, 1, 2].find((a) => !act.includes(a));
+      achse = new THREE.Vector3(k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0);
+      break;
+    }
+    if (!achse) return false;
+    const gegen = new THREE.Quaternion().setFromAxisAngle(achse, Math.PI / 4).invert();
+    const v = new THREE.Vector3();
+    return rohre.every((u) => {
+      v.set(u[0], u[1], u[2]).applyQuaternion(gegen);
+      return Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)) >= 0.99;
+    });
   }
 
   _tubeMaterial(colorId) {
@@ -2886,13 +2947,22 @@ export class SceneManager {
         pushDir(t.b, na.x - cx, na.y - cy, na.z - cz, true);
       } else if (t.arm) {
         // Kante zum Adapter-Koerper der Winkelkupplung: ihre Huelse steckt auf
-        // einem KARDINALEN Stutzen, der Koerper sitzt aber um den 45-Grad-Arm
-        // versetzt -- gemessen laeuft die Kante ~17 Grad schief. Der Stutzen der
-        // Basiskupplung gehoert trotzdem gerade auf die Achse.
+        // einem Stutzen, der Koerper sitzt aber um den 45-Grad-Arm versetzt --
+        // gemessen laeuft die Kante ~17 Grad schief. Der Stutzen gehoert
+        // trotzdem genau auf die Huelsenachse.
+        //
+        // Die steht am Adapter-Koerper (`c45axis`) und zeigt von der Kupplung
+        // weg. Nur wenn sie fehlt (alte Staende), wird auf die naechste ACHSE
+        // gerundet -- diagonal liegende Huelsen (Winkelkupplung im Rohr) zog das
+        // sonst auf eine Weltachse, und die Kupplung stand voellig verdreht da.
         const q = (d) => { const m = [Math.abs(d[0]), Math.abs(d[1]), Math.abs(d[2])];
           const ax = m.indexOf(Math.max(m[0], m[1], m[2]));
           const o = [0, 0, 0]; o[ax] = Math.sign(d[ax]) || 1; return o; };
-        const ab = q([nb.x - na.x, nb.y - na.y, nb.z - na.z]);
+        const koerper = na.c45body ? na : nb.c45body ? nb : null;
+        const achse = koerper && koerper.c45axis;
+        const ab = achse
+          ? (koerper === nb ? achse.slice() : [-achse[0], -achse[1], -achse[2]])
+          : q([nb.x - na.x, nb.y - na.y, nb.z - na.z]);
         pushDir(t.a, ab[0], ab[1], ab[2], false);
         pushDir(t.b, -ab[0], -ab[1], -ab[2], false);
       } else {
@@ -3923,13 +3993,15 @@ export class SceneManager {
     this.handleMeshes = [];
   }
 
-  addHandle(position, userData, kind = "dir") {
+  // `radius` waechst nur dort, wo ein Punkt schwerer zu treffen ist -- etwa der
+  // Punkt MITTEN auf einer Kupplung (Winkelkupplung direkt ins Rohr).
+  addHandle(position, userData, kind = "dir", radius = 2.4) {
     this._needsRender = true;
     const isOrigin = kind === "origin";
     const isDiag = kind === "diag";
     const geo = isOrigin
       ? new THREE.BoxGeometry(geometry().connectorSize, geometry().connectorSize, geometry().connectorSize)
-      : new THREE.SphereGeometry(2.4, 16, 12);
+      : new THREE.SphereGeometry(radius, 16, 12);
     const mat = this._handleMaterial(kind);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(position[0], position[1], position[2]);

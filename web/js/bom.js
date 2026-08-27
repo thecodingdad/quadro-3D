@@ -1,7 +1,7 @@
 // Stueckliste (BOM) + Kupplungstyp-Heuristik + Bestands-/Machbarkeitscheck.
 
 import { getTube, getConnector, getPanel, colorName, partName, reinforcementPart, partForFitting, getPartById, getScrew, poolLinerFor, geometry } from "./catalog.js";
-import { round2, xAxisOf } from "./util.js";
+import { round2, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
 import { POOL_KINDS, isHolePart, isBoltPart, BOLT_PART, HINGE_PART } from "./model.js";
 
 // Einheitsvektoren der Nachbarn eines Knotens. Doppelrohr-Verbindungen (link)
@@ -35,11 +35,19 @@ function neighborDirs(model, node) {
     if (!nb) continue;
     const dx = nb.x - node.x, dy = nb.y - node.y, dz = nb.z - node.z;
     const len = Math.hypot(dx, dy, dz) || 1;
-    // Die Huelse der Winkelkupplung steckt auf einem KARDINALEN Stutzen; ihr
-    // Koerper sitzt zusaetzlich um den 45-Grad-Arm versetzt, die Kante dorthin
-    // laeuft deshalb ~17 Grad schief. Ungerundet gaelte die Basiskupplung als
-    // Raumkupplung statt als flache -- also auf die Achse runden.
-    dirs.push(t.arm ? cardinalOf(dx, dy, dz) : [dx / len, dy / len, dz / len]);
+    // Die Huelse der Winkelkupplung steckt auf einem Stutzen; ihr Koerper sitzt
+    // zusaetzlich um den 45-Grad-Arm versetzt, die Kante dorthin laeuft deshalb
+    // ~17 Grad schief. Ungerundet gaelte die Basiskupplung als Raumkupplung
+    // statt als flache. Die genaue Richtung steht am Adapter-Koerper
+    // (`c45axis`) -- nur ohne sie wird auf die naechste Achse gerundet, sonst
+    // zoege eine diagonale Huelse (Winkelkupplung im Rohr) auf eine Weltachse.
+    if (t.arm) {
+      const achse = nb.c45body && nb.c45axis ? nb.c45axis
+        : (node.c45body && node.c45axis ? node.c45axis.map((v) => -v) : null);
+      dirs.push(achse ? achse.slice() : cardinalOf(dx, dy, dz));
+    } else {
+      dirs.push([dx / len, dy / len, dz / len]);
+    }
   }
   for (const f of (model.fittings ? model.fittings.values() : [])) {
     if (!ARM_FITTINGS.has(f.kind) || !f.quat) continue;
@@ -69,6 +77,68 @@ function neighborDirs(model, node) {
     if (!dirs.some((e) => e[0] * d[0] + e[1] * d[1] + e[2] * d[2] > 0.9)) dirs.push(d);
   }
   return dirs;
+}
+
+/**
+ * Richtungen ins Achsenkreuz DER KUPPLUNG drehen.
+ *
+ * `isC45Dir` und `isAxisDir` messen gegen die Weltachsen -- an einer gedrehten
+ * Kupplung (aus einer Datei oder an einer Winkelkupplung) laeuft ein Rohr aber
+ * entlang eines ihrer EIGENEN Arme, auch wenn es in der Welt schraeg steht.
+ * Ungedreht zaehlte die Heuristik dort lauter 45-Grad-Schraegen und legte je
+ * eine Winkelkupplung dazu. Ohne gespeicherte Lage bleibt es bei den
+ * Weltachsen.
+ */
+function localDirs(model, node, dirs) {
+  const achsen = frameOf(model, node);
+  if (!achsen) return dirs;
+  const [ex, ey, ez] = achsen;
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  return dirs.map((d) => [dot(d, ex), dot(d, ey), dot(d, ez)]);
+}
+
+/**
+ * Achsenkreuz einer Kupplung, oder null fuer die Weltachsen.
+ *
+ * Erste Wahl ist die gespeicherte Lage (`quat`). Eine im Editor gebaute
+ * Schraeg-Kupplung hat keine: ihre Drehung steckt allein darin, dass ein
+ * 45-Grad-Rohr an ihr haengt. Genommen wird sie nur, wenn danach JEDES Rohr des
+ * Knotens auf einer Wuerfelachse liegt -- sonst gehoert die Schraege einer
+ * Winkelkupplung und der Wuerfel steht kardinal (siehe `_slopeRotationAxis` in
+ * scene.js, dieselbe Regel).
+ */
+function frameOf(model, node) {
+  if (node.quat && node.quat.length === 4) {
+    return [xAxisOf(node.quat), yAxisOf(node.quat), zAxisOf(node.quat)];
+  }
+  const rohre = [];
+  for (const t of model.tubes.values()) {
+    if (t.arm || t.link) continue;
+    const o = t.a === node.id ? model.nodes.get(t.b) : t.b === node.id ? model.nodes.get(t.a) : null;
+    if (!o) continue;
+    const v = [o.x - node.x, o.y - node.y, o.z - node.z];
+    const L = Math.hypot(v[0], v[1], v[2]) || 1;
+    rohre.push([v[0] / L, v[1] / L, v[2] / L]);
+  }
+  let k = -1;
+  for (const u of rohre) {
+    if (Math.max(Math.abs(u[0]), Math.abs(u[1]), Math.abs(u[2])) >= 0.99) continue;
+    const act = [0, 1, 2].filter((a) => Math.abs(u[a]) > 0.3);
+    if (act.length !== 2) continue;
+    k = [0, 1, 2].find((a) => !act.includes(a));
+    break;
+  }
+  if (k < 0) return null;
+  const [i, j] = [0, 1, 2].filter((a) => a !== k);
+  const S = Math.SQRT1_2;
+  const e = (a, b, va, vb) => { const v = [0, 0, 0]; v[a] = va; v[b] = vb; return v; };
+  const ex = e(i, j, S, S), ey = e(i, j, -S, S), ez = e(k, k, 1, 1);
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const passt = rohre.every((u) => {
+    const l = [dot(u, ex), dot(u, ey), dot(u, ez)];
+    return Math.max(Math.abs(l[0]), Math.abs(l[1]), Math.abs(l[2])) >= 0.99;
+  });
+  return passt ? [ex, ey, ez] : null;
 }
 
 /**
@@ -191,7 +261,9 @@ export function infeasibleConnectors(model) {
     // Bolzen selbst und die Scharniere -- und die stehen frei in 45-Grad-
     // Schritten. An einer Kupplung gemessen waere das nie herstellbar.
     if (isBoltPart(n.part)) continue;
-    if (armsFeasible(dirsAt.get(n.id) || [])) bad.add(n.id);
+    // Im Achsenkreuz der Kupplung messen: eine gedrehte Kupplung haelt ihre
+    // Rohre auf ihren eigenen Achsen, in der Welt stehen sie schraeg.
+    if (armsFeasible(localDirs(model, n, dirsAt.get(n.id) || []))) bad.add(n.id);
   }
   return bad;
 }
@@ -276,7 +348,7 @@ export function connectorsForNode(model, node) {
     return t && t !== "end" ? [t] : [];
   }
   const axis = [], diag = [];
-  for (const d of dirs) (isC45Dir(d) ? diag : axis).push(d);
+  for (const d of localDirs(model, node, dirs)) (isC45Dir(d) ? diag : axis).push(d);
   const out = [];
   const baseType = connectorTypeForDirs(axis);
   if (baseType && baseType !== "end") out.push(baseType);

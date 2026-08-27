@@ -776,7 +776,16 @@ export class Builder {
           if (teil) this.model.removeHinge(teil.nodeId, teil.index);
         }
       }
-      for (const [id, kind] of entries) if (kind === "node") this.model.removeNode(id);
+      for (const [id, kind] of entries) {
+        if (kind !== "node") continue;
+        // Eine Winkelkupplung haelt zwei Enden zusammen, die fuer sich
+        // weiterbestehen: sie kommt heraus, die Rohre bleiben und tragen
+        // wieder Dummy-Kupplungen (`removeC45`). Erst danach die gewoehnliche
+        // Loeschung, die auch die Rohre mitnimmt.
+        const n = this.model.nodes.get(id);
+        if (n && n.c45body && this.model.removeC45(id)) continue;
+        this.model.removeNode(id);
+      }
       for (const [id] of entries) nachbarn.delete(id);
       this.model.removeEmptyNodes(nachbarn);
     });
@@ -960,27 +969,6 @@ export class Builder {
     return Math.abs(f[0]) >= Math.abs(f[2])
       ? [Math.sign(f[0]) || 1, 0, 0]
       : [0, 0, Math.sign(f[2]) || -1];
-  }
-
-  // Kardinaler Huelsen-Arm fuer eine 45-Grad-Diagonale. Gueltig (45°-Innenwinkel
-  // zur Diagonale) sind die NEGIERTEN Komponenten von d: Diagonale rechts-unten
-  // (+X-Y) -> linker Arm (-X) ODER oberer Arm (+Y). Bevorzugt die Waagerechte
-  // (Gregors Regel), nimmt aber nur einen FREIEN Arm -- sonst kollidiert die
-  // Huelse mit einem vorhandenen Rohr. Liefert null, wenn kein gueltiger Arm
-  // frei ist (dann darf hier keine Winkelkupplung gesetzt werden).
-  //
-  // `d` und das Ergebnis liegen im selben Achsenkreuz. `nachWelt` uebersetzt es
-  // fuer die Belegungspruefung in Weltkoordinaten -- an einer gedrehten
-  // Kupplung wird also in IHREM Kreuz gerechnet und nur zum Vergleich mit den
-  // Rohren gedreht. Ohne die Umrechnung gilt die Weltrichtung (ungedrehte
-  // Kupplung).
-  _diagSleeveAxis(node, d, nachWelt = null) {
-    const cands = [];
-    if (Math.abs(d[0]) > 0.3) cands.push([-Math.sign(d[0]), 0, 0]); // negierte Waagerechte X
-    if (Math.abs(d[2]) > 0.3) cands.push([0, 0, -Math.sign(d[2])]); // negierte Waagerechte Z
-    if (Math.abs(d[1]) > 0.3) cands.push([0, -Math.sign(d[1]), 0]); // negierte Senkrechte Y
-    for (const c of cands) if (!this._armOccupied(node, nachWelt ? nachWelt(c) : c)) return c;
-    return null;
   }
 
   // Steckt am Knoten schon etwas in Arm-Richtung `axis`? Zaehlt echte Rohre UND
@@ -1482,8 +1470,12 @@ export class Builder {
       // anderen Ende der Huelse entsteht eine neue Dummy-Kupplung.
       const achsen = this.model.c45SleeveAxes(this.model.c45TubeDir(node));
       if (achsen.length) {
+        // Er sitzt MITTEN auf der Dummy-Kupplung und ist etwas groesser: die
+        // Punkte weiter aussen setzen die Winkelkupplung auf einen Stutzen,
+        // dieser eine steckt sie ins Rohr. Auf der Rohrachse weiter aussen
+        // waere er nicht zu unterscheiden -- dort sitzt schon der Stutzen-Punkt.
         this.scene.addHandle([node.x, node.y, node.z],
-          { c45mount: true, inTube: true, nodeId: node.id, axis: achsen[0] }, "dir");
+          { c45mount: true, inTube: true, nodeId: node.id, axis: achsen[0] }, "dir", 3.6);
       }
     }
   }
@@ -1497,7 +1489,42 @@ export class Builder {
     if (node && node.quat && node.quat.length === 4) {
       return { ex: xAxisOf(node.quat), ey: yAxisOf(node.quat), ez: zAxisOf(node.quat) };
     }
-    return { ex: [1, 0, 0], ey: [0, 1, 0], ez: [0, 0, 1] };
+    // Ohne gespeicherte Lage: aus den Arm-Richtungen. Eine im Editor gebaute
+    // Schraeg-Kupplung traegt kein `quat` -- ihre Drehung steckt allein darin,
+    // dass ein 45-Grad-Rohr an ihr haengt (`_slopeArmDirs`, dieselbe Quelle wie
+    // im Bau-Modus). Ohne diesen Rueckfall boete der Winkelkupplungs-Modus dort
+    // die Weltachsen an, waehrend der Bau-Modus daneben die gedrehten zeigt.
+    const dirs = (node && node.armDirs && node.armDirs.length)
+      ? node.armDirs
+      : (node && this._hasDiagonalTube(node) ? this._slopeArmDirs(node) : null);
+    const frame = dirs && this._frameFromDirs(dirs.map((d) => d.vec || d));
+    return frame || { ex: [1, 0, 0], ey: [0, 1, 0], ez: [0, 0, 1] };
+  }
+
+  /**
+   * Rechtshaendiges Achsenkreuz aus einer Liste von Arm-Richtungen: die erste
+   * ist +X, dazu die erste dazu senkrechte als +Y, +Z ergibt sich. Liefert
+   * null, wenn keine zwei senkrechten dabei sind.
+   */
+  _frameFromDirs(list) {
+    const norm = (v) => {
+      const L = Math.hypot(v[0], v[1], v[2]) || 1;
+      return [v[0] / L, v[1] / L, v[2] / L];
+    };
+    for (const a of list) {
+      const ex = norm(a);
+      for (const b of list) {
+        const ey = norm(b);
+        if (Math.abs(ex[0] * ey[0] + ex[1] * ey[1] + ex[2] * ey[2]) > 0.01) continue;
+        const ez = [
+          ex[1] * ey[2] - ex[2] * ey[1],
+          ex[2] * ey[0] - ex[0] * ey[2],
+          ex[0] * ey[1] - ex[1] * ey[0],
+        ];
+        return { ex, ey, ez };
+      }
+    }
+    return null;
   }
 
   /**
@@ -1508,9 +1535,10 @@ export class Builder {
    * ebenso gedreht. Vorher standen die Punkte waagerecht in der Weltebene, und
    * die Kupplung landete schief.
    *
-   * Zu jeder Schraege gehoert eine Huelsenachse (`_diagSleeveAxis`, lokal
-   * gerechnet); mehrere Schraegen teilen sich einen Arm -- angeboten wird die
-   * erste, moeglichst nach oben. Die uebrigen erreicht man durch Weiterdrehen.
+   * Angeboten wird JEDER freie Arm -- auch der in der Rohrachse, aus der
+   * Dummy-Kupplung wird dann eine gerade Kupplung. Welche der vier Schraegen
+   * ein Arm bekommt, entscheidet die erste freie, moeglichst nach oben; die
+   * uebrigen erreicht man durch Weiterdrehen.
    */
   _c45MountsFor(node) {
     const { ex, ey, ez } = this._nodeFrame(node);
@@ -1519,21 +1547,26 @@ export class Builder {
       ex[1] * v[0] + ey[1] * v[1] + ez[1] * v[2],
       ex[2] * v[0] + ey[2] * v[1] + ez[2] * v[2],
     ];
-    const proArm = new Map();          // Huelsenachse -> { axis, dir }
-    for (const d of DIAGONAL_DIRECTIONS) {
-      const dir = nachWelt(d.vec);
-      if (this._targetBelowGround(node, dir)) continue;
-      // Schraege schon belegt? Geometrisch pruefen -- Namen aus
-      // `_occupiedDirs` gelten nur fuer die ungedrehte Kupplung.
-      if (this._armOccupied(node, dir)) continue;
-      const lokal = this._diagSleeveAxis(node, d.vec, nachWelt);
-      if (!lokal) continue;
-      const axis = nachWelt(lokal);
-      const key = lokal.join(",");
-      const vorher = proArm.get(key);
-      if (!vorher || (dir[1] > 0.3 && !(vorher.dir[1] > 0.3))) proArm.set(key, { axis, dir });
+    const out = [];
+    for (const a of DIRECTIONS) {
+      const axis = nachWelt(a.vec);
+      if (this._armOccupied(node, axis)) continue;
+      let beste = null;
+      for (const d of DIAGONAL_DIRECTIONS) {
+        // Die Schraege steht im 45-Grad-Innenwinkel zur Huelse: sie knickt
+        // zurueck ueber die Kupplung (Skalarprodukt -0,707).
+        const punkt = d.vec[0] * a.vec[0] + d.vec[1] * a.vec[1] + d.vec[2] * a.vec[2];
+        if (Math.abs(punkt + Math.SQRT1_2) > 0.05) continue;
+        const dir = nachWelt(d.vec);
+        if (this._targetBelowGround(node, dir)) continue;
+        // Schraege schon belegt? Geometrisch pruefen -- Namen aus
+        // `_occupiedDirs` gelten nur fuer die ungedrehte Kupplung.
+        if (this._armOccupied(node, dir)) continue;
+        if (!beste || (dir[1] > 0.3 && !(beste.dir[1] > 0.3))) beste = { axis, dir };
+      }
+      if (beste) out.push(beste);
     }
-    return [...proArm.values()];
+    return out;
   }
 
   /** Steckt in der Winkelkupplung schon ein Rohr? */

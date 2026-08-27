@@ -3534,6 +3534,43 @@ export class BuildModel {
     return true;
   }
 
+  /**
+   * Winkelkupplung entfernen -- OHNE die Rohre mitzunehmen.
+   *
+   * Anders als eine gewoehnliche Kupplung haelt sie zwei Enden zusammen, die
+   * fuer sich weiterbestehen: der Adapter-Koerper wird wieder zur
+   * Dummy-Kupplung am Rohrende, die Kupplung an der Huelse bleibt stehen. Weg
+   * kommen nur die Huelse (Arm-Kante) und das Kennzeichen. Was danach gar
+   * nichts mehr haelt, faellt weg.
+   */
+  removeC45(bodyId) {
+    const body = this.nodes.get(bodyId);
+    if (!body || !body.c45body) return false;
+    let baseId = null;
+    for (const t of [...this.tubes.values()]) {
+      if (!t.arm) continue;
+      const other = t.a === bodyId ? t.b : t.b === bodyId ? t.a : null;
+      if (!other) continue;
+      baseId = other;
+      this.tubes.delete(t.id);
+    }
+    body.c45 = false;
+    body.c45body = false;
+    body.c45axis = null;
+    body.c45quat = null;
+    body.c45file = false;
+    body.ownConnector = false;
+    if (baseId) this._syncC45Flag(baseId);
+    // Knoten, die nun nichts mehr halten, verschwinden -- ein Wuerfel ohne
+    // Rohr steht sonst allein in der Luft.
+    for (const id of [bodyId, baseId]) {
+      if (!id) continue;
+      const n = this.nodes.get(id);
+      if (n && this.degree(id) === 0) this.nodes.delete(id);
+    }
+    return true;
+  }
+
   /** Richtung des Rohrs, das im Adapter-Koerper steckt (vom Koerper weg). */
   _c45BodyTubeDir(bodyId) {
     const body = this.nodes.get(bodyId);

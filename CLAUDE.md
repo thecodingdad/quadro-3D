@@ -353,20 +353,30 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   Punkt an (**grün**, wie die übrigen Bau-Punkte), `model.addC45Adapter()` setzt Hülse +
   Adapterkörper (ohne Rohr), ein weiterer Klick auf die gesetzte Kupplung dreht sie über
   `model.rotateC45()` um 90° um ihre Hülsenachse – aber nur, **solange kein Rohr daran steckt**.
-  Welche Schräge zu einem Arm gehört, rechnet `_diagSleeveAxis()` wie eh und je aus; der 45°-Arm
-  knickt dabei **zurück** über die Kupplung (Achsanteil entgegen der Hülse) – wer das verwechselt,
-  zeichnet sie gespiegelt. Das Rohr kommt danach im Bau-Modus an den Adapterkörper – der bietet genau
+  Angeboten wird **jeder freie Arm**, die Schräge dazu ist die erste freie, möglichst nach oben;
+  der 45°-Arm knickt **zurück** über die Kupplung (Achsanteil entgegen der Hülse) – wer das
+  verwechselt, zeichnet sie gespiegelt. Das Rohr kommt danach im Bau-Modus an den Adapterkörper – der bietet genau
   seine eigene Schräge an (`_c45ArmDir`). Einen Schalter „Schräg" gibt es nicht mehr.
-  Drei Dinge kommen hinzu:
-  - **Die Punkte liegen im Achsenkreuz der Kupplung, nicht in dem der Welt.** `_c45MountsFor()`
-    dreht die Diagonalen mit `_nodeFrame()` (aus `node.quat`, sonst Weltachsen) und rechnet auch
-    `_diagSleeveAxis()` lokal; die Belegung prüft `_armOccupied()` geometrisch statt über die
-    Namen aus `_occupiedDirs()` (die gelten nur ungedreht). Vorher standen die Punkte an einer
-    gedrehten Kupplung waagerecht in der Weltebene und die Winkelkupplung landete schief.
+  Vier Dinge kommen hinzu:
+  - **Alles rechnet im Achsenkreuz der Kupplung, nicht in dem der Welt.** `_c45MountsFor()` dreht
+    die Diagonalen mit `_nodeFrame()`; die Lage kommt aus `node.quat`, sonst aus `armDirs` bzw.
+    – für eine im Editor gebaute Schrägkupplung ohne gespeicherte Lage – aus `_slopeArmDirs()`.
+    Die Belegung prüft `_armOccupied()` geometrisch statt über die Namen aus `_occupiedDirs()`
+    (die gelten nur ungedreht). Dieselbe Drehung brauchen **Zeichnung und Stückliste**:
+    `_diagonalDirsAt()` und `_slopeRotationAxis()` in `scene.js` sowie `frameOf()`/`localDirs()`
+    in `bom.js`. Sonst gilt ein Rohr, das entlang eines EIGENEN Arms der gedrehten Kupplung
+    läuft, als 45°-Schräge – die Szene zeichnete dann eine zweite Winkelkupplung daneben und die
+    Liste zählte sie mit. Die Drehung eines Schräg-Würfels gilt nur, wenn danach **jedes** Rohr
+    des Knotens auf einer Würfelachse liegt (`_slopeFitsAllTubes`); bleibt eines quer, gehört die
+    Schräge der Winkelkupplung und der Würfel steht kardinal.
   - **Ein Klick auf eine Kupplung wählt sie** (`_pickFittingNode` aus dem Anbauteil-Modus):
     danach zeigt nur noch sie ihre Punkte, ein Klick daneben hebt es auf – wie im Bau-Modus.
   - **Sie passt auch direkt ins Rohr.** An einer **Dummy-Kupplung** (ein Rohr, sonst nichts)
-    sitzt der Punkt **mittig**; `model.addC45OnTube()` macht diesen Knoten zum Adapterkörper –
+    sitzt ein **größerer** Punkt (Radius 3,6 statt 2,4) **mittig auf der Kupplung** – die Punkte
+    weiter außen setzen sie dagegen immer auf einen Stutzen. Auf der Rohrachse weiter draußen
+    wäre er nicht zu unterscheiden, dort sitzt schon der Stutzen-Punkt (aus der Dummy-Kupplung
+    wird damit eine gerade Kupplung).
+    `model.addC45OnTube()` macht diesen Knoten zum Adapterkörper –
     ihr 45°-Fortsatz steckt im Rohr – und legt am anderen Ende der Hülse eine **neue
     Dummy-Kupplung** an (dort passt nur ein Kupplungs-Stutzen hinein, kein Rohr). Die neue
     Kupplung ist um die Hülsenachse gedreht (`quat`), damit an ihr alles Weitere gesetzt werden
@@ -380,6 +390,11 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     deutete dagegen 150 gerade Rohrenden um. Die Hülsenachse wird deshalb auf die nächste
     **benannte** Richtung gerundet (`nearestNamedDir`, kardinal ODER 45°) – kardinal gerundet
     stünde der Adapter beim nächsten Laden schief.
+  - **Löschen nimmt die Rohre NICHT mit.** Anders als eine gewöhnliche Kupplung hält die
+    Winkelkupplung zwei Enden zusammen, die für sich weiterbestehen: `model.removeC45()` wirft nur
+    die Hülse (Arm-Kante) und die Kennzeichen weg, beide Enden sind danach wieder
+    Dummy-Kupplungen; nur ein Knoten, der dann gar nichts mehr hält, verschwindet.
+    `deleteSelection()` ruft das vor der gewöhnlichen Knoten-Löschung auf.
 - **Neue Bau-Richtung/Logik:** `config.js` + `builder.js` (+ ggf. `scene.js`).
 - **Tastatur:** zentral in `ui.js` (`keydown`). Pfeiltasten sind kamera-relativ über
   `scene.getHorizontalAxes()`. **Strg/Cmd+W ist nicht abfangbar** – Browser schließen damit ihren
