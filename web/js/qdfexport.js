@@ -298,9 +298,55 @@ export function reinforcementProfiles(model) {
   return out;
 }
 
-export function buildQDF(model) {
+/**
+ * Die gespeicherte Ansicht (`camera2`, docs/QDF-FORMAT.md §5.7) aus unserer
+ * Kamera. Ohne Ansicht bleibt die Zeile weg und die Herstellersoftware nimmt
+ * ihre eigene Vorgabe.
+ *
+ * Die Software dreht nicht die Kamera, sondern das MODELL: in allen
+ * Herstellerdateien steht der Blickwinkel in Feld 8 (Modell-Drehwinkel),
+ * waehrend die Kamera-Winkel 0 bleiben. Abstand und Hoehe sind die der Kamera,
+ * beides in cm.
+ *
+ * Die drei abgeleiteten Groessen sind am Bestand nachgerechnet: eine Datei mit
+ * 40 Grad Oeffnung fuehrt 33 mm Brennweite (12 / tan 20 Grad = 32,97), 146 cm
+ * senkrechte Bildhoehe bei 200 cm Abstand (2 * 200 * tan 20 = 145,6) und
+ * waagerecht das Seitenverhaeltnis mal diesen Wert.
+ *
+ * Geschrieben werden VIER gleiche Zeilen -- so viele legt die Software in einem
+ * frischen Dokument an (eine je Ansicht), und der Dialog bearbeitet die erste.
+ */
+function cameraLines(cam) {
+  if (!cam || !Array.isArray(cam.pos) || !Array.isArray(cam.target)) return [];
+  const v = [cam.pos[0] - cam.target[0], cam.pos[1] - cam.target[1], cam.pos[2] - cam.target[2]];
+  const abstand = Math.round(Math.hypot(v[0], v[2]));
+  const hoehe = Math.round(v[1]);
+  // Blickrichtung als Drehwinkel des Modells, 0 bis 359 Grad.
+  const grad = Math.round((Math.atan2(v[0], v[2]) * 180) / Math.PI);
+  const drehung = ((-grad % 360) + 360) % 360;
+  const fovV = cam.fov || 45;
+  const halb = Math.tan((fovV / 2) * (Math.PI / 180));
+  const seiten = cam.aspect || 1;
+  const fovH = Math.round((2 * Math.atan(seiten * halb) * 180) / Math.PI);
+  const brennweite = Math.round(12 / halb);
+  const bildH = Math.round(2 * abstand * halb);
+  const bildB = Math.round(bildH * seiten);
+  const zeile = [
+    abstand, hoehe, 0, 0, 0,           // Kamera: Abstand, Hoehe, Links/Rechts, Dreh-, Kippwinkel
+    0, 0, 0, drehung, 0,               // Modell: dasselbe -- nur der Drehwinkel traegt den Blick
+    55, 0,                             // Augenhoehe (55 cm in jeder Herstellerdatei), Breite
+    bildH, bildB, Math.round(fovV), fovH, brennweite,
+    3000, 10, 10,                      // in jeder Zeile des Bestands gleich
+    seiten.toFixed(6), fovV.toFixed(6),
+    0,                                 // Format: Bildschirm
+    "1.000000", "1.000000",            // eigenes Seitenverhaeltnis (nur bei Format 6)
+  ].join(", ");
+  return [`camera2{${zeile}}`, `camera2{${zeile}}`, `camera2{${zeile}}`, `camera2{${zeile}}`];
+}
+
+export function buildQDF(model, opts = {}) {
   const conn = geometry().connectorSize;
-  const lines = ["0, 0;", ...MATERIALS];
+  const lines = ["0, 0;", ...MATERIALS, ...cameraLines(opts.camera)];
   const stats = { connectors: 0, tubes: 0, bows: 0, panels: 0, textiles: 0, clamps: 0, slides: 0, alu: 0, fittings: 0 };
   // Das Lager fuehrt eine feste Laenge (50 mm in allen Herstellerdateien).
   const cs50 = 5;
@@ -697,7 +743,11 @@ export function buildQDF(model) {
     const q = s.quat && s.quat.length === 4
       ? encodeQuat([s.quat[3], s.quat[0], s.quat[1], s.quat[2]])
       : IDENTITY;
-    lines.push(`${s.kind || "slide-new2"}{${tubeMat(s.color)}, ${tuple(q, s.x, s.y, s.z)}, 1, 0}`);
+    // Feld 2 ist die Positionsanpassung (docs/QDF-FORMAT.md §3.6): 1 = frei,
+    // 0 = fixiert. Daecher haengt man von Hand ein, und die Herstellersoftware
+    // schreibt sie in 41 von 42 Zeilen fixiert -- Rutschen dagegen frei.
+    const frei = (s.kind === "roof2" || s.kind === "roof-large2") ? 0 : 1;
+    lines.push(`${s.kind || "slide-new2"}{${tubeMat(s.color)}, ${tuple(q, s.x, s.y, s.z)}, ${frei}, 0}`);
     stats.slides++;
     // Fussrohr: Unter jeder Rutsche liegt in den Herstellerdateien ein 35er
     // Rohr, mittig auf dem Rutschenpunkt. Es gehoert zum Rutschenbauteil --

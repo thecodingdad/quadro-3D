@@ -1658,7 +1658,9 @@ export function initUI({ scene, model, builder }) {
   function exportiereModell(name, daten) {
     const m2 = new (model.constructor)();
     m2.loadJSON(daten);
-    const { text, stats } = buildQDF(m2);
+    // Die aktuelle Ansicht kommt als `camera2` mit: die Herstellersoftware
+    // oeffnet das Modell dann mit unserem Blickwinkel statt mit ihrer Vorgabe.
+    const { text, stats } = buildQDF(m2, { camera: scene.cameraForQdf() });
     storage.exportText(text, `${dateiName(name)}.qdf`);
     const parts = `${stats.connectors} + ${stats.tubes + stats.bows} + ${stats.panels}`;
     flash(t("flash_exported_qdf", parts));
@@ -1714,7 +1716,7 @@ export function initUI({ scene, model, builder }) {
     const texte = alle.map((d) => {
       const m2 = new (model.constructor)();
       m2.loadJSON(d.data);
-      return { name: dateiName(d.name), text: buildQDF(m2).text };
+      return { name: dateiName(d.name), text: buildQDF(m2, { camera: scene.cameraForQdf() }).text };
     });
 
     if (window.showDirectoryPicker) {

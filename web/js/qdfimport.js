@@ -55,23 +55,21 @@ function nearestNamedDir(v) {
 // Anbauteile: QDF-Elementart -> wie sie zu lesen ist.
 //   sized      = bringt Kantenmasse mit (rest[3]/rest[5], wie panel2)
 //   masked     = fuehrt eine Arm-Maske (rest[4], wie connector3)
-//   renderBase = Feldzahl ohne renderRange; damit fallen die Alternativ-Pass-
-//                Duplikate weg (siehe hasRenderRange)
 const FITTING_KINDS = {
-  "bearing2":        { renderBase: 6 },   // Lagerkupplung, traegt die Radachse
-  "multi-wheel2":    { renderBase: 4 },   // Speichenrad
-  "floating-wheel2": { renderBase: 4 },   // schwarzes Laufrad
-  "hub-cap2":        { renderBase: 4 },   // Nabenkappe
-  "casters2":        { renderBase: 4 },   // Laufrolle
-  "steering-lock2":  { renderBase: 4 },   // Lenkarretierung
-  "adapter2":        { renderBase: 4 },
-  "textil-round2":   { renderBase: 5 },   // gebogene Wand (Viertelzylinder)
-  "roof-large2":     { renderBase: 4 },   // grosses Dach
-  "lattice2":        { renderBase: 8, sized: true },  // Netz
-  "bag2":            { renderBase: 4 },   // Spielsack
+  "bearing2":        {},                  // Lagerkupplung, traegt die Radachse
+  "multi-wheel2":    {},                  // Speichenrad
+  "floating-wheel2": {},                  // schwarzes Laufrad
+  "hub-cap2":        {},                  // Nabenkappe
+  "casters2":        {},                  // Laufrolle
+  "steering-lock2":  {},                  // Lenkarretierung
+  "adapter2":        {},
+  "textil-round2":   {},                  // gebogene Wand (Viertelzylinder)
+  "roof-large2":     {},                  // grosses Dach
+  "lattice2":        { sized: true },     // Netz
+  "bag2":            {},                  // Spielsack
   // Offenes Verbinderende: Huelse auf einem Stutzen der Kupplung. Sie erzwingt
   // diesen Stutzen -- ohne Rohr zeichnet und rechnet ihn sonst niemand.
-  "open-connector2": { renderBase: 4 },
+  "open-connector2": {},
   // Kupplungen, die wir (noch) nicht setzen koennen und auch nicht zeichnen --
   // gelesen, benannt und beim Speichern unveraendert zurueckgeschrieben werden
   // sie trotzdem. `keepRest` haelt dafuer die Felder hinter der Lage fest.
@@ -208,8 +206,40 @@ function padOf(rest, i) {
 //   panel2/textil2
 //   /display2      = 8  [id,∅,flag,w,_,h,_,0]
 // rest[base] ist dann renderRangeStart.
-function hasRenderRange(rest, base) {
-  return rest.length > base && typeof rest[base] === "number";
+/**
+ * Feldzahl einer LEBENDEN Zeile je Elementart (docs/QDF-FORMAT.md §5).
+ *
+ * Jede Teile-Zeile endet mit dem Schritt, in dem das Teil entstand; eine
+ * zweite Zahl dahinter ist der Schritt, in dem es wieder verschwand (§3.5).
+ * Eine Zeile mit dieser zweiten Zahl beschreibt also ein geloeschtes Teil und
+ * gehoert uebersprungen -- die Herstellersoftware zeichnet sie ebenfalls nicht.
+ * Ohne den Filter kommen Karteileichen als Teile herein: allein die Kupplungen
+ * brachten 575 Knoten an Stellen, an denen laengst nichts mehr steht.
+ */
+const LIVE_FIELDS = {
+  "connector3": 8, "connector45_2": 5,
+  "tube2": 6, "round-tube2": 6, "alu2": 6, "alu-connector2": 6,
+  "panel2": 8, "display2": 8, "textil2": 8, "lattice2": 8,
+  "clamp2": 4, "clip2": 5,
+  "bearing2": 6, "bearing-connector4": 6, "bolt2": 6,
+  "hole-connector4": 9, "flexi-connector3": 9,
+  "open-connector2": 4, "adapter2": 4, "tube-cap2": 4,
+  "multi-wheel2": 4, "floating-wheel2": 4, "hub-cap2": 4, "casters2": 4,
+  "steering-lock2": 4,
+  "slide2": 4, "slide-new2": 4, "curved-slide2": 4, "slide-end2": 4,
+  "roof2": 4, "roof-large2": 4,
+  "pool2": 4, "pool-small2": 4, "bag2": 4, "textil-round2": 5,
+};
+
+/**
+ * Beschreibt die Zeile ein geloeschtes Teil? Erkannt an der EINEN zusaetzlichen
+ * Zahl hinter den Feldern der Art. Genau eine -- laengere Zeilen bleiben
+ * stehen: unsere eigenen Exporte fuehrten die Winkelkupplung zeitweise mit acht
+ * statt fuenf Feldern, und die soll ein alter Entwurf nicht verlieren.
+ */
+function istTot(p) {
+  const live = LIVE_FIELDS[p.name];
+  return live != null && p.rest.length === live + 1;
 }
 
 // Lokale Arm-Achsen je variant2-Bit einer connector3 (Bitmaske der vorhandenen
@@ -434,6 +464,7 @@ export function parseQDF(text, opts = {}) {
       if (id != null) materials.set(id, COLOR_BY_NAME[colorName] || FALLBACK_COLOR);
     } else if (p.name === "connector3" || p.name === "connector45_2") {
       if (!p.tuple || p.tuple.length < 7) continue;
+      if (istTot(p)) continue;                 // geloescht (Schrittfelder, §3.5)
       const x = p.tuple[4] / 10, y = p.tuple[5] / 10, z = p.tuple[6] / 10;
       const nd = nodeAt(round(x), round(y), round(z));
       // Sie steht als eigene Zeile in der Datei: ein gekauftes Teil, das bleibt
@@ -515,6 +546,7 @@ export function parseQDF(text, opts = {}) {
       // laeuft (Test.qdf: Rohr auf der Y-Achse, clamp2 auf 0/340/0). Die lokale
       // +X-Achse ist die Rohrrichtung.
       if (!p.tuple || p.tuple.length < 7) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
+      if (istTot(p)) continue;
       const x = p.tuple[4] / 10, y = p.tuple[5] / 10, z = p.tuple[6] / 10;
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const dir = nearestCardinal(rotateByQuat(q, [1, 0, 0]));
@@ -548,7 +580,7 @@ export function parseQDF(text, opts = {}) {
       // trifft dort nichts). Vorher wurde der Bogen wie ein gerades Rohr
       // importiert und lag damit voellig falsch im Modell.
       if (!p.tuple || p.tuple.length < 7) continue;
-      if (hasRenderRange(p.rest, 6)) continue; // Alternativ-Pass-Duplikat (wie Viewer)
+      if (istTot(p)) continue;                 // geloescht (Schrittfelder, §3.5)
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const sx = p.tuple[4] / 10, sy = p.tuple[5] / 10, sz = p.tuple[6] / 10;
       const lenCm = (typeof p.rest[3] === "number" ? p.rest[3] : 350) / 10;
@@ -574,7 +606,7 @@ export function parseQDF(text, opts = {}) {
       });
     } else if (p.name === "tube2") {
       if (!p.tuple || p.tuple.length < 7) continue;
-      if (hasRenderRange(p.rest, 6)) continue; // Alternativ-Pass-Duplikat (wie Viewer)
+      if (istTot(p)) continue;                 // geloescht (Schrittfelder, §3.5)
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const sx = p.tuple[4] / 10, sy = p.tuple[5] / 10, sz = p.tuple[6] / 10;
       const lenCm = (typeof p.rest[3] === "number" ? p.rest[3] : 350) / 10;
@@ -612,7 +644,7 @@ export function parseQDF(text, opts = {}) {
       // Bestand). Welches Rohr sie umschliesst, steht erst nach Durchlauf 3
       // fest -- deshalb hier nur merken.
       if (!p.tuple || p.tuple.length < 7) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
-      if (hasRenderRange(p.rest, 9)) continue;
+      if (istTot(p)) continue;
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const ey = rotateByQuat(q, [0, 1, 0]);
       holeClamps.push({
@@ -635,7 +667,7 @@ export function parseQDF(text, opts = {}) {
       // Rohre ein -- deshalb eine eigene Sammlung.
       if (!p.tuple || p.tuple.length < 7) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
       const spec = FITTING_KINDS[p.name];
-      if (spec.renderBase != null && hasRenderRange(p.rest, spec.renderBase)) continue;
+      if (istTot(p)) continue;
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const qn = Math.hypot(q[0], q[1], q[2], q[3]) || 1;
       const r4 = (v) => Math.round(v * 1e4) / 1e4;
@@ -686,7 +718,7 @@ export function parseQDF(text, opts = {}) {
       // Ohne diesen Filter wird eine einzelne Rutsche mehrfach uebereinander
       // gezeichnet, teils spiegelverkehrt (entgegengesetzte Quaternionen).
       // Gleiche Regel wie bei round-tube2, dort mit dem Referenzbild abgeglichen.
-      if (hasRenderRange(p.rest, 4)) continue;
+      if (istTot(p)) continue;
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const qn = Math.hypot(q[0], q[1], q[2], q[3]) || 1;
       const r4 = (v) => Math.round(v * 1e4) / 1e4;
@@ -745,7 +777,7 @@ export function parseQDF(text, opts = {}) {
       // Platte (panel2) und Infoschild (display2): tuple = {q0..q3, cx,cy,cz} (Mitte, mm).
       // rest[3]/rest[5] = Kantenmaße (mm). display2 hat identische Struktur und wird als Panel importiert.
       if (!p.tuple || p.tuple.length < 7) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
-      if (hasRenderRange(p.rest, 8)) continue; // Alternativ-Pass-Duplikat (wie Viewer)
+      if (istTot(p)) continue;                 // geloescht (Schrittfelder, §3.5)
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const cx = p.tuple[4] / 10, cy = p.tuple[5] / 10, cz = p.tuple[6] / 10;
       const dimW = (typeof p.rest[3] === "number" ? p.rest[3] : 0) / 10;
@@ -776,7 +808,7 @@ export function parseQDF(text, opts = {}) {
       // Netz/Stoff: gleiche Struktur wie panel2 (Zentrum + Maße + Quat). Maße z.B.
       // 35x75 cm -> Netz 40x80 cm (nicht im Platten-Katalog -> eigene Textil-Sammlung).
       if (!p.tuple || p.tuple.length < 7) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
-      if (hasRenderRange(p.rest, 8)) continue;
+      if (istTot(p)) continue;
       const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
       const cx = p.tuple[4] / 10, cy = p.tuple[5] / 10, cz = p.tuple[6] / 10;
       const dimW = (typeof p.rest[3] === "number" ? p.rest[3] : 0) / 10;
@@ -795,6 +827,7 @@ export function parseQDF(text, opts = {}) {
       });
 
     } else if (p.name === "pool2" || p.name === "pool-small2") {
+      if (istTot(p)) continue;
       // Bällebad: feste Geometrie (keine Maße im QDF -- im Original-Binary hardcoded).
       // Entity-Ursprung = OBERKANTE der Front-Wand -> wahre Mitte = Ursprung - lokaleY*(span1/2).
       //   pool2:       Frontwand 120 x 40 cm (3 x 1 Felder)
@@ -934,6 +967,7 @@ export function parseQDF(text, opts = {}) {
     if (!p) continue;
     if (p.name !== "alu2" && p.name !== "alu-connector2") continue;
     if (!p.tuple || p.tuple.length < 7) { skipped[p.name] = (skipped[p.name] || 0) + 1; continue; }
+    if (istTot(p)) continue;
     const q = decodeQuat([p.tuple[0], p.tuple[1], p.tuple[2], p.tuple[3]]);
     const sx = p.tuple[4] / 10, sy = p.tuple[5] / 10, sz = p.tuple[6] / 10;
     const lenCm = (typeof p.rest[3] === "number" ? p.rest[3] : 800) / 10

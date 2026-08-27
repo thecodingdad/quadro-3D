@@ -298,6 +298,18 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
   sind Farben ohne Bezug zum Schema: Produktfarben (Farbrad) und Kacheln, die immer dunkel sind
   (Statuszeile, Beschriftungen über der Szene). Wer eine Rolle braucht, die es noch nicht gibt,
   legt eine Variable an und trägt sie in **beiden** Blöcken ein.
+- **Bearbeitungsschritte in der Datei:** jede Teile-Zeile endet mit dem Schritt, in dem das Teil
+  entstand; eine **zweite** Zahl dahinter ist der Schritt, in dem es wieder verschwand
+  (`docs/QDF-FORMAT.md` §3.5). Zeilen mit dieser zweiten Zahl beschreiben **gelöschte** Teile und
+  werden übersprungen – zentral über `LIVE_FIELDS` + `istTot()` in `qdfimport.js`, die die
+  lebende Feldzahl je Elementart führen. Wer eine Elementart ergänzt, trägt sie dort ein: ohne
+  Filter kommen Karteileichen als Teile herein (allein die Kupplungen brachten 575 Knoten an
+  Stellen, an denen längst nichts mehr steht, im Tobezimmer 436). Unser Export schreibt den Kopf
+  `0, 0;` und je Zeile eine `0` – ein Dokument ohne Vergangenheit.
+- **Ansicht in der Datei:** `buildQDF(model, { camera })` schreibt vier gleiche `camera2`-Zeilen
+  (`docs/QDF-FORMAT.md` §5.7), damit die Herstellersoftware das Modell mit unserem Blickwinkel
+  öffnet; die Werte liefert `scene.cameraForQdf()`. Die Software dreht dabei das **Modell**
+  (Feld 8), nicht die Kamera. Ohne `camera` bleibt die Zeile weg.
 - **Neues über das QDF-Format** gehört in `docs/QDF-FORMAT.md` – dort steht jedes Element mit allen
   Feldern und der Angabe, wie sicher wir uns sind (sicher / vermutet / unbekannt). Die
   Fundstellen-Kommentare im Code bleiben, aber die Beschreibung des Formats hat genau einen Ort;
@@ -464,7 +476,9 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     abgreift, muss die Maske richtig wählen.
   - **Beide Seiten rendern bleibt Pflicht.** Der Umlaufsinn ist in den Modelldateien zwar
     gerichtet, aber die Rutschbahn hat keine Wandstärke – sie ist ein einzelner Flächenzug.
-    Mit `FrontSide` fehlt von einer Seite die halbe Rutsche.
+    Mit `FrontSide` fehlt von einer Seite die halbe Rutsche. Dasselbe gilt für die
+    **Winkelkupplung** (`_c45Material()`): ihr Modell ist an Hülse und Stutzen offen, von innen
+    sah man sonst durch sie hindurch.
   - **Anbauteile** sitzen alle auf ihrer Lage aus der Datei, `_placeFitting()` genügt. Zwei
     Ausnahmen: der **Spielsack** – der Import rückt seinen Punkt um `BAG_OFFSET` (20 cm) auf die
     Feldmitte vor, das Modell erwartet den Punkt aus der Datei, also wieder zurück; und das
@@ -628,9 +642,9 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     abgegriffen (zwei Dreiecke, flach – skalieren genügt); `flexi-connector3` steht **zweimal je
     Gelenk** in der Datei und liegt auf einem Knoten, den die App schon als Kupplung zeichnet
     (`part = "flexi"`) – das Modell käme doppelt und über den Würfel.
-  - **`clip2` ist abgegriffen**, brauchte aber einen Trick: in Feld 4 muss **0** stehen. Mit der
-    `3` der einzigen Korpuszeile lädt die Datei und die Software zeichnet nichts (siehe
-    `docs/QDF-FORMAT.md` §5.3).
+  - **`clip2` ist abgegriffen**, brauchte aber einen Trick: in Feld 4 muss **0** stehen. Das ist
+    der **Geburtsschritt** (`docs/QDF-FORMAT.md` §3.5): mit der `3` der einzigen Korpuszeile
+    liegt er über unserem Kopf `0, 0;`, und die Software zeichnet nichts.
   Geladen wird erst, wenn ein Modell die Teile enthält, und danach zeichnet `onMeshesReady()`
   (in `main.js` auf `builder.refresh()`) einmal neu.
 - **Kantenglättung je Qualitätsstufe:** `antialias` schaltet die MSAA des Browsers – die kennt nur

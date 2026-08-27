@@ -1826,9 +1826,14 @@ export class SceneManager {
   _c45Material() {
     if (!this._materials["c45"]) {
       // Schwarz wie die normalen Kupplungen (Gregor: die C45 sind auch schwarz).
+      // BEIDE Seiten zeichnen: das abgegriffene Modell ist an Huelse und
+      // Stutzen offen, also ein Flaechenzug ohne Wandstaerke. Nur von vorn
+      // gezeichnet schaut man von innen durch die Kupplung hindurch -- dasselbe
+      // gilt fuer die Rutschenbahnen.
       this._materials["c45"] = new THREE.MeshStandardMaterial({
         color: new THREE.Color(connectorColor().hex), roughness: 0.6, metalness: 0.1,
         emissive: new THREE.Color(0x000000),
+        side: THREE.DoubleSide,
       });
     }
     return this._materials["c45"];
@@ -4236,6 +4241,23 @@ export class SceneManager {
   }
 
   /** Kamerazustand zum Sichern (Position, Ziel, Zoom). */
+  /**
+   * Ansicht in der Form, die der QDF-Export braucht (docs/QDF-FORMAT.md §5.7):
+   * Standpunkt und Blickziel in cm plus Oeffnungswinkel und Seitenverhaeltnis.
+   * Der Winkel kommt IMMER von der perspektivischen Kamera -- die
+   * orthografische hat keinen, ihre Ansicht laesst sich in der Datei nur als
+   * Perspektive beschreiben.
+   */
+  cameraForQdf() {
+    if (!this.controls) return null;
+    return {
+      pos: this.camera.position.toArray(),
+      target: this.controls.target.toArray(),
+      fov: this._perspCam.fov,
+      aspect: this._perspCam.aspect || 1,
+    };
+  }
+
   cameraState() {
     if (!this.controls) return null;
     return {

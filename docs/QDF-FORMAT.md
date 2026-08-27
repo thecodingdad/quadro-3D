@@ -376,8 +376,11 @@ connector45_2{1, {4., 0., 0., 0., 0., 800., -1000.}, 1, 0, 27, 36, 4095, 0}
 | 1 | placement, anchor = the connector it sits on | ✔ |
 | 2 | position adjustment (§3.6) | ✔ |
 | 3 | 0 in almost every line, 1 in 40 | ? |
-| 4 | 0 in every line but four | ? |
-| 5 | only present on those four lines | ? |
+| 4 | 0 in every line | ? |
+
+(The four eight-field `connector45_2` lines in the sample folder are not the
+manufacturer's — they come from an old export of this app, which wrote the
+fields of a `connector3` here. The software rejects such a file.)
 
 Two things are important here, both confirmed by what the software accepts:
 the angle connector does **not** replace the connector it sits on — the file
@@ -816,8 +819,13 @@ A file carries **one `camera2` per view** — four in a fresh document. They
 differ only in the horizontal extent and the aspect (fields 13, 15, 20), which
 is what a different window width gives. The dialog edits the **first** one.
 
-Writing the line is optional: this app omits it and the software falls back to
-its own default view.
+Writing the line is optional. This app writes **four identical lines** — as
+many as a fresh document has — from the current view, so the software opens the
+model the way the user last looked at it (`cameraLines()` in
+[`qdfexport.js`](../web/js/qdfexport.js), values from `scene.cameraForQdf()`).
+Two of the derived fields check out against the corpus: a line with 40° opening
+carries 33 mm focal length (12 / tan 20° = 32.97) and 146 cm of vertical extent
+at 200 cm distance (2 · 200 · tan 20° = 145.6).
 
 ## 6. What we do not know
 
