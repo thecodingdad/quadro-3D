@@ -375,6 +375,11 @@ function verdrahteKnoepfe() {
   $("tour-next").addEventListener("click", weiter);
   $("tour-back").addEventListener("click", zurueck);
   $("tour-skip").addEventListener("click", beende);
+  // Der Klick darf NICHT bis zum Dokument durchlaufen: dort schliessen die
+  // Zuhoerer in `ui.js` jedes offene Menue ("Klick daneben"). Ein Schritt, der
+  // gerade Hauptmenue und Einstellungen aufgeklappt hat, staende danach vor
+  // einem leeren Areal.
+  $("tour-card").addEventListener("click", (e) => e.stopPropagation());
 }
 
 /**
