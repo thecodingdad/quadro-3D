@@ -269,12 +269,28 @@ function messeNach() {
   setzeKarte(rect);
 }
 
+/**
+ * Text zum Schritt. Bei enger Kopfzeile (`compact-head`, also Telefon und
+ * schmales Fenster) gilt die eigene Fassung, wenn es sie gibt: dort stehen
+ * Knoepfe im Hauptmenue statt in der Leiste, und die Tastenkuerzel-Liste fehlt
+ * ganz (`.hide-mobile`) -- ein Text, der auf sie zeigt, ginge ins Leere.
+ * `t()` liefert bei unbekanntem Schluessel den Schluessel selbst zurueck.
+ */
+function schrittText(key, art) {
+  const voll = `tour_${key}_${art}`;
+  if (document.body.classList.contains("compact-head")) {
+    const eigen = t(`${voll}_mobile`);
+    if (eigen !== `${voll}_mobile`) return eigen;
+  }
+  return t(voll);
+}
+
 /** Karte fuellen und Schritt anzeigen. */
 function zeichne() {
   const schritt = STEPS[lauf.index];
   const nr = lauf.sichtbare.indexOf(lauf.index) + 1;
-  $("tour-title").textContent = t(`tour_${schritt.key}_title`);
-  $("tour-text").textContent = t(`tour_${schritt.key}_text`);
+  $("tour-title").textContent = schrittText(schritt.key, "title");
+  $("tour-text").textContent = schrittText(schritt.key, "text");
   $("tour-step").textContent = t("tour_step", nr, lauf.sichtbare.length);
   $("tour-back").hidden = nr <= 1;
   $("tour-next").textContent = nr >= lauf.sichtbare.length ? t("tour_done") : t("tour_next");
@@ -382,12 +398,15 @@ export function startTour(ctx) {
   // darunter nichts gebaut, gedreht oder umgeschaltet wird.
   const schlucke = (e) => { e.preventDefault(); e.stopPropagation(); };
   const veil = $("tour-veil");
-  const beobachter = new ResizeObserver(() => messeNach());
+  // Nicht nur nachmessen, sondern neu zeichnen: mit der Fensterbreite wechselt
+  // auch der Text (siehe schrittText).
+  const neuZeichnen = () => { if (lauf) zeichne(); };
+  const beobachter = new ResizeObserver(neuZeichnen);
 
   const abmelden = () => {
     window.removeEventListener("keydown", taste, true);
-    window.removeEventListener("resize", messeNach);
-    window.removeEventListener("orientationchange", messeNach);
+    window.removeEventListener("resize", neuZeichnen);
+    window.removeEventListener("orientationchange", neuZeichnen);
     for (const art of ["pointerdown", "click", "wheel", "touchmove", "contextmenu"]) {
       veil.removeEventListener(art, schlucke, true);
     }
@@ -397,8 +416,8 @@ export function startTour(ctx) {
   lauf = { ctx, index: -1, sichtbare, vorher: ctx.ui.tour.state(), abmelden };
 
   window.addEventListener("keydown", taste, true);
-  window.addEventListener("resize", messeNach);
-  window.addEventListener("orientationchange", messeNach);
+  window.addEventListener("resize", neuZeichnen);
+  window.addEventListener("orientationchange", neuZeichnen);
   for (const art of ["pointerdown", "click", "wheel", "touchmove", "contextmenu"]) {
     veil.addEventListener(art, schlucke, { capture: true, passive: false });
   }
