@@ -2,7 +2,8 @@
 
 QUADRO 3D – Planungstool für QUADRO-Klettergerüste. Reine Vanilla-JS-Web-App,
 **kein Build-Step, kein npm, keine Frameworks**, läuft offline aus dem Dateisystem eines
-statischen Servers. Nutzerdoku: `README.md`, Historie: `CHANGELOG.md`.
+statischen Servers. Nutzerdoku: `README.md`, Historie: die Releases auf GitHub (Notes entstehen
+automatisch aus den Commits – **eine `CHANGELOG.md` gibt es bewusst nicht**).
 
 ## Starten & Verifizieren
 
