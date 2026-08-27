@@ -7,6 +7,7 @@ import { Builder } from "./builder.js";
 import { initUI } from "./ui.js";
 import * as sync from "./sync.js";
 import { t } from "./i18n.js";
+import { startTour, tourSeen } from "./tour.js";
 
 async function boot() {
   try {
@@ -51,6 +52,13 @@ async function boot() {
 
   // Ab hier steht die Oberfläche vollständig.
   document.body.classList.remove("booting");
+
+  // Beim allerersten Start durch die Oberfläche führen. Erst jetzt: das Layout
+  // stellt sich in einem requestAnimationFrame ein (applyLayout in ui.js), und
+  // die Demo misst die Rechtecke ihrer Ziele -- vorher stünden sie falsch.
+  if (!tourSeen()) {
+    requestAnimationFrame(() => startTour({ ui, builder, model, scene }));
+  }
 
   // Dev-Hook (nur mit ?dev im URL): erlaubt programmatischen QDF-Import fuer Tests.
   if (location.search.includes("dev")) {

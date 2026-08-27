@@ -39,6 +39,7 @@
   --chip: rgba(255, 255, 255, 0.94);  /* schwebende Knöpfe über der Szene */
   --chip-line: rgba(0, 0, 0, 0.13);
   --veil: rgba(246, 248, 250, 0.92);  /* Schleier über der leeren Szene */
+  --tour-shade: rgba(20, 26, 34, 0.55);  /* Schleier der Onboarding-Demo */
   color-scheme: light;
 }
 
@@ -74,6 +75,7 @@
   --chip: rgba(35, 42, 51, 0.94);
   --chip-line: rgba(255, 255, 255, 0.14);
   --veil: rgba(23, 27, 33, 0.92);
+  --tour-shade: rgba(8, 11, 15, 0.68);
   color-scheme: dark;
 }
 
@@ -1343,3 +1345,44 @@ body.tab-dragging .tab { cursor: grabbing; }
 body.booting #toolbar-ctx,
 body.booting #tab-bar,
 body.booting #sidebar { visibility: hidden; }
+
+/* --- Onboarding-Demo --------------------------------------------------- */
+/* Liegt über Seitenleiste (400) und Menüs (300), aber UNTER der
+   Rückfrage-Karte (.dlg-overlay, 500) -- eine Rückfrage muss auch dann noch
+   bedienbar sein, wenn die Demo läuft. */
+#tour {
+  position: fixed; inset: 0; z-index: 450;
+  pointer-events: none;
+}
+/* Der Schleier selbst ist unsichtbar: die Fläche zeichnet der Schlagschatten
+   des Lochs. Er fängt aber jede Zeigergeste ab -- während der Demo wird nicht
+   gebaut, gedreht oder umgeschaltet. */
+#tour-veil { position: absolute; inset: 0; pointer-events: auto; }
+/* Das Loch: ein Rechteck ohne Füllung, dessen Schlagschatten den ganzen Rest
+   der Seite grau legt. Ein Knoten statt vier Streifen -- und der Wechsel
+   zwischen zwei Schritten lässt sich so animieren. */
+#tour-hole {
+  position: absolute;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px var(--tour-shade);
+  outline: 2px solid var(--accent);
+  pointer-events: none;
+  transition: left 0.22s ease, top 0.22s ease, width 0.22s ease, height 0.22s ease;
+}
+/* Ohne Areal (Begrüßung) liegt der Schleier ungelocht über allem: das Loch
+   schrumpft auf einen Punkt in der Mitte, sein Schatten bleibt. */
+#tour-hole.no-hole { left: 50%; top: 50%; width: 0; height: 0; outline: none; }
+#tour-card {
+  position: absolute;
+  width: min(380px, 92vw);
+  box-sizing: border-box;
+  background: var(--surface); color: var(--ink);
+  border-radius: 12px; padding: 16px 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+}
+#tour-card h3 { margin: 0 0 6px; font-size: 15px; }
+#tour-card p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-soft); }
+.tour-foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+/* Die Schrittzahl steht links, die Knöpfe rechts. */
+#tour-step { flex: 1 1 auto; }

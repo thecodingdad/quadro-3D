@@ -78,6 +78,8 @@ dem eigenen Rechner.
 
 **Drumherum**
 
+- **Einführung** – beim ersten Start führt eine Demo durch die Oberfläche und hebt Areal für
+  Areal hervor; überspringbar und in den Einstellungen jederzeit wieder zu starten
 - **Zweisprachig** – Deutsch und Englisch, umschaltbar im laufenden Betrieb
 - **Installierbar (PWA)** – als eigenes Fenster einrichten und offline weiterbauen
 - **Mobil bedienbar** – im Hochformat wandert die Bauteil-Leiste nach unten, Werkzeuge klappen
@@ -218,6 +220,8 @@ your own machine.
 
 **Around it**
 
+- **Guided tour** – on the first start a demo walks through the interface, highlighting one area
+  at a time; skippable and restartable from the settings at any time
 - **Bilingual** – German and English, switchable while running
 - **Installable (PWA)** – set it up as its own window and keep building offline
 - **Works on mobile** – in portrait the part row moves to the bottom, tools collapse when space

@@ -110,6 +110,7 @@ alles ohne Docker Hub durch.
 | `web/js/sync.js` | Abgleich mit dem optionalen Backend: Suche (`probe`), WebSocket-Ereignisse, `reconcile`, Konflikte |
 | `server.py` | Optionales Backend (aiohttp): statische App + `/api/` + Ereignis-Kanal, Ablage als Dateien |
 | `web/js/ui.js` | Toolbar, Datei-Tabs, Seitenleiste (Stückliste & Bestand / Modelle / Aufbau), Tastatur |
+| `web/js/tour.js` | Onboarding-Demo: Schleier mit Loch, Karte je Schritt, Demo-Modell |
 | `web/js/qdfimport.js` | Parser für QDF-Dateien der Original-QUADRO-3D-Software (Format: `docs/QDF-FORMAT.md`) |
 | `web/js/qdfexport.js` | Schreibt ein Modell als QDF (Gegenstück zu `qdfimport.js`) |
 | `web/js/library.js` | Modell-Bibliothek: QDF-Sammlung einlesen, Kennzahlen, Bestandsabgleich |
@@ -407,6 +408,27 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
     die Hülse (Arm-Kante) und die Kennzeichen weg, beide Enden sind danach wieder
     Dummy-Kupplungen; nur ein Knoten, der dann gar nichts mehr hält, verschwindet.
     `deleteSelection()` ruft das vor der gewöhnlichen Knoten-Löschung auf.
+- **Onboarding-Demo (`tour.js`):** beim ersten Start (Merker `quadro.tour.v1` in localStorage,
+  gesetzt bei „Fertig" **und** bei „Überspringen"/Escape), danach nur noch über
+  `#btn-tour` in den Einstellungen. Die Schritte stehen in **einer** Tabelle
+  (`STEPS`), Texte je Schritt als `tour_<key>_title`/`_text` in beiden Wörterbüchern.
+  Vier Dinge, die dabei zählen:
+  - **Ziele sind Funktionen, keine Selektoren.** Die Kopfzeile hängt Knöpfe je nach Breite um
+    (`applyHeadCollapse`, `applyLayout`) – ein Schritt nennt deshalb jede Stelle, an der sein
+    Knopf stehen kann, und die Hülle nimmt, was gerade sichtbar ist. `menueFuer()` klappt die
+    Schublade (`#toolbar-right-inner`) nur auf, wenn das Ziel **nur** dort steht. Ein Schritt
+    ohne sichtbares Ziel fällt aus; `immer: true` gilt für Schritte, deren `before()` das Ziel
+    erst hervorholt (Seitenleiste). Ein absolut liegendes Popup gehört **einzeln** in die
+    Zielliste – das Rechteck des Elternknotens enthält es nicht.
+  - **Nach dem Umschalten zweimal messen:** einmal im nächsten Bild und einmal nach 320 ms.
+    Die überlagernde Seitenleiste gleitet herein (0,2 s), sonst steht das Loch auf halbem Weg.
+  - **Die Oberfläche ist gesperrt:** `#tour-veil` schluckt jede Zeigergeste, und der
+    `keydown`-Zuhörer in `ui.js` steigt bei `tourRunning()` aus. `stopPropagation` allein
+    genügt dafür **nicht** – beide hängen an `window`, der ältere läuft zuerst.
+  - **Das Beispielmodell liegt in einem eigenen Tab** (`ui.tour.openDemo`, als Vorschau geführt:
+    kein Änderungs-Punkt, schließt wortlos) und wird am Ende wieder geschlossen; Modus und
+    Seitenleisten-Panel gibt `ui.tour.restore()` zurück. `tour.js` kennt die Interna von `ui.js`
+    nicht, alles läuft über `ui.tour`.
 - **Neue Bau-Richtung/Logik:** `config.js` + `builder.js` (+ ggf. `scene.js`).
 - **Tastatur:** zentral in `ui.js` (`keydown`). Pfeiltasten sind kamera-relativ über
   `scene.getHorizontalAxes()`. **Strg/Cmd+W ist nicht abfangbar** – Browser schließen damit ihren
@@ -891,7 +913,7 @@ Koordinaten in **cm**, Three.js-Konvention **y = oben**, Boden bei y = 0.
 - In `localStorage` stehen nur noch Einstellungen: `quadro.inventory.v1`, `quadro.sidebarWidth.v1`,
   `quadro.sidebarPanel.v1`, `quadro.autosaveMode.v1`, `quadro.quality.v1`, `quadro.slice.v1`,
   `quadro.camera.v1`, `quadro.projection.v1`, `quadro.scene.v1`, `quadro.migrated.v2`,
-  `quadro.clientId.v1`, `quadro.inventory.meta.v1`, Sprache in `i18n.js`. Die alten Schlüssel `quadro.autosave.v1`/`quadro.design.v1.<name>` werden beim ersten
+  `quadro.clientId.v1`, `quadro.inventory.meta.v1`, `quadro.tour.v1`, Sprache in `i18n.js`. Die alten Schlüssel `quadro.autosave.v1`/`quadro.design.v1.<name>` werden beim ersten
   Start einmalig nach `docs` übernommen (`docs.migrateOldDrafts()`) und danach nur noch gelesen.
   `quadro.autosave.v1` dient dabei nur noch als Rückfall, wenn es **gar keine** Sitzung gibt –
   eine leere Sitzung (alle Tabs zu) startet mit einem leeren Entwurf.

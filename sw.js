@@ -55,6 +55,7 @@ const SCHALE = [
   "web/js/scene.js",
   "web/js/storage.js",
   "web/js/sync.js",
+  "web/js/tour.js",
   "web/js/ui.js",
   "web/js/util.js",
 ];

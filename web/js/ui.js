@@ -15,6 +15,7 @@ import * as sync from "./sync.js";
 import { designEntry, parseDesign, checkAgainstInventory, missingCount, META_VERSION } from "./library.js";
 import { buildQDF } from "./qdfexport.js";
 import { t, getLang, setLang, applyTranslations } from "./i18n.js";
+import { startTour, refreshTour, tourRunning } from "./tour.js";
 
 function $(id) { return document.getElementById(id); }
 
@@ -212,6 +213,9 @@ export function initUI({ scene, model, builder }) {
       renderTabs();          // der Schliessen-Knopf jedes Tabs traegt einen Tooltip
       renderFittingButton();
       syncProjectionButton();
+      // Laeuft die Onboarding-Demo, baut sie ihre Karte selbst -- sie stuende
+      // sonst bis zum naechsten Schritt in der alten Sprache da.
+      refreshTour();
       // Dynamische UI-Texte aktualisieren
       setMode(builder.mode);
       update();
@@ -658,6 +662,15 @@ export function initUI({ scene, model, builder }) {
   // Fassung der App. Nur die Nummer steht hier -- die Beschriftung daneben
   // haengt an `data-i18n` und wird vom Sprachwechsel selbst erwischt.
   if ($("app-version")) $("app-version").textContent = APP_VERSION;
+
+  // Onboarding-Demo: beim ersten Start laeuft sie von selbst (main.js), hier
+  // laesst sie sich erneut starten. Das Menue hat dann seinen Zweck erfuellt --
+  // die Demo klappt es im letzten Schritt selbst wieder auf.
+  $("btn-tour").addEventListener("click", () => {
+    toggleSettingsMenu(false);
+    toggleHamburger(false);
+    startTour({ ui, builder, model, scene });
+  });
 
   // --- Installieren (PWA) ------------------------------------------------
   // Der Browser meldet selbst, wenn die App installierbar ist. Vorher hat ein
@@ -2985,8 +2998,11 @@ export function initUI({ scene, model, builder }) {
 
   // --- Tastatur ----------------------------------------------------------
   window.addEventListener("keydown", (e) => {
-    // Steht ein Dialog offen, gehört die Tastatur ihm allein.
-    if (dialogOpen()) return;
+    // Steht ein Dialog offen, gehört die Tastatur ihm allein -- und während der
+    // Onboarding-Demo ebenso ihr (die Oberfläche ist dann gesperrt). Ein
+    // stopPropagation der Demo reicht dafür nicht: dieser Zuhörer hängt am
+    // selben Knoten und wurde früher angemeldet.
+    if (dialogOpen() || tourRunning()) return;
     const tgt = e.target;
     if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "SELECT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
 
@@ -4683,6 +4699,45 @@ export function initUI({ scene, model, builder }) {
     openDocById, saveActiveTab, refreshDocList, isAutosaveOn, setAutosaveOn,
     syncButtons: syncDeleteButton,
   });
+  // --- Schnittstelle für die Onboarding-Demo -----------------------------
+  // `tour.js` soll die Interna dieser Datei nicht kennen; es bewegt die
+  // Oberfläche ausschließlich über diese sechs Funktionen.
+  let demoTabId = null;
+
+  Object.assign(ui, {
+    tour: {
+      /** Beispielmodell in einem eigenen Tab öffnen. */
+      openDemo(data, name) {
+        if (demoTabId) return demoTabId;
+        const tab = openTab({ name: name || "Demo", data });
+        // Als Vorschau geführt: so trägt der Tab keinen Änderungs-Punkt und
+        // geht am Ende wortlos zu (siehe closeTab). `preview: true` gleich beim
+        // Öffnen wäre falsch -- das würfe eine Vorschau des Nutzers weg.
+        tab.preview = true;
+        demoTabId = tab.tabId;
+        renderTabs();
+        return demoTabId;
+      },
+      closeDemo() {
+        if (!demoTabId) return;
+        const id = demoTabId;
+        demoTabId = null;
+        closeTab(id).catch((e) => console.warn("Demo-Tab:", e));
+      },
+      openSettings(on) { toggleSettingsMenu(!!on); },
+      openMenu(on) { toggleHamburger(!!on); },
+      showPanel(name) { showSidebarPanel(name); },
+      setMode(m) { if (builder.mode !== m) setMode(m); },
+      /** Stand vor der Demo, damit sie ihn danach zurückgeben kann. */
+      state() { return { mode: builder.mode, panel: currentPanel }; },
+      restore(st) {
+        if (!st) return;
+        if (st.mode && st.mode !== builder.mode) setMode(st.mode);
+        showSidebarPanel(st.panel || null);
+      },
+    },
+  });
+
   // Als echte Zugriffsfunktionen anlegen: Object.assign würde einen Getter
   // sofort auswerten und den damaligen Stand einfrieren.
   Object.defineProperties(ui, {
