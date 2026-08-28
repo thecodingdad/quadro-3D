@@ -1,7 +1,7 @@
 // Datenmodell des Bauwerks: Graph aus Knoten (Kupplungen) und Kanten (Rohren).
 // Bewusst ohne Three.js-Abhaengigkeit, damit es testbar und Backend-tauglich bleibt.
 
-import { MERGE_EPS, FORMAT_VERSION, DIAGONAL_SNAP_TOL, DIRECTIONS, DIAGONAL_DIRECTIONS } from "./config.js";
+import { MERGE_EPS, FORMAT_VERSION, DIAGONAL_SNAP_TOL, DIRECTIONS, DIAGONAL_DIRECTIONS, anchorGap } from "./config.js";
 
 // Zellweite des Rasters, mit dem die Kollisionspruefung Nachbarn sucht. Etwas
 // groesser als das laengste Rohr (75 cm + Kupplung): ein Rohr liegt damit in
@@ -299,6 +299,41 @@ export function holeClampDirsAt(model, node, cs = 5) {
     const L = Math.hypot(d[0], d[1], d[2]);
     if (L < 0.5 || L > cs * 1.2) continue;
     out.push([d[0] / L, d[1] / L, d[2] / L]);
+  }
+  return out;
+}
+
+/**
+ * Anbauteile, die den Stutzen einer Kupplung FUELLEN: sie stecken darauf oder
+ * darin, daneben passt nichts mehr. Dieselbe Liste fuehren builder.js, scene.js
+ * (zeichnet den Stutzen) und bom.js (zaehlt ihn als Arm).
+ */
+export const ARM_FITTINGS = new Set(["adapter2", "bearing2", "steering-lock2", "open-connector2"]);
+
+/**
+ * Teile, die den Stutzen ABSCHLIESSEN. Die Multirad-Arretierung sitzt an seinem
+ * Ende; was darueber hinausginge -- Rohr, Winkelkupplung, Lochzapfen- oder
+ * Lagerkupplung, weitere Anbauteile -- passt dort nicht mehr. Erlaubt bleibt
+ * nur, was UNTER ihr sitzt: das Radlager (und das Rad darauf, das ohnehin am
+ * Lager haengt, nicht am Stutzen).
+ */
+export const STUB_END_FITTINGS = new Set(["steering-lock2"]);
+export const STUB_END_ALLOWED = new Set(["bearing2", "multi-wheel2"]);
+
+/**
+ * In welchen Richtungen steckt an dieser Kupplung ein Anbauteil im Stutzen?
+ * `kinds` waehlt aus, welche zaehlen -- alle stutzenfuellenden (ARM_FITTINGS)
+ * oder nur die abschliessenden (STUB_END_FITTINGS).
+ */
+export function armFittingDirsAt(model, node, kinds = ARM_FITTINGS) {
+  const out = [];
+  if (!model.fittings || !node) return out;
+  for (const f of model.fittings.values()) {
+    if (!kinds.has(f.kind) || !f.quat) continue;
+    // Die Teile sitzen mit Abstand 0 auf der Kupplung (FITTING_MOUNTS); ihre
+    // Richtung ist die eigene +X-Achse.
+    if (Math.hypot(f.x - node.x, f.y - node.y, f.z - node.z) > 2) continue;
+    out.push(xAxisOf(f.quat));
   }
   return out;
 }
@@ -1201,13 +1236,13 @@ export class BuildModel {
    * eine freie Achsrichtung, die anderen stecken auf einem Rohr.
    * Liefert je Stelle { pos:[x,y,z], dir:[x,y,z], nodeId?, tubeId? }.
    */
-  fittingMounts(kind) {
+  fittingMounts(kind, cs = 5) {
     if (kind === "multi-wheel2") return this._wheelMounts();
     if (kind === "hub-cap2" || kind === "tube-cap2") return this._wheelCapMounts();
     if (kind === "textil-round2") return this._roundCoverMounts();
     const spec = FITTING_MOUNTS[kind];
     if (!spec) return [];
-    return spec.at === "tube" ? this._fittingTubeMounts(spec) : this._fittingNodeMounts(spec);
+    return spec.at === "tube" ? this._fittingTubeMounts(spec) : this._fittingNodeMounts(spec, cs, kind);
   }
 
   /**
@@ -1438,7 +1473,7 @@ export class BuildModel {
 
   // An der Kupplung: jede kardinale Richtung ohne Rohr, nicht unter den Boden.
   // Die Laufrolle haengt immer nach unten, sie kennt nur diese eine Stelle.
-  _fittingNodeMounts(spec) {
+  _fittingNodeMounts(spec, cs = 5, kind = null) {
     const out = [];
     for (const n of this.nodes.values()) {
       if (n.c45body) continue;                       // Adapterkoerper ist keine Kupplung
@@ -1459,15 +1494,23 @@ export class BuildModel {
       // Auf einem Stutzen mit Lochzapfenkupplung ist kein Platz mehr -- ausser
       // fuer die Multirad-Arretierung, die sie genau dort festhaelt.
       const durchKlemme = spec.onClamp ? [] : holeClampDirsAt(this, n);
+      // Eine Multirad-Arretierung schliesst den Stutzen ab: was ueber sie
+      // hinausginge, passt dort nicht mehr. Nur das Radlager unter ihr (und das
+      // Rad, das ohnehin am Lager haengt) bleibt moeglich.
+      const abgeschlossen = STUB_END_ALLOWED.has(kind)
+        ? [] : armFittingDirsAt(this, n, STUB_END_FITTINGS);
       for (const dir of (spec.dirs === "down" ? [[0, -1, 0]] : CARDINALS)) {
         if (taken.has(cardinalName(dir))) continue;
         if (durchKlemme.some((k) => dot3(k, dir) > 0.9)) continue;
+        if (abgeschlossen.some((k) => dot3(k, dir) > 0.9)) continue;
         const pos = [n.x + dir[0] * spec.offset, n.y + dir[1] * spec.offset, n.z + dir[2] * spec.offset];
         if (this.isBelowGround(pos[1])) continue;
         // Der Ankerpunkt liegt weiter aussen als das Teil selbst: Teile, die
         // direkt auf der Kupplung sitzen (Abstand 0), haetten ihren Punkt sonst
-        // mitten im Kupplungswuerfel -- unsichtbar und nicht anklickbar.
-        const gap = Math.max(spec.offset, 7);
+        // mitten im Kupplungswuerfel -- unsichtbar und nicht anklickbar. Der
+        // Abstand ist derselbe wie im Bau-Modus (anchorGap): jeder Punkt an
+        // einer Kupplung meint dasselbe und soll gleich weit draussen stehen.
+        const gap = Math.max(spec.offset, anchorGap(cs));
         out.push({ pos, dir, nodeId: n.id,
           handle: [n.x + dir[0] * gap, n.y + dir[1] * gap, n.z + dir[2] * gap] });
       }
@@ -1552,12 +1595,18 @@ export class BuildModel {
       }
       if (!belegt.length) continue;   // freie Kupplung ohne Rohr: nichts zu tragen
       belegt.push(...holeClampDirsAt(this, n, cs));
+      // Sie schiebt sich auf den Stutzen -- ein Anbauteil darin sperrt ihn.
+      belegt.push(...armFittingDirsAt(this, n));
       for (const richtung of DIRECTIONS) {
         const d = richtung.vec;
         if (belegt.some((b) => dot3(b, d) > 0.9)) continue;
         const pos = [n.x + d[0] * off, n.y + d[1] * off, n.z + d[2] * off];
         if (this.isBelowGround(pos[1])) continue;
-        out.push({ nodeId: n.id, dir: d, pos });
+        // `pos` ist die Stelle, an die die Klemme kommt; der gruene Griff steht
+        // wie jeder Punkt an einer Kupplung gleich weit vor ihrem Wuerfel.
+        const gap = anchorGap(cs);
+        out.push({ nodeId: n.id, dir: d, pos,
+          handle: [n.x + d[0] * gap, n.y + d[1] * gap, n.z + d[2] * gap] });
       }
     }
     return out;
@@ -1644,13 +1693,21 @@ export class BuildModel {
       }
       if (!belegt.length) continue;   // freie Kupplung ohne Rohr: nichts zu tragen
       belegt.push(...holeClampDirsAt(this, n, cs));
+      // Ihr Ring greift UEBER den Stutzen -- steckt dort schon ein Anbauteil
+      // (Radlager, Adapter, Arretierung, offenes Ende), passt sie nicht mehr.
+      belegt.push(...armFittingDirsAt(this, n));
       for (const richtung of DIRECTIONS) {
         const d = richtung.vec;
         if (belegt.some((b) => dot3(b, d) > 0.9)) continue;
         const pos = [round(n.x + d[0] * cs), round(n.y + d[1] * cs), round(n.z + d[2] * cs)];
         if (this.isBelowGround(pos[1])) continue;
         if (this.findNodeNear(pos[0], pos[1], pos[2])) continue;   // dort steht schon etwas
-        out.push({ nodeId: n.id, dir: d, pos });
+        // `pos` ist die Stelle, an die die Kupplung KOMMT (eine Kupplungslaenge
+        // vor dem Traeger); der gruene Griff steht dort, wo alle Punkte an
+        // einer Kupplung stehen -- sonst saesse er als einziger enger.
+        const gap = anchorGap(cs);
+        out.push({ nodeId: n.id, dir: d, pos,
+          handle: [round(n.x + d[0] * gap), round(n.y + d[1] * gap), round(n.z + d[2] * gap)] });
       }
     }
     return out;

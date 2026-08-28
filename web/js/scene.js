@@ -5,7 +5,8 @@ import { OrbitControls } from "../vendor/three/OrbitControls.js";
 import { geometry, colorHex, connectorColor, getPanel } from "./catalog.js";
 import { panelNormal, modelMiddle } from "./util.js";
 import { nodeClampOffset, isHolePart, HOLE_MASKS, holeArmDirs, BLACK_FITTINGS,
-  isBoltPart, boltAxis, boltShift, hingeDir, hingeKey, POOL_KINDS, fixedFittingColor } from "./model.js";
+  isBoltPart, boltAxis, boltShift, hingeDir, hingeKey, POOL_KINDS, fixedFittingColor,
+  ARM_FITTINGS } from "./model.js";
 import { reinforcementProfiles } from "./qdfexport.js";
 import { loadConnectorMeshes, loadSlideMeshes, loadTubeMeshes, loadFittingMeshes,
   loadSurfaceMeshes } from "./meshes.js";
@@ -140,12 +141,10 @@ const POOL_SMALL_OFFSET = 20;
 const POOL_SKIN = 2;
 // Sie haengt innen im Rahmen -- eine halbe Rohrbreite von den Rohrachsen weg.
 const POOL_INSET = 2.5;
-// Anbauteile, die auf einem Stutzen der Kupplung sitzen: die Kupplung bekommt
-// dort denselben Stutzen wie fuer ein Rohr.
-// Teile, die auf einem Stutzen der Kupplung sitzen -- dort gehoert einer
-// gezeichnet, auch wenn kein Rohr steckt. Beim offenen Verbinderende ist genau
-// das seine Aufgabe: es ERZWINGT den Stutzen (so auch in der Herstellersoftware).
-const ARM_FITTINGS = new Set(["adapter2", "bearing2", "steering-lock2", "open-connector2"]);
+// ARM_FITTINGS (aus model.js): Teile, die auf einem Stutzen der Kupplung sitzen
+// -- dort gehoert einer gezeichnet, auch wenn kein Rohr steckt. Beim offenen
+// Verbinderende ist genau das seine Aufgabe: es ERZWINGT den Stutzen (so auch
+// in der Herstellersoftware).
 
 
 // Farbschema der normalen Ansicht (die Szene bringt ihren eigenen Himmel mit).

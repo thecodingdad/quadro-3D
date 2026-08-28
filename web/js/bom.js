@@ -2,7 +2,7 @@
 
 import { getTube, getConnector, getPanel, colorName, partName, reinforcementPart, partForFitting, getPartById, getScrew, poolLinerFor, geometry } from "./catalog.js";
 import { round2, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
-import { POOL_KINDS, isHolePart, isBoltPart, BOLT_PART, HINGE_PART } from "./model.js";
+import { POOL_KINDS, isHolePart, isBoltPart, BOLT_PART, HINGE_PART, ARM_FITTINGS } from "./model.js";
 
 // Einheitsvektoren der Nachbarn eines Knotens. Doppelrohr-Verbindungen (link)
 // sind KEIN Arm der Kupplung und zaehlen nicht in die Kupplungstyp-Heuristik
@@ -11,10 +11,10 @@ import { POOL_KINDS, isHolePart, isBoltPart, BOLT_PART, HINGE_PART } from "./mod
 // des Adapter-Koerpers (c45body).
 // Anbauteile, die einen ARM der Kupplung belegen -- sie stecken auf einem
 // Stutzen, genau wie ein Rohr, und gehoeren deshalb in die Armzahl. Die
-// Laufrolle sitzt auf ihrem Adapter und zaehlt nicht doppelt. Das offene
-// Verbinderende ist genau dafuer da: es erzwingt den Stutzen, den ein freier
-// Arm sonst weder bekommt noch kostet.
-const ARM_FITTINGS = new Set(["bearing2", "adapter2", "steering-lock2", "open-connector2"]);
+// ARM_FITTINGS (aus model.js): Teile, die einen Stutzen belegen und ihn damit
+// mitkaufen. Die Laufrolle sitzt auf ihrem Adapter und zaehlt nicht doppelt.
+// Das offene Verbinderende ist genau dafuer da: es erzwingt den Stutzen, den
+// ein freier Arm sonst weder bekommt noch kostet.
 
 // Naechste Achsenrichtung zu einem Vektor.
 function cardinalOf(dx, dy, dz) {

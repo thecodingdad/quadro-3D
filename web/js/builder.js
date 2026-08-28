@@ -1,6 +1,6 @@
 // Bau-Interaktion: Auswahl, Anbau ueber Richtungs-Handles, Loeschen.
 
-import { DIRECTIONS, DIAGONAL_DIRECTIONS, DIR_ALIGN_TOL, ARM_ALIGN_TOL, CLAMP_LINK_DIST, C45_SLEEVE_LEN, C45_ARM_LEN } from "./config.js";
+import { DIRECTIONS, DIAGONAL_DIRECTIONS, DIR_ALIGN_TOL, ARM_ALIGN_TOL, CLAMP_LINK_DIST, C45_SLEEVE_LEN, C45_ARM_LEN, anchorGap } from "./config.js";
 import { accessories, buildableTubes, geometry, getTube, spacingFor, getPanel, defaultPanel, diagonalTubeId, slideKindLabel, slideKindName, isCurvedTube, gridSpacing, tubeColors, partName, partForFitting, getPartById, getConnector, poolLinerFor, reinforcementPart } from "./catalog.js";
 import { computeBuildPlan, connectorLabelInfo } from "./buildplan.js";
 import { infeasibleConnectors, inferConnectorType } from "./bom.js";
@@ -8,17 +8,12 @@ import { t } from "./i18n.js";
 import { round2, panelNormal, modelMiddle, xAxisOf, yAxisOf, zAxisOf } from "./util.js";
 import { TUBE_FITTINGS, POOL_KINDS, isHolePart, holeArmDirs, holeClampDirsAt, HOLE_MASKS,
   BOLT_PART, HINGE_PART, isBoltPart, boltArmDirs, boltDepth, hingeDir, hingeKey, splitHingeKey,
-  POOL_SETS } from "./model.js";
+  POOL_SETS, ARM_FITTINGS, armFittingDirsAt } from "./model.js";
 
 // Kupplungen, die auf einem Rohr sitzen statt im Raster: QDF-Art -> Katalogteil.
 // Teile, die sich um ein Rohr klemmen lassen. Die Lochzapfenkupplung gehört
 // NICHT dazu -- sie umschließt kein Rohr (siehe PLACEABLE_FITTINGS).
 const TUBE_CLAMP_PARTS = { "bearing-clamp": "bearing" };
-
-// Anbauteile, die auf einem Stutzen der Kupplung SITZEN -- dort ist dann kein
-// Platz mehr fuer ein Rohr. Dieselbe Liste fuehren scene.js (sie zeichnet den
-// Stutzen) und bom.js (sie zaehlt ihn als Arm).
-const ARM_FITTINGS = new Set(["adapter2", "bearing2", "steering-lock2", "open-connector2"]);
 
 // So lange wartet der Seitenwechsel einer Platte auf einen zweiten Klick. Der
 // Doppelklick dreht sie stattdessen; 250 ms ist der uebliche Abstand, den
@@ -976,6 +971,13 @@ export class Builder {
   // richtung); nur reine Doppelrohr-Links zaehlen nicht. Dann ist dort kein Platz
   // fuer eine weitere Winkelkupplung/Huelse.
   _armOccupied(node, axis) {
+    // Ein Anbauteil im Stutzen belegt ihn genauso wie ein Rohr -- die
+    // Multirad-Arretierung schliesst ihn sogar ab. Ohne diese Pruefung bot der
+    // Winkelkupplungs-Modus dort weiter einen Ankerpunkt an, waehrend der
+    // Bau-Modus daneben schon keinen mehr zeigte (_occupiedDirs).
+    for (const d of armFittingDirsAt(this.model, node)) {
+      if (d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2] > 0.9) return true;
+    }
     for (const t of this.model.tubes.values()) {
       if (t.link) continue;
       let nb = null;
@@ -1142,7 +1144,7 @@ export class Builder {
     if (this.mode !== "add") return;
 
     const cs = geometry().connectorSize;
-    const gap = cs / 2 + 4;
+    const gap = anchorGap(cs);
 
     if (this.model.isEmpty()) {
       this.scene.addHandle([0, 0, 0], { origin: true }, "origin");
@@ -1280,11 +1282,14 @@ export class Builder {
       if (c45Dir && this._armOccupied(node, d.vec)) continue;
       if (this._targetBelowGround(node, d.vec)) continue;
       const isCardDir = Math.max(Math.abs(d.vec[0]), Math.abs(d.vec[1]), Math.abs(d.vec[2])) > DIR_ALIGN_TOL;
-      const hg = ((useDiag || c45Dir) && !isCardDir) ? gap * 1.6 : gap;
+      // Alle Punkte stehen gleich weit drausssen -- auch die schraegen. Sie
+      // saessen sonst deutlich weiter aussen als ihre kardinalen Nachbarn,
+      // obwohl sie dasselbe meinen. Erkennbar bleiben sie an ihrer Form
+      // ("diag"), nicht an ihrem Abstand.
       const pos = [
-        node.x + d.vec[0] * hg,
-        node.y + d.vec[1] * hg,
-        node.z + d.vec[2] * hg,
+        node.x + d.vec[0] * gap,
+        node.y + d.vec[1] * gap,
+        node.z + d.vec[2] * gap,
       ];
       this.scene.addHandle(
         pos, { nodeId: node.id, dir: d.vec, dirName: d.name, slope: isSlope || !!c45Dir },
@@ -1376,11 +1381,7 @@ export class Builder {
     // mehr dazu. Andere Teile auf demselben Zapfen bleiben moeglich, die laufen
     // ueber die Anbauteil-Ankerpunkte.
     const durchKlemme = holeClampDirsAt(this.model, node, geometry().connectorSize);
-    for (const f of this.model.fittings.values()) {
-      if (!ARM_FITTINGS.has(f.kind) || !f.quat) continue;
-      if (Math.hypot(f.x - node.x, f.y - node.y, f.z - node.z) > 2) continue;
-      durchKlemme.push(xAxisOf(f.quat));
-    }
+    durchKlemme.push(...armFittingDirsAt(this.model, node, ARM_FITTINGS));
     // Rotierte Kupplung (armDirs aus QDF-Import): Belegung gegen gespeicherte
     // Arm-Richtungen pruefen (nicht gegen DIRECTIONS/DIAGONAL_DIRECTIONS).
     const eigene = node.c45body ? null : this._armDirsOf(node);
@@ -1453,7 +1454,7 @@ export class Builder {
     //
     // Wie im Bau-Modus zeigt eine GEWAEHLTE Kupplung nur noch ihre eigenen
     // Punkte (Klick auf die Kupplung, siehe _clickC45).
-    const gap = geometry().connectorSize / 2 + 4;
+    const gap = anchorGap(geometry().connectorSize);
     const nodes = this.selectedNodeId
       ? [this.model.nodes.get(this.selectedNodeId)].filter(Boolean)
       : [...this.model.nodes.values()];
@@ -1656,7 +1657,7 @@ export class Builder {
       for (const m of this.model.holeArmMounts(geometry().connectorSize)) {
         this._fittingMountNodes.add(m.nodeId);
         if (sel0 && m.nodeId !== sel0) continue;
-        this.scene.addHandle(m.pos, { holeArm: m }, "dir");
+        this.scene.addHandle(m.handle || m.pos, { holeArm: m }, "dir");
       }
       return;
     }
@@ -1696,7 +1697,7 @@ export class Builder {
       }
       return true;
     };
-    for (const m of this.model.fittingMounts(this.fittingKind)) {
+    for (const m of this.model.fittingMounts(this.fittingKind, geometry().connectorSize)) {
       if (m.nodeId) this._fittingMountNodes.add(m.nodeId);
       if (sel && m.nodeId !== sel) continue;
       if (!frei(m)) continue;
@@ -1723,7 +1724,7 @@ export class Builder {
       if (this.fittingKind === "bearing-clamp") {
         const cs = geometry().connectorSize;
         for (const m of this.model.bearingArmMounts(cs)) {
-          this.scene.addHandle(m.pos, { bearingArm: m }, "dir");
+          this.scene.addHandle(m.handle || m.pos, { bearingArm: m }, "dir");
         }
       }
     }

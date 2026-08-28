@@ -59,6 +59,21 @@ export const C45_ARM_LEN = 3.61;
 // Doppelrohrverbinder noch mit seinem Nachbarn verlinkt wird (builder.js).
 export const CLAMP_LINK_DIST = 7;
 
+/**
+ * Abstand der gruenen Ankerpunkte vom MITTELPUNKT der Kupplung, in cm.
+ *
+ * Alle Punkte an einer Kupplung meinen dasselbe: "hier ist ein Stutzen frei".
+ * Ob daran ein Rohr, eine Winkelkupplung, ein Anbauteil oder eine
+ * Lochzapfenkupplung haengt, aendert nichts an der Stelle -- sie stehen deshalb
+ * ueberall gleich weit draussen, in jede Richtung. Halbe Kupplung plus Luft:
+ * damit liegt der Punkt knapp vor dem Wuerfel und ist frei anklickbar.
+ *
+ * NICHT gemeint sind Punkte mit eigener Bedeutung: das freie Loch einer
+ * Rohrklammer oder eines Lagermauls liegt genau dort, wo das Rohr durchlaeuft,
+ * und ein Punkt zum ERSETZEN der Kupplung gehoert auf sie selbst.
+ */
+export const anchorGap = (connectorSize = 5) => connectorSize / 2 + 4;
+
 // Schluessel fuer den automatischen Zwischenspeicher.
 export const AUTOSAVE_KEY = "quadro.autosave.v1";
 
