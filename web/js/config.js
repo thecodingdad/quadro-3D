@@ -6,7 +6,7 @@
 // auseinander und der Release-Workflow bricht ab.
 // Nicht zu verwechseln mit FORMAT_VERSION weiter unten: das ist das
 // Speicherformat der Modelle und zaehlt fuer sich.
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.1.1";
 
 // Die 6 Achsen-Richtungen eines Wuerfel-Knotens (Three.js: y = oben).
 export const DIRECTIONS = [

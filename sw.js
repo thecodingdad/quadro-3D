@@ -12,7 +12,7 @@
 // Aktivieren den alten Vorrat weg (siehe `activate` unten). Bliebe er stehen,
 // liefe eine installierte App nach einem Release mit ihren alten ES-Modulen
 // weiter. Gepflegt wird die Zeile von `tools/bump-version.py`.
-const CACHE = "quadro-v1.1.0";
+const CACHE = "quadro-v1.1.1";
 
 // Alles, was die App zum Starten braucht. Pfade relativ zu dieser Datei, damit
 // es auch unter GitHub Pages in einem Unterordner passt.
