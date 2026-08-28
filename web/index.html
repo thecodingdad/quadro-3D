@@ -172,18 +172,15 @@
               <div class="menu-section" id="install-section" hidden>
                 <span class="menu-label" data-i18n="settings_install">App</span>
                 <button id="btn-install" class="btn full" data-i18n="btn_install">Installieren</button>
-                <span class="hint" data-i18n="settings_install_hint">Als eigenes Fenster einrichten, auch offline nutzbar.</span>
               </div>
               <!-- Rundgang durch die Oberfläche; beim ersten Start läuft er von
                    selbst, danach nur noch über diesen Knopf. -->
               <div class="menu-section">
                 <span class="menu-label" data-i18n="settings_tour">Einführung</span>
                 <button id="btn-tour" class="btn full" data-i18n="btn_tour">Demo starten</button>
-                <span class="hint" data-i18n="tour_hint">Zeigt Schritt für Schritt, wo was liegt.</span>
               </div>
               <!-- Fassung der App; die Nummer traegt ui.js aus config.js ein -->
               <div class="menu-section">
-                <span class="menu-label" data-i18n="settings_version">Version</span>
                 <span class="hint" id="app-version"></span>
               </div>
             </div>
@@ -537,6 +534,14 @@
     <div id="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-title">
       <h3 id="tour-title"></h3>
       <p id="tour-text"></p>
+      <!-- Sprachwahl: nur im ersten Schritt zu sehen (siehe tour.js) -->
+      <div id="tour-lang-row" hidden>
+        <label for="tour-lang" data-i18n="settings_language">Sprache</label>
+        <select id="tour-lang" class="lang-select" title="Sprache / Language">
+          <option value="de">&#x1F1E9;&#x1F1EA; DE</option>
+          <option value="en">&#x1F1EC;&#x1F1E7; EN</option>
+        </select>
+      </div>
       <div class="tour-foot">
         <span id="tour-step" class="hint"></span>
         <button id="tour-skip" class="btn ghost" data-i18n="tour_skip">Überspringen</button>

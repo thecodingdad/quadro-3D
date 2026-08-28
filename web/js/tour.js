@@ -9,7 +9,7 @@
 // der Oberflaeche bewegen muss (Menue auf, Panel zeigen, Modus setzen), laeuft
 // ueber die kleine Schnittstelle `ui.tour` (siehe ui.js).
 
-import { t } from "./i18n.js";
+import { t, getLang } from "./i18n.js";
 import { APP_VERSION } from "./config.js";
 import { BuildModel } from "./model.js";
 import { getTube, spacingFor, defaultPanel } from "./catalog.js";
@@ -112,18 +112,26 @@ function demoModell() {
 // Huelle nimmt, was gerade sichtbar ist. Ist nichts davon zu sehen, faellt der
 // Schritt aus.
 
+/**
+ * Ueberlagernde Seitenleiste zumachen. Auf schmalen Schirmen liegt sie ueber
+ * der halben Szene -- und damit ueber der Aufbau-Karte, die von unten kommt.
+ */
+function schliesseUeberlagerung(ctx) {
+  if (document.body.classList.contains("sidebar-overlay")) ctx.ui.tour.showPanel(null);
+}
+
 const STEPS = [
   {
     key: "welcome",
+    // Hier steht die Sprachwahl in der Karte: wer die Demo in der falschen
+    // Sprache startet, soll nicht erst durch alle Schritte bis zu den
+    // Einstellungen (der Schleier laesst daneben keinen Klick durch).
+    sprache: true,
     before: (ctx) => ctx.ui.tour.openDemo(demoModell(), t("tour_demo_name")),
   },
   {
     key: "file",
     targets: () => [$("file-actions"), $("menu-file-rows")],
-  },
-  {
-    key: "modes",
-    targets: () => [$("mode-add").parentNode],
   },
   {
     // Zurueck und Wieder stehen IMMER in der Kopfzeile, das automatische
@@ -180,8 +188,34 @@ const STEPS = [
     targets: () => [$("sidebar")],
   },
   {
+    // Beide Betriebsarten auf einmal: das Knopfpaar Bauen/Aufbau. Bei enger
+    // Kopfzeile steht es im Hauptmenue -- das klappt die Demo dafuer auf, und
+    // genau deshalb ist das Erklaeren des Aufbau-Bereichs ein EIGENER Schritt:
+    // das offene Menue laege sonst ueber der Karte, die unten hereinkommt.
     key: "assembly",
-    targets: () => [$("mode-assembly")],
+    before: (ctx) => { ctx.ui.tour.setMode("assembly"); schliesseUeberlagerung(ctx); },
+    // Beim Zurueckgehen faellt der Aufbau-Modus wieder weg -- der Schritt davor
+    // erklaert die Seitenleiste, und die gehoert dann wieder ihr selbst.
+    after: (ctx) => ctx.ui.tour.setMode("add"),
+    targets: () => [$("mode-add").parentNode],
+  },
+  {
+    // ... dann, was der Moduswechsel gebracht hat: im breiten Fenster der
+    // Aufbau-Bereich der Seitenleiste, im schmalen die Karte ueber der Szene.
+    // Beides gibt es erst im Aufbau-Modus, deshalb `immer`.
+    key: "assembly_panel",
+    immer: true,
+    variante: () => document.body.classList.contains("asm-sheet-on")
+      ? "assembly_sheet" : "assembly_panel",
+    before: (ctx) => {
+      ctx.ui.tour.setMode("assembly");
+      schliesseUeberlagerung(ctx);
+      ctx.ui.tour.openAsmSheet(true);
+    },
+    // Danach zurueck ins Bauen -- sonst laege die Karte im naechsten Schritt
+    // ueber den Einstellungen.
+    after: (ctx) => ctx.ui.tour.setMode("add"),
+    targets: () => [$("asm-sheet"), $("panel-assembly")],
   },
   {
     key: "settings",
@@ -214,7 +248,13 @@ function menueFuer(ctx, ziele) {
 /** Loch auf das Areal setzen. Ohne Areal bleibt der Schleier ungelocht. */
 function setzeLoch(rect) {
   const loch = $("tour-hole");
-  if (!rect) { loch.classList.add("no-hole"); return; }
+  if (!rect) {
+    // Die Masse von vorhin stehen INLINE am Knoten und schlagen die Regel zu
+    // `.no-hole` -- ohne Loeschen bliebe das Areal des Nachbarschritts hell.
+    loch.style.left = loch.style.top = loch.style.width = loch.style.height = "";
+    loch.classList.add("no-hole");
+    return;
+  }
   loch.classList.remove("no-hole");
   loch.style.left = `${Math.round(rect.left - LUFT)}px`;
   loch.style.top = `${Math.round(rect.top - LUFT)}px`;
@@ -289,9 +329,17 @@ function schrittText(key, art) {
 function zeichne() {
   const schritt = STEPS[lauf.index];
   const nr = lauf.sichtbare.indexOf(lauf.index) + 1;
-  $("tour-title").textContent = schrittText(schritt.key, "title");
-  $("tour-text").textContent = schrittText(schritt.key, "text");
+  // `variante` erlaubt einem Schritt, den Text nach der Lage zu waehlen -- der
+  // Aufbau steht mal in der Seitenleiste, mal als Karte ueber der Szene.
+  const key = schritt.variante ? schritt.variante() : schritt.key;
+  $("tour-title").textContent = schrittText(key, "title");
+  $("tour-text").textContent = schrittText(key, "text");
   $("tour-step").textContent = t("tour_step", nr, lauf.sichtbare.length);
+  const sprachZeile = $("tour-lang-row");
+  if (sprachZeile) {
+    sprachZeile.hidden = !schritt.sprache;
+    if (schritt.sprache) $("tour-lang").value = getLang();
+  }
   $("tour-back").hidden = nr <= 1;
   $("tour-next").textContent = nr >= lauf.sichtbare.length ? t("tour_done") : t("tour_next");
   messeNach();
@@ -342,8 +390,13 @@ function zurueck() {
   gehe(lauf.sichtbare[pos - 1]);
 }
 
-/** Demo beenden: Zustand zurueckgeben, Demo-Tab schliessen, Merker setzen. */
-function beende() {
+/**
+ * Demo beenden und Merker setzen. `abgebrochen` trennt die beiden Wege:
+ * Uebersprungen wird der Demo-Tab weggeraeumt, durchlaufen bleibt er offen --
+ * dann ist das Beispielmodell zum Weiterspielen da (und aus der Vorschau wird
+ * ein gewoehnlicher Tab). Gearbeitet wird danach immer im Bauen-Modus.
+ */
+function beende(abgebrochen = false) {
   if (!lauf) return;
   const { ctx, vorher, abmelden } = lauf;
   const schritt = STEPS[lauf.index];
@@ -354,8 +407,12 @@ function beende() {
   $("tour").hidden = true;
   ctx.ui.tour.openSettings(false);
   ctx.ui.tour.openMenu(false);
-  ctx.ui.tour.closeDemo();
-  ctx.ui.tour.restore(vorher);
+  if (abgebrochen) ctx.ui.tour.closeDemo();
+  else ctx.ui.tour.keepDemo();
+  // Das Aufbau-Panel gehoert zum Aufbau-Modus -- mit dem Bauen-Modus waere es
+  // eine leere Leiste, also lieber der Stand von vorher (oder zu).
+  const panel = vorher && vorher.panel !== "assembly" ? vorher.panel : null;
+  ctx.ui.tour.restore({ mode: "add", panel });
   merkeGesehen();
 }
 
@@ -374,7 +431,19 @@ function verdrahteKnoepfe() {
   knoepfeVerdrahtet = true;
   $("tour-next").addEventListener("click", weiter);
   $("tour-back").addEventListener("click", zurueck);
-  $("tour-skip").addEventListener("click", beende);
+  $("tour-skip").addEventListener("click", () => beende(true));
+  // Sprachwahl im ersten Schritt: umgeschaltet wird ueber das Auswahlfeld der
+  // Einstellungen -- an dessen Zuhoerer in ui.js haengt alles, was der Wechsel
+  // sonst noch nachziehen muss (Texte, Knopfbeschriftungen, Demo-Karte).
+  const sprache = $("tour-lang");
+  if (sprache) {
+    sprache.addEventListener("change", () => {
+      const haupt = $("btn-lang");
+      if (!haupt) return;
+      haupt.value = sprache.value;
+      haupt.dispatchEvent(new Event("change"));
+    });
+  }
   // Der Klick darf NICHT bis zum Dokument durchlaufen: dort schliessen die
   // Zuhoerer in `ui.js` jedes offene Menue ("Klick daneben"). Ein Schritt, der
   // gerade Hauptmenue und Einstellungen aufgeklappt hat, staende danach vor
@@ -395,7 +464,7 @@ export function startTour(ctx) {
     if (!lauf) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (e.key === "Escape") beende();
+    if (e.key === "Escape") beende(true);   // Escape ist Abbruch, kein Durchlauf
     else if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight") weiter();
     else if (e.key === "ArrowLeft") zurueck();
   };
@@ -459,7 +528,7 @@ export function startTour(ctx) {
           karte: $("tour-card").getBoundingClientRect(),
         };
       },
-      next: weiter, back: zurueck, end: beende,
+      next: weiter, back: zurueck, end: (abbruch = true) => beende(abbruch),
     };
   }
 }

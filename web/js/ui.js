@@ -335,14 +335,22 @@ export function initUI({ scene, model, builder }) {
     } else {
       pop.style.bottom = "auto";
       pop.style.top = (rect.bottom + 5) + "px";
+      // Deckel auf den Platz bis zum unteren Rand: ein langes Menue liefe sonst
+      // aus dem Bild, und die Seite selbst scrollt nicht.
+      pop.style.maxHeight = Math.max(140, window.innerHeight - rect.bottom - 13) + "px";
     }
     requestAnimationFrame(() => {
       const maxLeft = window.innerWidth - pop.offsetWidth - 8;
       if (parseFloat(pop.style.left) > maxLeft) pop.style.left = Math.max(8, maxLeft) + "px";
       // Am oberen Rand angeschlagen? Dann doch nach oben klappen.
       if (!nachOben && rect.bottom + 5 + pop.offsetHeight > window.innerHeight - 8) {
-        pop.style.top = "auto";
-        pop.style.bottom = (window.innerHeight - rect.top + 5) + "px";
+        // Nur umklappen, wenn oben mehr Platz ist -- sonst bleibt es unten und
+        // scrollt (der Deckel steht schon).
+        if (rect.top > window.innerHeight - rect.bottom) {
+          pop.style.top = "auto";
+          pop.style.bottom = (window.innerHeight - rect.top + 5) + "px";
+          pop.style.maxHeight = Math.max(140, rect.top - 13) + "px";
+        }
       }
     });
   }
@@ -643,6 +651,23 @@ export function initUI({ scene, model, builder }) {
     const show = open == null ? pop.hidden : open;
     pop.hidden = !show;
     $("btn-settings").classList.toggle("active", show);
+    // Fixiert unter dem Knopf statt absolut im Fluss: bei enger Kopfzeile steht
+    // der Knopf IM Hauptmenue, und das scrollt -- ein absolut gesetztes Popup
+    // schnitte dessen Rahmen ab. Nebenbei kommt so der Hoehendeckel.
+    if (show) placePopupUnder(pop, $("btn-settings"));
+    markiereMenue();
+  }
+
+  /**
+   * Merker "ein Menü ist offen" am <body>. Daran hängt die Stapelhöhe der
+   * Kopfzeile: nur so liegt ein Menü über der Aufbau-Karte, die im Hochformat
+   * bis über die untere Leiste reicht.
+   */
+  function markiereMenue() {
+    const drawer = $("toolbar-right-inner");
+    const offen = (drawer && drawer.classList.contains("open"))
+      || !$("settings-pop").hidden;
+    document.body.classList.toggle("menu-open", offen);
   }
 
   if (qualitySelect) {
@@ -659,9 +684,8 @@ export function initUI({ scene, model, builder }) {
     });
   }
 
-  // Fassung der App. Nur die Nummer steht hier -- die Beschriftung daneben
-  // haengt an `data-i18n` und wird vom Sprachwechsel selbst erwischt.
-  if ($("app-version")) $("app-version").textContent = APP_VERSION;
+  // Fassung der App -- nur die Nummer, rechtsbuendig unten im Menue.
+  if ($("app-version")) $("app-version").textContent = `v${APP_VERSION}`;
 
   // Onboarding-Demo: beim ersten Start laeuft sie von selbst (main.js), hier
   // laesst sie sich erneut starten. Das Menue hat dann seinen Zweck erfuellt --
@@ -702,6 +726,21 @@ export function initUI({ scene, model, builder }) {
     const show = open == null ? !hamburgerInner.classList.contains("open") : open;
     hamburgerInner.classList.toggle("open", show);
     hamburgerBtn.classList.toggle("active", show);
+    if (show) deckleMenue(hamburgerInner);
+    markiereMenue();
+  }
+
+  /**
+   * Menü-Schublade auf den Platz bis zum unteren Fensterrand deckeln. Sie hängt
+   * unter der Kopfzeile; wie viel darunter bleibt, weiß erst das Fenster. Ohne
+   * Deckel stünden die letzten Einträge außerhalb des Bildes -- unerreichbar,
+   * weil die Seite selbst nicht scrollt.
+   */
+  function deckleMenue(el) {
+    if (!el) return;
+    el.style.maxHeight = "";
+    const oben = el.getBoundingClientRect().top;
+    el.style.maxHeight = `${Math.max(140, window.innerHeight - oben - 12)}px`;
   }
   if (hamburgerBtn) {
     hamburgerBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleHamburger(); });
@@ -717,6 +756,14 @@ export function initUI({ scene, model, builder }) {
         toggleHamburger(false);
     });
   }
+
+  // Wird das Fenster kleiner gezogen (oder dreht sich das Telefon), gilt für ein
+  // offenes Menü ein neuer Deckel -- sonst stünde es wieder über dem Rand.
+  window.addEventListener("resize", () => {
+    if (hamburgerInner && hamburgerInner.classList.contains("open")) deckleMenue(hamburgerInner);
+    const pop = $("settings-pop");
+    if (pop && !pop.hidden) placePopupUnder(pop, $("btn-settings"));
+  });
 
 
   // --- Modus -------------------------------------------------------------
@@ -4724,6 +4771,19 @@ export function initUI({ scene, model, builder }) {
         demoTabId = null;
         closeTab(id).catch((e) => console.warn("Demo-Tab:", e));
       },
+      /**
+       * Demo-Tab behalten (Demo ganz durchlaufen): aus der Vorschau wird ein
+       * gewöhnlicher Tab -- sonst würfe ihn der nächste Vorschau-Klick wortlos
+       * weg, obwohl darin schon gebaut wurde.
+       */
+      keepDemo() {
+        if (!demoTabId) return;
+        const tab = tabs.find((x) => x.tabId === demoTabId);
+        demoTabId = null;
+        pinTab(tab);
+      },
+      /** Aufbau-Karte über der Szene auf- oder zuklappen (nur schmale Fenster). */
+      openAsmSheet(on) { if (!$("asm-sheet").hidden) setSheetOpen(!!on); },
       openSettings(on) { toggleSettingsMenu(!!on); },
       openMenu(on) { toggleHamburger(!!on); },
       showPanel(name) { showSidebarPanel(name); },
